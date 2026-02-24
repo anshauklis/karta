@@ -50,12 +50,12 @@ export function useUpdateDashboard() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: DashboardUpdateData }) =>
+    mutationFn: ({ id, data }: { id: number; data: DashboardUpdateData; silent?: boolean }) =>
       api.put<Dashboard>(`/api/dashboards/${id}`, data, token),
-    onSuccess: () => {
+    onSuccess: (_, { silent }) => {
       queryClient.invalidateQueries({ queryKey: ["dashboards"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success("Dashboard updated");
+      if (!silent) toast.success("Dashboard updated");
     },
   });
 }

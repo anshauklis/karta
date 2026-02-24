@@ -781,6 +781,7 @@ export function FilterGrid({
       updateDashboard.mutate({
         id: dashboard.id,
         data: { filter_layout: { ...dashboard.filter_layout, collapsed, items } },
+        silent: true,
       });
       return next;
     });
@@ -937,6 +938,7 @@ export function FilterGrid({
       updateDashboard.mutate({
         id: dashboard.id,
         data: { filter_layout: { items } },
+        silent: true,
       });
     }
   }, [filters, layout, dashboard.id, updateDashboard]);
@@ -954,6 +956,7 @@ export function FilterGrid({
       updateDashboard.mutate({
         id: dashboard.id,
         data: { filter_layout: { ...dashboard.filter_layout, items } },
+        silent: true,
       });
     },
     [dashboard.id, dashboard.filter_layout, updateDashboard]
