@@ -1,0 +1,41 @@
+Karta
+Copyright 2026 Karta Contributors
+
+This product is licensed under the Apache License, Version 2.0
+(the "License"); you may not use this product except in compliance
+with the License. You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+This product includes software developed by third parties. See below
+for attribution notices required by their respective licenses.
+
+------------------------------------------------------------------------
+
+This product includes software from the following projects:
+
+- FastAPI (MIT) — https://github.com/tiangolo/fastapi
+- Next.js (MIT) — https://github.com/vercel/next.js
+- React (MIT) — https://github.com/facebook/react
+- Plotly.js (MIT) — https://github.com/plotly/plotly.js
+- SQLAlchemy (MIT) — https://github.com/sqlalchemy/sqlalchemy
+- Tailwind CSS (MIT) — https://github.com/tailwindlabs/tailwindcss
+- shadcn/ui (MIT) — https://github.com/shadcn-ui/ui
+- Radix UI (MIT) — https://github.com/radix-ui/primitives
+- Tanstack React Query (MIT) — https://github.com/TanStack/query
+- Monaco Editor (MIT) — https://github.com/microsoft/monaco-editor
+- react-grid-layout (MIT) — https://github.com/react-grid-layout/react-grid-layout
+- cmdk (MIT) — https://github.com/pacocoursey/cmdk
+- next-themes (MIT) — https://github.com/pacocoursey/next-themes
+- exceljs (MIT) — https://github.com/exceljs/exceljs
+- jsPDF (MIT) — https://github.com/parallax/jsPDF
+- html2canvas-pro (MIT) — https://github.com/nicolo-ribaudo/html2canvas-pro
+- Lucide Icons (ISC) — https://github.com/lucide-icons/lucide
+- NextAuth.js (ISC) — https://github.com/nextauthjs/next-auth
+- pandas (BSD-3-Clause) — https://github.com/pandas-dev/pandas
+- NumPy (BSD-3-Clause) — https://github.com/numpy/numpy
+- SciPy (BSD-3-Clause) — https://github.com/scipy/scipy
+- uvicorn (BSD-3-Clause) — https://github.com/encode/uvicorn
+- DOMPurify (Apache-2.0) — https://github.com/cure53/DOMPurify
+- psycopg2 (LGPL-3.0) — https://github.com/psycopg/psycopg2
+- pymssql (LGPL-2.1) — https://github.com/pymssql/pymssql

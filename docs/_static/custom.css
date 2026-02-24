@@ -1,0 +1,14 @@
+/* Wider content area */
+.content {
+    max-width: 900px;
+}
+
+/* Better table styling */
+table.docutils {
+    width: 100%;
+}
+
+table.docutils td,
+table.docutils th {
+    padding: 8px 12px;
+}
