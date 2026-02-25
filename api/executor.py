@@ -468,7 +468,20 @@ def _eval_subtotal_formula(formula: str, group_df: pd.DataFrame) -> float:
 
 def _compute_subtotal_value(metric: str, group_df: pd.DataFrame, subtotal_funcs: dict) -> float:
     """Compute a single subtotal value for a metric using the configured function or formula."""
-    func = subtotal_funcs.get(metric, "sum")
+    import re as _re
+    # Look up func: try exact metric name first, then strip __N suffix for duplicates
+    func = subtotal_funcs.get(metric)
+    base_metric = metric
+    if func is None:
+        m = _re.match(r'^(.+)__\d+$', metric)
+        if m:
+            base_metric = m.group(1)
+            func = subtotal_funcs.get(base_metric, "sum")
+        else:
+            func = "sum"
+    # For aggregate expression columns (temp cols like _ptmp*), can't compute subtotal
+    if metric.startswith("_ptmp"):
+        return 0.0
     SIMPLE_FUNCS = {
         "sum": lambda s: float(s.sum()),
         "avg": lambda s: float(s.mean()),
@@ -477,8 +490,10 @@ def _compute_subtotal_value(metric: str, group_df: pd.DataFrame, subtotal_funcs:
         "max": lambda s: float(s.max()),
     }
     if func in SIMPLE_FUNCS:
-        if metric in group_df.columns:
-            return SIMPLE_FUNCS[func](group_df[metric])
+        # For duplicate columns (col__N), the source data column is the base name
+        col_name = metric if metric in group_df.columns else base_metric
+        if col_name in group_df.columns:
+            return SIMPLE_FUNCS[func](group_df[col_name])
         return 0.0
     # Formula string (contains parentheses)
     if "(" in func:
@@ -487,8 +502,9 @@ def _compute_subtotal_value(metric: str, group_df: pd.DataFrame, subtotal_funcs:
         except (ValueError, SyntaxError):
             return float("nan")
     # Unknown func name — fallback to sum
-    if metric in group_df.columns:
-        return float(group_df[metric].sum())
+    col_name = metric if metric in group_df.columns else base_metric
+    if col_name in group_df.columns:
+        return float(group_df[col_name].sum())
     return 0.0
 
 
@@ -568,6 +584,9 @@ def build_pivot_table(config: dict, df: pd.DataFrame) -> dict:
 
     # Per-column aggfunc: {"revenue": "sum", "rating": "avg"}
     aggfuncs = config.get("pivot_aggfuncs", {})
+    # Defensive: ensure all aggfunc values are strings (corrupted configs may have dicts)
+    if aggfuncs and isinstance(aggfuncs, dict):
+        aggfuncs = {k: v if isinstance(v, str) else "sum" for k, v in aggfuncs.items()}
     aggfunc_map = {
         "sum": "sum", "avg": "mean", "count": "count", "min": "min", "max": "max",
         "median": "median", "count_distinct": "nunique", "std": "std", "var": "var",
@@ -781,7 +800,8 @@ def build_pivot_table(config: dict, df: pd.DataFrame) -> dict:
         else:
             val_name = str(nc)
         matched_val = None
-        for pv in pivot_value_cols:
+        # Match longest prefix first to avoid "revenue" matching before "revenue__2"
+        for pv in sorted(pivot_value_cols, key=len, reverse=True):
             if val_name == pv or val_name.startswith(pv):
                 matched_val = pv
                 break

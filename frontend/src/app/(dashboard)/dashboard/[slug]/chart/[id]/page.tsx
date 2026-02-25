@@ -276,7 +276,14 @@ export default function ChartEditorPage({
         if (current.includes(col)) {
           let suffix = 2;
           while (current.includes(`${col}__${suffix}`)) suffix++;
-          updateConfig(targetZone, [...current, `${col}__${suffix}`]);
+          const dupId = `${col}__${suffix}`;
+          updateConfig(targetZone, [...current, dupId]);
+          // Copy aggfunc from base column to duplicate
+          const fns = { ...((chartConfig.pivot_aggfuncs as Record<string, unknown>) || {}) };
+          if (col in fns) {
+            fns[dupId] = fns[col];
+            updateConfig("pivot_aggfuncs", fns);
+          }
         } else {
           updateConfig(targetZone, [...current, col]);
         }

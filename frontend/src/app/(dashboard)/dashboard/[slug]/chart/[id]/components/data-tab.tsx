@@ -121,9 +121,25 @@ export function DataTab({
   const movePivotField = (item: string, fromKey: string, toKey: string) => {
     setChartConfig((prev: Record<string, unknown>) => {
       const fromArr = ((prev[fromKey] as string[]) || []).filter((c) => c !== item);
+      // For duplicates (col__N) moving out of values, use base column name in target
+      const dupMatch = item.match(/^(.+)__(\d+)$/);
+      const targetItem = (fromKey === "pivot_values" && toKey !== "pivot_values" && dupMatch)
+        ? dupMatch[1]
+        : item;
       const toArr = (prev[toKey] as string[]) || [];
-      if (toArr.includes(item)) return { ...prev, [fromKey]: fromArr };
-      return { ...prev, [fromKey]: fromArr, [toKey]: [...toArr, item] };
+      const alreadyInTarget = toArr.includes(targetItem);
+      const next: Record<string, unknown> = alreadyInTarget
+        ? { ...prev, [fromKey]: fromArr }
+        : { ...prev, [fromKey]: fromArr, [toKey]: [...toArr, targetItem] };
+      // Clean up aggfuncs/custom SQL when leaving values
+      if (fromKey === "pivot_values") {
+        const fns = { ...((prev.pivot_aggfuncs as Record<string, unknown>) || {}) };
+        delete fns[item];
+        next.pivot_aggfuncs = fns;
+        const csql = { ...((prev.pivot_custom_sql as Record<string, string>) || {}) };
+        if (item in csql) { delete csql[item]; next.pivot_custom_sql = Object.keys(csql).length ? csql : null; }
+      }
+      return next;
     });
   };
 
