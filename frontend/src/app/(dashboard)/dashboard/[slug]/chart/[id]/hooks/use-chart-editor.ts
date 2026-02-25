@@ -343,15 +343,21 @@ export function useChartEditor(slug: string, id: string) {
         chart_config: chartConfig,
         ...(isCodeMode ? { chart_code: chartCode } : {}),
       });
-      setResult(res);
+      setResult((prev) => {
+        // Preserve previous columns when response has error and returns no columns
+        if (res.error && (!res.columns || res.columns.length === 0) && prev?.columns?.length) {
+          return { ...res, columns: prev.columns };
+        }
+        return res;
+      });
     } catch (e: any) {
-      setResult({
+      setResult((prev) => ({
         figure: null,
-        columns: [],
+        columns: prev?.columns || [],
         rows: [],
         row_count: 0,
         error: e.message,
-      });
+      }));
     } finally {
       setPreviewing(false);
       if (execStartRef.current) setExecTime(Date.now() - execStartRef.current);
@@ -498,7 +504,13 @@ export function useChartEditor(slug: string, id: string) {
       if (res.columns) setQueryColumns(res.columns);
       setResult(res);
     } catch (e: any) {
-      setResult({ figure: null, columns: [], rows: [], row_count: 0, error: e.message });
+      setResult((prev) => ({
+        figure: null,
+        columns: prev?.columns || [],
+        rows: [],
+        row_count: 0,
+        error: e.message,
+      }));
     } finally {
       setPreviewing(false);
     }

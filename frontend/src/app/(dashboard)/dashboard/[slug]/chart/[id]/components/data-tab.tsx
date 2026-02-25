@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +15,7 @@ import {
   Trash2,
   ChevronDown,
   ArrowLeftRight,
+  Play,
 } from "lucide-react";
 import { DropZone } from "./drop-zone";
 import { useTranslations } from "next-intl";
@@ -21,6 +23,45 @@ import dynamic from "next/dynamic";
 import type { ChartExecuteResult } from "@/types";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
+
+/** Buffered SQL input — only commits to config on Enter or Apply click */
+function SqlInput({
+  value,
+  onChange,
+  placeholder,
+  className,
+  mono = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  className?: string;
+  mono?: boolean;
+}) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => { setLocal(value); }, [value]);
+  const dirty = local !== value;
+  return (
+    <div className="flex gap-1 items-center">
+      <Input
+        className={`${className || "h-7 text-[11px] bg-card"} ${mono ? "font-mono" : ""} flex-1`}
+        placeholder={placeholder}
+        value={local}
+        onChange={(e) => setLocal(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") onChange(local); }}
+      />
+      {dirty && (
+        <button
+          onClick={() => onChange(local)}
+          className="shrink-0 p-1 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+          title="Apply (Enter)"
+        >
+          <Play className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
+}
 
 export interface DataTabProps {
   dataSource: string;
@@ -477,17 +518,18 @@ export function DataTab({
                             />
                           ) : (
                             <div className="space-y-1.5">
-                              <Input
-                                className="h-7 text-[11px] font-mono bg-card"
+                              <SqlInput
+                                mono
+                                className="h-7 text-[11px] bg-card"
                                 placeholder="DATE_TRUNC('month', created_at)"
                                 value={(chartConfig.x_custom_sql as string) || ""}
-                                onChange={(e) => updateConfig("x_custom_sql", e.target.value)}
+                                onChange={(v) => updateConfig("x_custom_sql", v)}
                               />
-                              <Input
+                              <SqlInput
                                 className="h-7 text-[11px] bg-card"
                                 placeholder="Label"
                                 value={(chartConfig.x_column as string) || ""}
-                                onChange={(e) => updateConfig("x_column", e.target.value)}
+                                onChange={(v) => updateConfig("x_column", v)}
                               />
                             </div>
                           )}
@@ -557,17 +599,18 @@ export function DataTab({
                             />
                           ) : (
                             <div className="space-y-1.5">
-                              <Input
-                                className="h-7 text-[11px] font-mono bg-card"
+                              <SqlInput
+                                mono
+                                className="h-7 text-[11px] bg-card"
                                 placeholder="CASE WHEN amount > 100 THEN 'high' ELSE 'low' END"
                                 value={(chartConfig.color_custom_sql as string) || ""}
-                                onChange={(e) => updateConfig("color_custom_sql", e.target.value)}
+                                onChange={(v) => updateConfig("color_custom_sql", v)}
                               />
-                              <Input
+                              <SqlInput
                                 className="h-7 text-[11px] bg-card"
                                 placeholder="Label"
                                 value={(chartConfig.color_column as string) || ""}
-                                onChange={(e) => updateConfig("color_column", e.target.value)}
+                                onChange={(v) => updateConfig("color_column", v)}
                               />
                             </div>
                           )}
@@ -787,13 +830,14 @@ export function DataTab({
                                 {/* Custom SQL mode: expression + label */}
                                 {exprType === "custom_sql" && (
                                   <div className="space-y-1.5">
-                                    <Input
-                                      className="h-7 text-[11px] font-mono bg-card"
+                                    <SqlInput
+                                      mono
+                                      className="h-7 text-[11px] bg-card"
                                       placeholder="SUM(amount) / COUNT(DISTINCT user_id)"
                                       value={m.sqlExpression || ""}
-                                      onChange={(e) => {
+                                      onChange={(v) => {
                                         const updated = [...metrics];
-                                        updated[idx] = { ...updated[idx], sqlExpression: e.target.value };
+                                        updated[idx] = { ...updated[idx], sqlExpression: v };
                                         updateConfig("metrics", updated);
                                         const labels = updated.map(mm => {
                                           if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
@@ -802,13 +846,13 @@ export function DataTab({
                                         updateConfig("y_columns", labels);
                                       }}
                                     />
-                                    <Input
+                                    <SqlInput
                                       className="h-7 text-[11px] bg-card"
                                       placeholder="Label (required)"
                                       value={m.label || ""}
-                                      onChange={(e) => {
+                                      onChange={(v) => {
                                         const updated = [...metrics];
-                                        updated[idx] = { ...updated[idx], label: e.target.value };
+                                        updated[idx] = { ...updated[idx], label: v };
                                         updateConfig("metrics", updated);
                                         const labels = updated.map(mm => {
                                           if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
@@ -938,13 +982,14 @@ export function DataTab({
 
                                 {/* Custom SQL mode: raw expression */}
                                 {filterExprType === "custom_sql" && (
-                                  <Input
-                                    className="h-7 text-[11px] font-mono bg-card"
+                                  <SqlInput
+                                    mono
+                                    className="h-7 text-[11px] bg-card"
                                     placeholder="revenue / units > 100"
                                     value={f.sqlExpression || ""}
-                                    onChange={(e) => {
+                                    onChange={(v) => {
                                       const updated = [...filters];
-                                      updated[idx] = { ...updated[idx], sqlExpression: e.target.value };
+                                      updated[idx] = { ...updated[idx], sqlExpression: v };
                                       updateConfig("chart_filters", updated);
                                     }}
                                   />

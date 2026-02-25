@@ -1282,16 +1282,16 @@ def _apply_row_limit(df, config: dict):
 
 
 def _has_custom_sql(config: dict) -> bool:
-    """Check if any config element uses custom SQL expressions."""
-    if config.get("x_expression_type") == "custom_sql":
+    """Check if any config element uses custom SQL expressions with non-empty values."""
+    if config.get("x_expression_type") == "custom_sql" and config.get("x_custom_sql", "").strip():
         return True
-    if config.get("color_expression_type") == "custom_sql":
+    if config.get("color_expression_type") == "custom_sql" and config.get("color_custom_sql", "").strip():
         return True
     for m in config.get("metrics", []):
-        if m.get("expressionType") == "custom_sql":
+        if m.get("expressionType") == "custom_sql" and m.get("sqlExpression", "").strip():
             return True
     for f in config.get("chart_filters", []):
-        if f.get("expressionType") == "custom_sql":
+        if f.get("expressionType") == "custom_sql" and f.get("sqlExpression", "").strip():
             return True
     return False
 
@@ -1314,7 +1314,7 @@ def _build_custom_sql_query(base_sql: str, config: dict) -> tuple[str, bool]:
     x_col = config.get("x_column", "")
     if x_expr_type == "custom_sql":
         x_sql = validate_sql_expression(config.get("x_custom_sql", ""))
-        alias = x_col or "x"
+        alias = (x_col or "").strip() or "x"
         select_parts.append(f'{x_sql} AS "{alias}"')
         group_by_parts.append(x_sql)
     elif x_col:
@@ -1326,7 +1326,7 @@ def _build_custom_sql_query(base_sql: str, config: dict) -> tuple[str, bool]:
     color_col = config.get("color_column", "")
     if color_expr_type == "custom_sql":
         color_sql = validate_sql_expression(config.get("color_custom_sql", ""))
-        alias = color_col or "color"
+        alias = (color_col or "").strip() or "color"
         select_parts.append(f'{color_sql} AS "{alias}"')
         group_by_parts.append(color_sql)
     elif color_col and has_metrics:
@@ -1335,10 +1335,13 @@ def _build_custom_sql_query(base_sql: str, config: dict) -> tuple[str, bool]:
 
     # Metrics
     metrics = config.get("metrics", [])
-    for m in metrics:
+    for idx, m in enumerate(metrics):
         if m.get("expressionType") == "custom_sql":
-            expr = validate_sql_expression(m.get("sqlExpression", ""))
-            label = m.get("label", "metric")
+            sql_expr = m.get("sqlExpression", "").strip()
+            if not sql_expr:
+                continue  # skip metrics with empty expressions
+            expr = validate_sql_expression(sql_expr)
+            label = m.get("label", "").strip() or f"metric_{idx}"
             select_parts.append(f'{expr} AS "{label}"')
         else:
             col = m.get("column", "")
@@ -1356,7 +1359,10 @@ def _build_custom_sql_query(base_sql: str, config: dict) -> tuple[str, bool]:
     filters = config.get("chart_filters", [])
     for f in filters:
         if f.get("expressionType") == "custom_sql":
-            expr = validate_sql_expression(f.get("sqlExpression", ""))
+            sql_expr = f.get("sqlExpression", "").strip()
+            if not sql_expr:
+                continue  # skip filters with empty expressions
+            expr = validate_sql_expression(sql_expr)
             where_parts.append(f"({expr})")
         # Simple filters handled in pandas pipeline as before
 
@@ -1364,18 +1370,35 @@ def _build_custom_sql_query(base_sql: str, config: dict) -> tuple[str, bool]:
     if not select_parts and not where_parts:
         return base_sql, False
 
+    has_custom_metrics = any(
+        m.get("expressionType") == "custom_sql" and m.get("sqlExpression", "").strip()
+        for m in metrics
+    )
+    has_any_metrics = bool(metrics)
+
     if not select_parts:
         select_parts.append("*")
+    elif not has_any_metrics:
+        # No metrics — include y_columns explicitly to avoid _t.* duplicate column conflicts
+        existing_aliases = set()
+        for part in select_parts:
+            if " AS " in part:
+                alias = part.split(" AS ")[-1].strip().strip('"')
+                existing_aliases.add(alias)
+        for yc in config.get("y_columns", []):
+            if yc and yc not in existing_aliases:
+                select_parts.append(f'"{yc}"')
+                existing_aliases.add(yc)
 
     sql = f"SELECT {', '.join(select_parts)} FROM ({base_sql}) AS _t"
 
     if where_parts:
         sql += f" WHERE {' AND '.join(where_parts)}"
 
-    if group_by_parts and metrics:
+    if group_by_parts and has_any_metrics:
         sql += f" GROUP BY {', '.join(group_by_parts)}"
 
-    return sql, bool(metrics)
+    return sql, has_any_metrics
 
 
 def _apply_pipeline(df, chart_config: dict, skip_metrics: bool = False):
