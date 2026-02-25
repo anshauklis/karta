@@ -1226,6 +1226,9 @@ def _apply_metrics_df(df, config: dict):
         # Aggregate entire dataframe into one row
         result = {}
         for m in metrics:
+            # Skip custom SQL metrics — they are handled by SQL-based aggregation
+            if m.get("expressionType") == "custom_sql":
+                continue
             col = m.get("column", "")
             agg = m.get("aggregate", "SUM").upper()
             label = m.get("label", f"{agg}({col})")
@@ -1240,31 +1243,31 @@ def _apply_metrics_df(df, config: dict):
                 elif agg == "COUNT_DISTINCT": result[label] = [df[col].nunique()]
         return pd.DataFrame(result) if result else df
 
-    # Build aggregation dict
-    agg_dict = {}
-    rename_map = {}
+    # Build aggregation dict using NamedAgg to support duplicate columns
+    agg_specs = {}
     for m in metrics:
         col = m.get("column", "")
         agg = m.get("aggregate", "SUM").upper()
         label = m.get("label", f"{agg}({col})")
 
+        # Skip custom SQL metrics — they are handled by SQL-based aggregation
+        if m.get("expressionType") == "custom_sql":
+            continue
+
         if agg == "COUNT" and col == "*":
             count_col = next((c for c in df.columns if c not in group_cols), group_cols[0])
-            agg_dict[count_col] = "count"
-            rename_map[count_col] = label
+            agg_specs[label] = pd.NamedAgg(column=count_col, aggfunc="count")
         elif col in df.columns:
             agg_map = {"SUM": "sum", "AVG": "mean", "COUNT": "count",
                        "MIN": "min", "MAX": "max", "COUNT_DISTINCT": "nunique"}
             pd_agg = agg_map.get(agg, "sum")
-            agg_dict[col] = pd_agg
-            rename_map[col] = label
+            agg_specs[label] = pd.NamedAgg(column=col, aggfunc=pd_agg)
 
-    if not agg_dict:
+    if not agg_specs:
         return df
 
     try:
-        result = df.groupby(group_cols, sort=True, dropna=False).agg(agg_dict).reset_index()
-        result = result.rename(columns=rename_map)
+        result = df.groupby(group_cols, sort=True, dropna=False).agg(**agg_specs).reset_index()
         return result
     except Exception:
         return df
@@ -1278,13 +1281,111 @@ def _apply_row_limit(df, config: dict):
     return df
 
 
-def _apply_pipeline(df, chart_config: dict):
+def _has_custom_sql(config: dict) -> bool:
+    """Check if any config element uses custom SQL expressions."""
+    if config.get("x_expression_type") == "custom_sql":
+        return True
+    if config.get("color_expression_type") == "custom_sql":
+        return True
+    for m in config.get("metrics", []):
+        if m.get("expressionType") == "custom_sql":
+            return True
+    for f in config.get("chart_filters", []):
+        if f.get("expressionType") == "custom_sql":
+            return True
+    return False
+
+
+def _build_custom_sql_query(base_sql: str, config: dict) -> tuple[str, bool]:
+    """Build aggregation query wrapping base SQL when custom SQL expressions are used.
+
+    Returns (sql_query, has_aggregation) tuple.
+    has_aggregation=True means the result is already aggregated (skip pandas metrics).
+    """
+    from api.sql_validator import validate_sql_expression
+
+    select_parts = []
+    group_by_parts = []
+    where_parts = []
+    has_metrics = bool(config.get("metrics"))
+
+    # X-axis
+    x_expr_type = config.get("x_expression_type", "simple")
+    x_col = config.get("x_column", "")
+    if x_expr_type == "custom_sql":
+        x_sql = validate_sql_expression(config.get("x_custom_sql", ""))
+        alias = x_col or "x"
+        select_parts.append(f'{x_sql} AS "{alias}"')
+        group_by_parts.append(x_sql)
+    elif x_col:
+        select_parts.append(f'"{x_col}"')
+        group_by_parts.append(f'"{x_col}"')
+
+    # Color
+    color_expr_type = config.get("color_expression_type", "simple")
+    color_col = config.get("color_column", "")
+    if color_expr_type == "custom_sql":
+        color_sql = validate_sql_expression(config.get("color_custom_sql", ""))
+        alias = color_col or "color"
+        select_parts.append(f'{color_sql} AS "{alias}"')
+        group_by_parts.append(color_sql)
+    elif color_col and has_metrics:
+        select_parts.append(f'"{color_col}"')
+        group_by_parts.append(f'"{color_col}"')
+
+    # Metrics
+    metrics = config.get("metrics", [])
+    for m in metrics:
+        if m.get("expressionType") == "custom_sql":
+            expr = validate_sql_expression(m.get("sqlExpression", ""))
+            label = m.get("label", "metric")
+            select_parts.append(f'{expr} AS "{label}"')
+        else:
+            col = m.get("column", "")
+            agg = m.get("aggregate", "SUM").upper()
+            label = m.get("label", f"{agg}({col})")
+            if agg == "COUNT" and col == "*":
+                select_parts.append(f'COUNT(*) AS "{label}"')
+            elif col:
+                if agg == "COUNT_DISTINCT":
+                    select_parts.append(f'COUNT(DISTINCT "{col}") AS "{label}"')
+                else:
+                    select_parts.append(f'{agg}("{col}") AS "{label}"')
+
+    # Filters
+    filters = config.get("chart_filters", [])
+    for f in filters:
+        if f.get("expressionType") == "custom_sql":
+            expr = validate_sql_expression(f.get("sqlExpression", ""))
+            where_parts.append(f"({expr})")
+        # Simple filters handled in pandas pipeline as before
+
+    # Only build SQL query if we have something custom to do
+    if not select_parts and not where_parts:
+        return base_sql, False
+
+    if not select_parts:
+        select_parts.append("*")
+
+    sql = f"SELECT {', '.join(select_parts)} FROM ({base_sql}) AS _t"
+
+    if where_parts:
+        sql += f" WHERE {' AND '.join(where_parts)}"
+
+    if group_by_parts and metrics:
+        sql += f" GROUP BY {', '.join(group_by_parts)}"
+
+    return sql, bool(metrics)
+
+
+def _apply_pipeline(df, chart_config: dict, skip_metrics: bool = False):
     """Apply the full processing pipeline to a DataFrame."""
     df = _apply_time_range_df(df, chart_config)
     df = _apply_time_grain_df(df, chart_config)
-    df = _apply_chart_filters_df(df, chart_config)
-    df = _apply_calculated_columns_df(df, chart_config)
-    df = _apply_metrics_df(df, chart_config)
+    if not skip_metrics:
+        df = _apply_chart_filters_df(df, chart_config)
+        df = _apply_calculated_columns_df(df, chart_config)
+        df = _apply_metrics_df(df, chart_config)
     df = _apply_row_limit(df, chart_config)
     # Update y_columns to match metric labels when metrics are present
     if chart_config.get("metrics"):
@@ -1363,6 +1464,14 @@ def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, current
     # Apply time grain
     sql_query = _apply_time_grain(sql_query, chart_config)
 
+    # Build custom SQL wrapper if config uses custom SQL expressions
+    _skip_metrics = False
+    if _has_custom_sql(chart_config):
+        try:
+            sql_query, _skip_metrics = _build_custom_sql_query(sql_query, chart_config)
+        except Exception as e:
+            return ChartExecuteResponse(error=_classify_error(e))
+
     # Execute SQL
     uid = int(current_user["sub"])
     try:
@@ -1371,7 +1480,7 @@ def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, current
         return ChartExecuteResponse(error=_classify_error(e))
 
     # Apply processing pipeline
-    df = _apply_pipeline(df, chart_config)
+    df = _apply_pipeline(df, chart_config, skip_metrics=_skip_metrics)
     columns = list(df.columns)
     row_count = len(df)
 
@@ -1454,6 +1563,15 @@ def preview_chart(req: ChartPreviewRequest, current_user: dict = Depends(get_cur
     if not sql_query or not connection_id:
         return ChartExecuteResponse(error={"code": "MISSING_CONFIG", "message": "SQL query and connection are required"})
 
+    # Build custom SQL wrapper if config uses custom SQL expressions
+    chart_config = req.chart_config or {}
+    _skip_metrics = False
+    if _has_custom_sql(chart_config):
+        try:
+            sql_query, _skip_metrics = _build_custom_sql_query(sql_query, chart_config)
+        except Exception as e:
+            return ChartExecuteResponse(error=_classify_error(e))
+
     uid = int(current_user["sub"])
     try:
         columns, rows, df = _execute_chart_sql(connection_id, sql_query, req.filters, user_id=uid)
@@ -1461,8 +1579,7 @@ def preview_chart(req: ChartPreviewRequest, current_user: dict = Depends(get_cur
         return ChartExecuteResponse(error=_classify_error(e))
 
     # Apply processing pipeline
-    chart_config = req.chart_config or {}
-    df = _apply_pipeline(df, chart_config)
+    df = _apply_pipeline(df, chart_config, skip_metrics=_skip_metrics)
     columns = list(df.columns)
     row_count = len(df)
 
@@ -1538,13 +1655,21 @@ def chart_thumbnail(
     chart_config = chart.get("chart_config", {}) or {}
     sql_query = _apply_time_grain(sql_query, chart_config)
 
+    # Build custom SQL wrapper if config uses custom SQL expressions
+    _skip_metrics = False
+    if _has_custom_sql(chart_config):
+        try:
+            sql_query, _skip_metrics = _build_custom_sql_query(sql_query, chart_config)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Custom SQL expression error: {str(e)}")
+
     uid = int(current_user["sub"])
     try:
         columns, rows, df = _execute_chart_sql(connection_id, sql_query, user_id=uid)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"SQL execution failed: {str(e)}")
 
-    df = _apply_pipeline(df, chart_config)
+    df = _apply_pipeline(df, chart_config, skip_metrics=_skip_metrics)
 
     figure = None
     try:

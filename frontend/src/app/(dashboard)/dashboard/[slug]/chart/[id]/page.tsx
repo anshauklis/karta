@@ -266,6 +266,10 @@ export default function ChartEditorPage({
 
       if (targetZone === "x_column" || targetZone === "color_column") {
         updateConfig(targetZone, col);
+      } else if (targetZone === "y_columns") {
+        // Allow duplicate columns in y_columns (e.g. SUM(revenue) + AVG(revenue))
+        const current = (chartConfig[targetZone] as string[]) || [];
+        updateConfig(targetZone, [...current, col]);
       } else {
         const current = (chartConfig[targetZone] as string[]) || [];
         if (!current.includes(col)) {

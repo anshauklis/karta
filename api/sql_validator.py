@@ -77,3 +77,29 @@ def validate_sql(sql: str, max_limit: int = MAX_LIMIT) -> str:
         sql = f"{sql}\nLIMIT {max_limit}"
 
     return sql
+
+
+def validate_sql_expression(expr: str) -> str:
+    """Validate a SQL expression fragment (for SELECT/WHERE/GROUP BY).
+
+    Unlike validate_sql(), this doesn't require SELECT prefix or add LIMIT.
+    Only checks for dangerous keywords/functions and subqueries.
+    """
+    expr = expr.strip()
+    if not expr:
+        raise SQLValidationError("Empty expression")
+
+    stripped = _strip_sql_comments(expr)
+    check_str = _strip_string_literals(stripped)
+
+    if ";" in check_str:
+        raise SQLValidationError("Semicolons are not allowed in expressions")
+
+    match = _FORBIDDEN_RE.search(check_str)
+    if match:
+        raise SQLValidationError(f"Forbidden keyword: {match.group().upper()}")
+
+    if re.search(r'\bSELECT\b', check_str, re.IGNORECASE):
+        raise SQLValidationError("Subqueries are not allowed in expressions")
+
+    return expr
