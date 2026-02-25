@@ -172,6 +172,8 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
       const scope = (config.scope as Record<string, string>) || {};
       const delimiter = config.delimiter as string | undefined;
       const chartKey = String(chartId);
+      // Only apply filter to charts explicitly listed in scope
+      if (!(chartKey in scope)) continue;
       const col = scope[chartKey] || filter.target_column;
       // Wrap in __contains for delimiter-split columns
       resolved[col] = delimiter ? { __contains: value } : value;
