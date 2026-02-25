@@ -244,7 +244,9 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
   }, [charts, activeFilters, drillFilters]);
 
   const executeChartById = async (chartId: number, filters?: Record<string, unknown>, force?: boolean) => {
-    setExecuting((prev) => new Set(prev).add(chartId));
+    startTransition(() => {
+      setExecuting((prev) => new Set(prev).add(chartId));
+    });
     try {
       // If no explicit resolved filters provided, resolve from current active + drill filters
       const resolved = filters ?? resolveFiltersForChart(chartId, { ...activeFilters, ...drillFilters });
@@ -262,10 +264,12 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
         }));
       });
     } finally {
-      setExecuting((prev) => {
-        const next = new Set(prev);
-        next.delete(chartId);
-        return next;
+      startTransition(() => {
+        setExecuting((prev) => {
+          const next = new Set(prev);
+          next.delete(chartId);
+          return next;
+        });
       });
     }
   };

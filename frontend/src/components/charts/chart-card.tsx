@@ -24,6 +24,7 @@ import { RichTextView } from "@/components/rich-text-view";
 import { downloadCSV, downloadExcel } from "@/lib/export";
 import { useSummarizeChart } from "@/hooks/use-ai";
 import type { Chart, ChartExecuteResult, ColumnFormat } from "@/types";
+import { useInView } from "@/hooks/use-in-view";
 
 // Re-export for backward compatibility (chart-preview.tsx imports from here)
 export { getCellStyle, computeColumnStats } from "./data-table";
@@ -58,6 +59,7 @@ export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, e
   const hasDesc = !!chart.description?.trim();
   const colFormats = (chart.chart_config?.column_formats as Record<string, ColumnFormat>) || undefined;
   const chartId = chart.id;
+  const [viewRef, isInView] = useInView();
 
   const handleEdit = useCallback(() => onEdit?.(chartId), [onEdit, chartId]);
   const handleRefresh = useCallback(() => onRefresh?.(chartId), [onRefresh, chartId]);
@@ -248,9 +250,9 @@ export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, e
         )}
       </div>
 
-      {/* Chart body */}
-      <div className="flex-1 p-2 min-h-0">
-        {isExecuting && !result ? (
+      {/* Chart body — lazy: heavy content (Plotly/DataTable) only mounts when card is in viewport */}
+      <div ref={viewRef} className="flex-1 p-2 min-h-0">
+        {!isInView || (isExecuting && !result) ? (
           <div className="flex h-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
