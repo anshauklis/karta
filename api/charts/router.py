@@ -1420,9 +1420,9 @@ _AGG_FUNC_RE = re.compile(
 def _build_pivot_custom_sql_query(base_sql: str, config: dict) -> str:
     """Wrap base SQL with computed columns for pivot table custom expressions and duplicates.
 
-    Custom SQL expressions use _pcs_ prefix to avoid duplicate column conflicts with _t.*.
+    Row-level expressions use _pcs_ prefix to avoid duplicate column conflicts with _t.*.
+    Aggregate expressions (SUM, COUNT, ...) are skipped here — handled post-pivot in build_pivot_table.
     Caller must rename _pcs_X → X after execution (see _rename_pivot_custom_cols).
-    Only row-level expressions are allowed (no aggregate functions like SUM, COUNT, AVG).
     """
     from api.sql_validator import validate_sql_expression
 
@@ -1434,12 +1434,9 @@ def _build_pivot_custom_sql_query(base_sql: str, config: dict) -> str:
         if not expression.strip():
             continue
         expr = validate_sql_expression(expression)
-        # Reject aggregate functions — pivot aggregation is handled by pandas pivot_table
+        # Skip aggregate expressions — they are evaluated post-pivot in build_pivot_table
         if _AGG_FUNC_RE.search(expr):
-            raise ValueError(
-                f"Aggregate functions (SUM, COUNT, AVG, ...) are not allowed in pivot expressions. "
-                f"Use the aggregation dropdown instead. Expression: {expression}"
-            )
+            continue
         select_parts.append(f'{expr} AS "_pcs_{alias}"')
 
     # Duplicate value column aliases (items with __N suffix)

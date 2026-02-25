@@ -1,5 +1,6 @@
 import json
 import multiprocessing
+import re
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -8,6 +9,53 @@ from plotly.subplots import make_subplots
 from api.pivot_postprocessing import run_pipeline
 
 EXEC_TIMEOUT = 30
+
+# --- Pivot aggregate expression support ---
+# Matches SQL aggregate function calls with simple column arguments:
+#   sum(col), count("Column Name"), avg(col_name), etc.
+_PIVOT_AGG_CALL_RE = re.compile(
+    r'\b(sum|count|avg|mean|min|max|stddev|variance)\s*\(\s*("(?:[^"]+)"|[a-zA-Z_]\w*)\s*\)',
+    re.IGNORECASE,
+)
+_PIVOT_AGG_MAP = {
+    "sum": "sum", "count": "count", "avg": "mean", "mean": "mean",
+    "min": "min", "max": "max", "stddev": "std", "variance": "var",
+}
+
+
+def _has_pivot_agg(expr: str) -> bool:
+    """Check if expression contains SQL aggregate function calls."""
+    return bool(_PIVOT_AGG_CALL_RE.search(expr))
+
+
+def _parse_pivot_agg_expr(expr: str):
+    """Parse aggregate function calls from a pivot custom SQL expression.
+
+    Returns (calls, rewritten) where:
+      calls = [(pandas_func, source_col, temp_col_name), ...]
+      rewritten = expression with agg calls replaced by temp col names (for pd.eval)
+    Example: "sum(is_crash)/count(is_crash)"
+      → calls=[("sum","is_crash","_ptmp1"), ("count","is_crash","_ptmp2")]
+      → rewritten="_ptmp1/_ptmp2"
+    """
+    calls = []
+    seen = {}  # (func, col) → temp_name
+    counter = [0]
+
+    def replacer(match):
+        func = match.group(1).lower()
+        col = match.group(2).strip().strip('"')
+        key = (func, col)
+        if key not in seen:
+            pd_func = _PIVOT_AGG_MAP.get(func, func)
+            counter[0] += 1
+            temp_name = f"_ptmp{counter[0]}"
+            seen[key] = temp_name
+            calls.append((pd_func, col, temp_name))
+        return seen[key]
+
+    rewritten = _PIVOT_AGG_CALL_RE.sub(replacer, expr)
+    return calls, rewritten
 
 # Module-level constant for code sandbox security check
 _DANGEROUS_PATTERNS = (
@@ -533,6 +581,47 @@ def build_pivot_table(config: dict, df: pd.DataFrame) -> dict:
     else:
         agg = "sum"
 
+    # Handle aggregate custom SQL expressions (e.g., "sum(col_a)/count(col_b)")
+    # These can't run in SQL (no GROUP BY), so we decompose them into individual
+    # aggregations, pivot those, then compute the formula post-pivot.
+    pivot_custom_sql = config.get("pivot_custom_sql") or {}
+    agg_formulas = {}  # {val_name: (rewritten_formula, [temp_col_names])}
+    all_temp_cols = set()
+
+    for val_name in list(regular_vals):
+        expr = pivot_custom_sql.get(val_name, "")
+        if not expr or not _has_pivot_agg(expr):
+            continue
+
+        calls, rewritten = _parse_pivot_agg_expr(expr)
+        # Verify all source columns exist in df
+        missing = [src for _, src, _ in calls if src not in df.columns]
+        if missing:
+            continue  # skip — source column(s) not found
+
+        if not all_temp_cols:
+            df = df.copy()
+        for pd_func, src_col, temp_name in calls:
+            if temp_name not in all_temp_cols:
+                df[temp_name] = df[src_col]
+                all_temp_cols.add(temp_name)
+                regular_vals.append(temp_name)
+                if isinstance(agg, dict):
+                    agg[temp_name] = pd_func
+
+        # Remove the formula value from pivot (it will be computed post-pivot)
+        regular_vals.remove(val_name)
+        if isinstance(agg, dict) and val_name in agg:
+            del agg[val_name]
+        agg_formulas[val_name] = (rewritten, [t for _, _, t in calls])
+
+    # If all regular_vals were replaced by formulas, we still need at least the temp cols
+    if not regular_vals and not all_temp_cols:
+        return {"columns": [], "rows": [], "row_count": 0, "formatting": [],
+                "pivot_header_levels": [], "pivot_row_index_count": 0}
+    if not regular_vals:
+        regular_vals = list(all_temp_cols)
+
     # Limit pivot columns to top N by sum (rest → "Other")
     pivot_col_limit = config.get("pivot_column_limit", 500)
     if pivot_cols and pivot_col_limit:
@@ -552,6 +641,41 @@ def build_pivot_table(config: dict, df: pd.DataFrame) -> dict:
         margins=False,
         fill_value=0,
     )
+
+    # Evaluate aggregate formula expressions post-pivot using pandas arithmetic
+    # (pd.eval is safe here — only operates on numeric Series with temp column names,
+    # no arbitrary code execution; expressions are pre-validated by sql_validator)
+    if agg_formulas:
+        for val_name, (formula, temp_names) in agg_formulas.items():
+            try:
+                if isinstance(pivot.columns, pd.MultiIndex):
+                    # MultiIndex: evaluate formula per second-level column combination
+                    ref_temp = temp_names[0]
+                    ref_cols = [c for c in pivot.columns if c[0] == ref_temp]
+                    for rc in ref_cols:
+                        second = rc[1:]
+                        ns = {}
+                        for tn in temp_names:
+                            key = (tn,) + second
+                            if key in pivot.columns:
+                                ns[tn] = pivot[key]
+                        if ns:
+                            pivot[(val_name,) + second] = pd.eval(formula, local_dict=ns)
+                else:
+                    ns = {tn: pivot[tn] for tn in temp_names if tn in pivot.columns}
+                    if ns:
+                        pivot[val_name] = pd.eval(formula, local_dict=ns)
+            except Exception:
+                if not isinstance(pivot.columns, pd.MultiIndex):
+                    pivot[val_name] = float("nan")
+
+        # Drop temporary columns
+        if isinstance(pivot.columns, pd.MultiIndex):
+            drop_cols = [c for c in pivot.columns if c[0] in all_temp_cols]
+        else:
+            drop_cols = [c for c in pivot.columns if c in all_temp_cols]
+        if drop_cols:
+            pivot = pivot.drop(columns=drop_cols)
 
     # Post-pivot row/column filtering (whitelist)
     row_filter = config.get("pivot_row_filter")
