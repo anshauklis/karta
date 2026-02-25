@@ -131,13 +131,15 @@ export function DataTab({
       const next: Record<string, unknown> = alreadyInTarget
         ? { ...prev, [fromKey]: fromArr }
         : { ...prev, [fromKey]: fromArr, [toKey]: [...toArr, targetItem] };
-      // Clean up aggfuncs/custom SQL when leaving values
+      // Clean up aggfuncs/custom SQL/pct modes when leaving values
       if (fromKey === "pivot_values") {
         const fns = { ...((prev.pivot_aggfuncs as Record<string, unknown>) || {}) };
         delete fns[item];
         next.pivot_aggfuncs = fns;
         const csql = { ...((prev.pivot_custom_sql as Record<string, string>) || {}) };
         if (item in csql) { delete csql[item]; next.pivot_custom_sql = Object.keys(csql).length ? csql : null; }
+        const pct = { ...((prev.pivot_pct_modes as Record<string, string | null>) || {}) };
+        if (item in pct) { delete pct[item]; next.pivot_pct_modes = Object.keys(pct).length ? pct : null; }
       }
       return next;
     });
@@ -385,6 +387,9 @@ export function DataTab({
                           // Clean up custom SQL for removed column
                           const csql = { ...((chartConfig.pivot_custom_sql as Record<string, string>) || {}) };
                           if (col in csql) { delete csql[col]; updateConfig("pivot_custom_sql", Object.keys(csql).length ? csql : null); }
+                          // Clean up per-column pct mode
+                          const pct = { ...((chartConfig.pivot_pct_modes as Record<string, string | null>) || {}) };
+                          if (col in pct) { delete pct[col]; updateConfig("pivot_pct_modes", Object.keys(pct).length ? pct : null); }
                         }}
                         color="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
                         placeholder="Drop value columns here"
@@ -401,8 +406,14 @@ export function DataTab({
                           const rawAggfunc = ((chartConfig.pivot_aggfuncs as Record<string, unknown>) || {})[col];
                           const selectValue = typeof rawAggfunc === "string" ? rawAggfunc : "sum";
 
+                          const pctModes = (chartConfig.pivot_pct_modes as Record<string, string | null>) || {};
+                          const globalPct = (chartConfig.pivot_pct_mode as string) || null;
+                          const colPct = col in pctModes ? pctModes[col] : undefined;
+                          // Effective value: per-column override > global > ABS
+                          const effectivePct = colPct !== undefined ? (colPct ?? "_abs_") : (globalPct ?? "_abs_");
+
                           return (
-                            <div className="flex flex-col gap-0.5" onPointerDownCapture={(e) => e.stopPropagation()}>
+                            <div className="flex gap-0.5" onPointerDownCapture={(e) => e.stopPropagation()}>
                               <Select
                                 value={selectValue}
                                 onValueChange={(v) => {
@@ -426,6 +437,33 @@ export function DataTab({
                                   <SelectItem value="var">VARIANCE</SelectItem>
                                   <SelectItem value="first">FIRST</SelectItem>
                                   <SelectItem value="last">LAST</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Select
+                                value={effectivePct}
+                                onValueChange={(v) => {
+                                  const next = { ...pctModes };
+                                  if (v === "_abs_") {
+                                    // If global is set, force absolute with null; otherwise just remove override
+                                    if (globalPct) {
+                                      next[col] = null;
+                                    } else {
+                                      delete next[col];
+                                    }
+                                  } else {
+                                    next[col] = v;
+                                  }
+                                  updateConfig("pivot_pct_modes", Object.keys(next).length ? next : null);
+                                }}
+                              >
+                                <SelectTrigger size="xs" className={`h-5 uppercase font-medium border-border/50 ${effectivePct !== "_abs_" ? "text-violet-600 dark:text-violet-400" : ""}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="_abs_">ABS</SelectItem>
+                                  <SelectItem value="row">% ROW</SelectItem>
+                                  <SelectItem value="column">% COL</SelectItem>
+                                  <SelectItem value="total">% ALL</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
