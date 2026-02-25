@@ -1411,11 +1411,18 @@ def _has_pivot_custom_sql(config: dict) -> bool:
     return False
 
 
+_AGG_FUNC_RE = re.compile(
+    r'\b(SUM|COUNT|AVG|MIN|MAX|STDDEV|VARIANCE|ARRAY_AGG|STRING_AGG|BOOL_AND|BOOL_OR|EVERY)\s*\(',
+    re.IGNORECASE,
+)
+
+
 def _build_pivot_custom_sql_query(base_sql: str, config: dict) -> str:
     """Wrap base SQL with computed columns for pivot table custom expressions and duplicates.
 
     Custom SQL expressions use _pcs_ prefix to avoid duplicate column conflicts with _t.*.
     Caller must rename _pcs_X → X after execution (see _rename_pivot_custom_cols).
+    Only row-level expressions are allowed (no aggregate functions like SUM, COUNT, AVG).
     """
     from api.sql_validator import validate_sql_expression
 
@@ -1427,6 +1434,12 @@ def _build_pivot_custom_sql_query(base_sql: str, config: dict) -> str:
         if not expression.strip():
             continue
         expr = validate_sql_expression(expression)
+        # Reject aggregate functions — pivot aggregation is handled by pandas pivot_table
+        if _AGG_FUNC_RE.search(expr):
+            raise ValueError(
+                f"Aggregate functions (SUM, COUNT, AVG, ...) are not allowed in pivot expressions. "
+                f"Use the aggregation dropdown instead. Expression: {expression}"
+            )
         select_parts.append(f'{expr} AS "_pcs_{alias}"')
 
     # Duplicate value column aliases (items with __N suffix)
