@@ -211,6 +211,8 @@ export interface ChartMetric {
   column: string;
   aggregate: "SUM" | "AVG" | "COUNT" | "MIN" | "MAX" | "COUNT_DISTINCT";
   label: string;
+  expressionType?: "simple" | "custom_sql";
+  sqlExpression?: string;
 }
 
 export interface ColumnFormat {
