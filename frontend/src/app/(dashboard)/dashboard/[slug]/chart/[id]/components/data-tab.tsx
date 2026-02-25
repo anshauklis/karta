@@ -441,17 +441,57 @@ export function DataTab({
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                     <div className="border-t border-border px-3 py-3 space-y-3">
-                      {/* X Axis — drop zone */}
+                      {/* X Axis — drop zone with Simple/SQL toggle */}
                       {showXAxis && (
-                        <DropZone
-                          id="zone-x"
-                          label={isHistogram ? "Column to bin" : "X Axis"}
-                          items={(chartConfig.x_column as string) ? [chartConfig.x_column as string] : []}
-                          onRemove={() => updateConfig("x_column", "")}
-                          color="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
-                          placeholder="Drop X axis column here"
-                          maxItems={1}
-                        />
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-medium text-muted-foreground">{isHistogram ? "Column to bin" : "X Axis"}</span>
+                            <div className="flex gap-0.5 rounded-md border border-border p-0.5">
+                              <button
+                                className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                                  (chartConfig.x_expression_type as string || "simple") === "simple" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground"
+                                }`}
+                                onClick={() => updateConfig("x_expression_type", "simple")}
+                              >
+                                Simple
+                              </button>
+                              <button
+                                className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                                  (chartConfig.x_expression_type as string) === "custom_sql" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground"
+                                }`}
+                                onClick={() => updateConfig("x_expression_type", "custom_sql")}
+                              >
+                                SQL
+                              </button>
+                            </div>
+                          </div>
+                          {(chartConfig.x_expression_type as string || "simple") === "simple" ? (
+                            <DropZone
+                              id="zone-x"
+                              label=""
+                              items={(chartConfig.x_column as string) ? [chartConfig.x_column as string] : []}
+                              onRemove={() => updateConfig("x_column", "")}
+                              color="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
+                              placeholder="Drop X axis column here"
+                              maxItems={1}
+                            />
+                          ) : (
+                            <div className="space-y-1.5">
+                              <Input
+                                className="h-7 text-[11px] font-mono bg-card"
+                                placeholder="DATE_TRUNC('month', created_at)"
+                                value={(chartConfig.x_custom_sql as string) || ""}
+                                onChange={(e) => updateConfig("x_custom_sql", e.target.value)}
+                              />
+                              <Input
+                                className="h-7 text-[11px] bg-card"
+                                placeholder="Label"
+                                value={(chartConfig.x_column as string) || ""}
+                                onChange={(e) => updateConfig("x_column", e.target.value)}
+                              />
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {/* Y Axis — drop zone (multi) */}
@@ -481,17 +521,57 @@ export function DataTab({
                         />
                       )}
 
-                      {/* Color / Group — drop zone */}
+                      {/* Color / Group — drop zone with Simple/SQL toggle */}
                       {showColor && (
-                        <DropZone
-                          id="zone-color"
-                          label={chartType === "heatmap" ? "Row grouping" : "Color / Group"}
-                          items={(chartConfig.color_column as string) ? [chartConfig.color_column as string] : []}
-                          onRemove={() => updateConfig("color_column", "")}
-                          color="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200"
-                          placeholder="Drop color/group column here"
-                          maxItems={1}
-                        />
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-medium text-muted-foreground">{chartType === "heatmap" ? "Row grouping" : "Color / Group"}</span>
+                            <div className="flex gap-0.5 rounded-md border border-border p-0.5">
+                              <button
+                                className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                                  (chartConfig.color_expression_type as string || "simple") === "simple" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground"
+                                }`}
+                                onClick={() => updateConfig("color_expression_type", "simple")}
+                              >
+                                Simple
+                              </button>
+                              <button
+                                className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                                  (chartConfig.color_expression_type as string) === "custom_sql" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground"
+                                }`}
+                                onClick={() => updateConfig("color_expression_type", "custom_sql")}
+                              >
+                                SQL
+                              </button>
+                            </div>
+                          </div>
+                          {(chartConfig.color_expression_type as string || "simple") === "simple" ? (
+                            <DropZone
+                              id="zone-color"
+                              label=""
+                              items={(chartConfig.color_column as string) ? [chartConfig.color_column as string] : []}
+                              onRemove={() => updateConfig("color_column", "")}
+                              color="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200"
+                              placeholder="Drop color/group column here"
+                              maxItems={1}
+                            />
+                          ) : (
+                            <div className="space-y-1.5">
+                              <Input
+                                className="h-7 text-[11px] font-mono bg-card"
+                                placeholder="CASE WHEN amount > 100 THEN 'high' ELSE 'low' END"
+                                value={(chartConfig.color_custom_sql as string) || ""}
+                                onChange={(e) => updateConfig("color_custom_sql", e.target.value)}
+                              />
+                              <Input
+                                className="h-7 text-[11px] bg-card"
+                                placeholder="Label"
+                                value={(chartConfig.color_column as string) || ""}
+                                onChange={(e) => updateConfig("color_column", e.target.value)}
+                              />
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {/* === Type-specific config === */}
@@ -573,7 +653,7 @@ export function DataTab({
                             <button
                               onClick={() => {
                                 const metrics = ((chartConfig.metrics as Array<Record<string, string>>) || []);
-                                updateConfig("metrics", [...metrics, { column: "", aggregate: "SUM", label: "" }]);
+                                updateConfig("metrics", [...metrics, { column: "", aggregate: "SUM", label: "", expressionType: "simple" }]);
                               }}
                               className="text-xs text-primary hover:underline"
                             >
@@ -587,63 +667,158 @@ export function DataTab({
                           )}
                           {((chartConfig.metrics as Array<Record<string, string>>) || []).map((m, idx) => {
                             const metrics = (chartConfig.metrics as Array<Record<string, string>>) || [];
+                            const exprType = m.expressionType || "simple";
                             return (
-                              <div key={idx} className="flex items-center gap-1">
-                                <Select
-                                  value={m.aggregate || "SUM"}
-                                  onValueChange={(agg) => {
-                                    const updated = [...metrics];
-                                    updated[idx] = { ...updated[idx], aggregate: agg, label: `${agg}(${updated[idx].column || ""})` };
-                                    updateConfig("metrics", updated);
-                                  }}
-                                >
-                                  <SelectTrigger size="xs" className="h-7 bg-card">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="SUM">SUM</SelectItem>
-                                    <SelectItem value="AVG">AVG</SelectItem>
-                                    <SelectItem value="COUNT">COUNT</SelectItem>
-                                    <SelectItem value="MIN">MIN</SelectItem>
-                                    <SelectItem value="MAX">MAX</SelectItem>
-                                    <SelectItem value="COUNT_DISTINCT">DISTINCT</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <span className="text-[10px] text-muted-foreground">(</span>
-                                <Select
-                                  value={m.column || "_empty_"}
-                                  onValueChange={(col) => {
-                                    const c = col === "_empty_" ? "" : col;
-                                    const updated = [...metrics];
-                                    updated[idx] = { ...updated[idx], column: c, label: `${updated[idx].aggregate || "SUM"}(${c})` };
-                                    updateConfig("metrics", updated);
-                                    const labels = updated.map(mm => mm.label || `${mm.aggregate}(${mm.column})`);
-                                    updateConfig("y_columns", labels);
-                                  }}
-                                >
-                                  <SelectTrigger size="xs" className="h-7 flex-1 bg-card">
-                                    <SelectValue placeholder="Column..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="_empty_">Column...</SelectItem>
-                                    <SelectItem value="*">* (all rows)</SelectItem>
-                                    {availableColumns.map(c => (
-                                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <span className="text-[10px] text-muted-foreground">)</span>
-                                <button
-                                  onClick={() => {
-                                    const updated = metrics.filter((_, i) => i !== idx);
-                                    updateConfig("metrics", updated);
-                                    const labels = updated.map(mm => mm.label || `${mm.aggregate}(${mm.column})`);
-                                    updateConfig("y_columns", labels);
-                                  }}
-                                  className="text-red-400 hover:text-red-600"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
+                              <div key={idx} className="rounded-md border border-border p-2 space-y-2">
+                                {/* Tab switcher + delete */}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex gap-0.5 rounded-md border border-border p-0.5">
+                                    <button
+                                      className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                                        exprType === "simple" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground"
+                                      }`}
+                                      onClick={() => {
+                                        const updated = [...metrics];
+                                        updated[idx] = { ...updated[idx], expressionType: "simple" };
+                                        updateConfig("metrics", updated);
+                                        const labels = updated.map(mm => {
+                                          if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
+                                          return mm.label || `${mm.aggregate}(${mm.column})`;
+                                        });
+                                        updateConfig("y_columns", labels);
+                                      }}
+                                    >
+                                      Simple
+                                    </button>
+                                    <button
+                                      className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                                        exprType === "custom_sql" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground"
+                                      }`}
+                                      onClick={() => {
+                                        const updated = [...metrics];
+                                        const cur = updated[idx];
+                                        const autoExpr = (cur.aggregate && cur.column) ? `${cur.aggregate}(${cur.column})` : (cur.sqlExpression || "");
+                                        updated[idx] = { ...cur, expressionType: "custom_sql", sqlExpression: autoExpr || cur.sqlExpression || "" };
+                                        updateConfig("metrics", updated);
+                                        const labels = updated.map(mm => {
+                                          if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
+                                          return mm.label || `${mm.aggregate}(${mm.column})`;
+                                        });
+                                        updateConfig("y_columns", labels);
+                                      }}
+                                    >
+                                      Custom SQL
+                                    </button>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      const updated = metrics.filter((_, i) => i !== idx);
+                                      updateConfig("metrics", updated);
+                                      const labels = updated.map(mm => {
+                                        if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
+                                        return mm.label || `${mm.aggregate}(${mm.column})`;
+                                      });
+                                      updateConfig("y_columns", labels);
+                                    }}
+                                    className="text-red-400 hover:text-red-600"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+
+                                {/* Simple mode: aggregate + column dropdowns */}
+                                {exprType === "simple" && (
+                                  <div className="flex items-center gap-1">
+                                    <Select
+                                      value={m.aggregate || "SUM"}
+                                      onValueChange={(agg) => {
+                                        const updated = [...metrics];
+                                        updated[idx] = { ...updated[idx], aggregate: agg, label: `${agg}(${updated[idx].column || ""})` };
+                                        updateConfig("metrics", updated);
+                                        const labels = updated.map(mm => {
+                                          if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
+                                          return mm.label || `${mm.aggregate}(${mm.column})`;
+                                        });
+                                        updateConfig("y_columns", labels);
+                                      }}
+                                    >
+                                      <SelectTrigger size="xs" className="h-7 bg-card">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="SUM">SUM</SelectItem>
+                                        <SelectItem value="AVG">AVG</SelectItem>
+                                        <SelectItem value="COUNT">COUNT</SelectItem>
+                                        <SelectItem value="MIN">MIN</SelectItem>
+                                        <SelectItem value="MAX">MAX</SelectItem>
+                                        <SelectItem value="COUNT_DISTINCT">DISTINCT</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <span className="text-[10px] text-muted-foreground">(</span>
+                                    <Select
+                                      value={m.column || "_empty_"}
+                                      onValueChange={(col) => {
+                                        const c = col === "_empty_" ? "" : col;
+                                        const updated = [...metrics];
+                                        updated[idx] = { ...updated[idx], column: c, label: `${updated[idx].aggregate || "SUM"}(${c})` };
+                                        updateConfig("metrics", updated);
+                                        const labels = updated.map(mm => {
+                                          if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
+                                          return mm.label || `${mm.aggregate}(${mm.column})`;
+                                        });
+                                        updateConfig("y_columns", labels);
+                                      }}
+                                    >
+                                      <SelectTrigger size="xs" className="h-7 flex-1 bg-card">
+                                        <SelectValue placeholder="Column..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="_empty_">Column...</SelectItem>
+                                        <SelectItem value="*">* (all rows)</SelectItem>
+                                        {availableColumns.map(c => (
+                                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <span className="text-[10px] text-muted-foreground">)</span>
+                                  </div>
+                                )}
+
+                                {/* Custom SQL mode: expression + label */}
+                                {exprType === "custom_sql" && (
+                                  <div className="space-y-1.5">
+                                    <Input
+                                      className="h-7 text-[11px] font-mono bg-card"
+                                      placeholder="SUM(amount) / COUNT(DISTINCT user_id)"
+                                      value={m.sqlExpression || ""}
+                                      onChange={(e) => {
+                                        const updated = [...metrics];
+                                        updated[idx] = { ...updated[idx], sqlExpression: e.target.value };
+                                        updateConfig("metrics", updated);
+                                        const labels = updated.map(mm => {
+                                          if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
+                                          return mm.label || `${mm.aggregate}(${mm.column})`;
+                                        });
+                                        updateConfig("y_columns", labels);
+                                      }}
+                                    />
+                                    <Input
+                                      className="h-7 text-[11px] bg-card"
+                                      placeholder="Label (required)"
+                                      value={m.label || ""}
+                                      onChange={(e) => {
+                                        const updated = [...metrics];
+                                        updated[idx] = { ...updated[idx], label: e.target.value };
+                                        updateConfig("metrics", updated);
+                                        const labels = updated.map(mm => {
+                                          if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
+                                          return mm.label || `${mm.aggregate}(${mm.column})`;
+                                        });
+                                        updateConfig("y_columns", labels);
+                                      }}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -658,7 +833,7 @@ export function DataTab({
                             <button
                               onClick={() => {
                                 const filters = ((chartConfig.chart_filters as Array<Record<string, string>>) || []);
-                                updateConfig("chart_filters", [...filters, { column: "", operator: "=", value: "" }]);
+                                updateConfig("chart_filters", [...filters, { column: "", operator: "=", value: "", expressionType: "simple" }]);
                               }}
                               className="text-xs text-primary hover:underline"
                             >
@@ -667,63 +842,113 @@ export function DataTab({
                           </div>
                           {((chartConfig.chart_filters as Array<Record<string, string>>) || []).map((f, idx) => {
                             const filters = (chartConfig.chart_filters as Array<Record<string, string>>) || [];
+                            const filterExprType = f.expressionType || "simple";
                             return (
-                              <div key={idx} className="flex items-center gap-1">
-                                <Select
-                                  value={f.column || "_empty_"}
-                                  onValueChange={(v) => {
-                                    const updated = [...filters];
-                                    updated[idx] = { ...updated[idx], column: v === "_empty_" ? "" : v };
-                                    updateConfig("chart_filters", updated);
-                                  }}
-                                >
-                                  <SelectTrigger size="xs" className="h-7 flex-1 bg-card">
-                                    <SelectValue placeholder="Column..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="_empty_">Column...</SelectItem>
-                                    {availableColumns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
-                                <Select
-                                  value={f.operator || "="}
-                                  onValueChange={(v) => {
-                                    const updated = [...filters];
-                                    updated[idx] = { ...updated[idx], operator: v };
-                                    updateConfig("chart_filters", updated);
-                                  }}
-                                >
-                                  <SelectTrigger size="xs" className="h-7 bg-card">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="=">=</SelectItem>
-                                    <SelectItem value="!=">!=</SelectItem>
-                                    <SelectItem value=">">{`>`}</SelectItem>
-                                    <SelectItem value=">=">{`>=`}</SelectItem>
-                                    <SelectItem value="<">{`<`}</SelectItem>
-                                    <SelectItem value="<=">{`<=`}</SelectItem>
-                                    <SelectItem value="IN">IN</SelectItem>
-                                    <SelectItem value="NOT IN">NOT IN</SelectItem>
-                                    <SelectItem value="LIKE">LIKE</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <Input
-                                  className="h-7 w-24 text-[10px]"
-                                  value={f.value ?? ""}
-                                  onChange={(e) => {
-                                    const updated = [...filters];
-                                    updated[idx] = { ...updated[idx], value: e.target.value };
-                                    updateConfig("chart_filters", updated);
-                                  }}
-                                  placeholder="Value..."
-                                />
-                                <button
-                                  onClick={() => updateConfig("chart_filters", filters.filter((_, i) => i !== idx))}
-                                  className="text-red-400 hover:text-red-600"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
+                              <div key={idx} className="rounded-md border border-border p-2 space-y-2">
+                                {/* Toggle + delete */}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex gap-0.5 rounded-md border border-border p-0.5">
+                                    <button
+                                      className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                                        filterExprType === "simple" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground"
+                                      }`}
+                                      onClick={() => {
+                                        const updated = [...filters];
+                                        updated[idx] = { ...updated[idx], expressionType: "simple" };
+                                        updateConfig("chart_filters", updated);
+                                      }}
+                                    >
+                                      Simple
+                                    </button>
+                                    <button
+                                      className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                                        filterExprType === "custom_sql" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground"
+                                      }`}
+                                      onClick={() => {
+                                        const updated = [...filters];
+                                        updated[idx] = { ...updated[idx], expressionType: "custom_sql" };
+                                        updateConfig("chart_filters", updated);
+                                      }}
+                                    >
+                                      SQL
+                                    </button>
+                                  </div>
+                                  <button
+                                    onClick={() => updateConfig("chart_filters", filters.filter((_, i) => i !== idx))}
+                                    className="text-red-400 hover:text-red-600"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+
+                                {/* Simple mode: column + operator + value */}
+                                {filterExprType === "simple" && (
+                                  <div className="flex items-center gap-1">
+                                    <Select
+                                      value={f.column || "_empty_"}
+                                      onValueChange={(v) => {
+                                        const updated = [...filters];
+                                        updated[idx] = { ...updated[idx], column: v === "_empty_" ? "" : v };
+                                        updateConfig("chart_filters", updated);
+                                      }}
+                                    >
+                                      <SelectTrigger size="xs" className="h-7 flex-1 bg-card">
+                                        <SelectValue placeholder="Column..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="_empty_">Column...</SelectItem>
+                                        {availableColumns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
+                                    <Select
+                                      value={f.operator || "="}
+                                      onValueChange={(v) => {
+                                        const updated = [...filters];
+                                        updated[idx] = { ...updated[idx], operator: v };
+                                        updateConfig("chart_filters", updated);
+                                      }}
+                                    >
+                                      <SelectTrigger size="xs" className="h-7 bg-card">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="=">=</SelectItem>
+                                        <SelectItem value="!=">!=</SelectItem>
+                                        <SelectItem value=">">{`>`}</SelectItem>
+                                        <SelectItem value=">=">{`>=`}</SelectItem>
+                                        <SelectItem value="<">{`<`}</SelectItem>
+                                        <SelectItem value="<=">{`<=`}</SelectItem>
+                                        <SelectItem value="IN">IN</SelectItem>
+                                        <SelectItem value="NOT IN">NOT IN</SelectItem>
+                                        <SelectItem value="LIKE">LIKE</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      className="h-7 w-24 text-[10px]"
+                                      value={f.value ?? ""}
+                                      onChange={(e) => {
+                                        const updated = [...filters];
+                                        updated[idx] = { ...updated[idx], value: e.target.value };
+                                        updateConfig("chart_filters", updated);
+                                      }}
+                                      placeholder="Value..."
+                                    />
+                                  </div>
+                                )}
+
+                                {/* Custom SQL mode: raw expression */}
+                                {filterExprType === "custom_sql" && (
+                                  <Input
+                                    className="h-7 text-[11px] font-mono bg-card"
+                                    placeholder="revenue / units > 100"
+                                    value={f.sqlExpression || ""}
+                                    onChange={(e) => {
+                                      const updated = [...filters];
+                                      updated[idx] = { ...updated[idx], sqlExpression: e.target.value };
+                                      updateConfig("chart_filters", updated);
+                                    }}
+                                  />
+                                )}
                               </div>
                             );
                           })}
