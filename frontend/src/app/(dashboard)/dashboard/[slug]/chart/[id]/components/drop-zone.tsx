@@ -121,6 +121,7 @@ interface DropZoneProps {
   color?: string;
   placeholder?: string;
   maxItems?: number;
+  getLabel?: (item: string) => string;
   renderExtra?: (item: string) => React.ReactNode;
   renderExpanded?: (item: string) => React.ReactNode;
   moveTargets?: MoveTarget[];
@@ -135,6 +136,7 @@ export function DropZone({
   color,
   placeholder = "Drop column here",
   maxItems,
+  getLabel,
   renderExtra,
   renderExpanded,
   moveTargets,
@@ -164,7 +166,7 @@ export function DropZone({
                 <SortablePill
                   key={item}
                   id={item}
-                  label={item}
+                  label={getLabel ? getLabel(item) : item}
                   onRemove={() => onRemove(item)}
                   color={color}
                   renderExtra={renderExtra?.(item)}

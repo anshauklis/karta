@@ -1401,6 +1401,69 @@ def _build_custom_sql_query(base_sql: str, config: dict) -> tuple[str, bool]:
     return sql, has_any_metrics
 
 
+def _has_pivot_custom_sql(config: dict) -> bool:
+    """Check if pivot config has custom SQL expressions or duplicate value columns."""
+    if config.get("pivot_custom_sql"):
+        return True
+    for v in config.get("pivot_values", []):
+        if re.match(r'^.+__\d+$', v):
+            return True
+    return False
+
+
+def _build_pivot_custom_sql_query(base_sql: str, config: dict) -> str:
+    """Wrap base SQL with computed columns for pivot table custom expressions and duplicates.
+
+    Custom SQL expressions use _pcs_ prefix to avoid duplicate column conflicts with _t.*.
+    Caller must rename _pcs_X → X after execution (see _rename_pivot_custom_cols).
+    """
+    from api.sql_validator import validate_sql_expression
+
+    pivot_custom_sql = config.get("pivot_custom_sql", {}) or {}
+    select_parts = ["_t.*"]
+
+    # Custom SQL expressions: use _pcs_ prefix to avoid clashing with original columns
+    for alias, expression in pivot_custom_sql.items():
+        if not expression.strip():
+            continue
+        expr = validate_sql_expression(expression)
+        select_parts.append(f'{expr} AS "_pcs_{alias}"')
+
+    # Duplicate value column aliases (items with __N suffix)
+    for v in config.get("pivot_values", []):
+        if v in pivot_custom_sql:
+            continue  # already handled above
+        match = re.match(r'^(.+)__(\d+)$', v)
+        if match:
+            base_col = match.group(1)
+            select_parts.append(f'_t."{base_col}" AS "{v}"')
+
+    if len(select_parts) <= 1:
+        return base_sql  # no changes needed
+
+    return f"SELECT {', '.join(select_parts)} FROM ({base_sql}) AS _t"
+
+
+def _rename_pivot_custom_cols(df, config: dict):
+    """Rename _pcs_ prefixed columns back to their intended names after SQL execution."""
+    pivot_custom_sql = config.get("pivot_custom_sql") or {}
+    if not pivot_custom_sql:
+        return df
+    renames = {}
+    drops = []
+    for alias in pivot_custom_sql:
+        pcs_col = f"_pcs_{alias}"
+        if pcs_col in df.columns:
+            if alias in df.columns:
+                drops.append(alias)
+            renames[pcs_col] = alias
+    if drops:
+        df = df.drop(columns=drops)
+    if renames:
+        df = df.rename(columns=renames)
+    return df
+
+
 def _apply_pipeline(df, chart_config: dict, skip_metrics: bool = False):
     """Apply the full processing pipeline to a DataFrame."""
     df = _apply_time_range_df(df, chart_config)
@@ -1495,12 +1558,22 @@ def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, current
         except Exception as e:
             return ChartExecuteResponse(error=_classify_error(e))
 
+    # Build pivot custom SQL wrapper (computed columns + duplicate value aliases)
+    if _has_pivot_custom_sql(chart_config):
+        try:
+            sql_query = _build_pivot_custom_sql_query(sql_query, chart_config)
+        except Exception as e:
+            return ChartExecuteResponse(error=_classify_error(e))
+
     # Execute SQL
     uid = int(current_user["sub"])
     try:
         columns, rows, df = _execute_chart_sql(connection_id, sql_query, filters, user_id=uid)
     except Exception as e:
         return ChartExecuteResponse(error=_classify_error(e))
+
+    # Rename pivot custom SQL columns (_pcs_ prefix → original names)
+    df = _rename_pivot_custom_cols(df, chart_config)
 
     # Apply processing pipeline
     df = _apply_pipeline(df, chart_config, skip_metrics=_skip_metrics)
@@ -1595,11 +1668,21 @@ def preview_chart(req: ChartPreviewRequest, current_user: dict = Depends(get_cur
         except Exception as e:
             return ChartExecuteResponse(error=_classify_error(e))
 
+    # Build pivot custom SQL wrapper (computed columns + duplicate value aliases)
+    if _has_pivot_custom_sql(chart_config):
+        try:
+            sql_query = _build_pivot_custom_sql_query(sql_query, chart_config)
+        except Exception as e:
+            return ChartExecuteResponse(error=_classify_error(e))
+
     uid = int(current_user["sub"])
     try:
         columns, rows, df = _execute_chart_sql(connection_id, sql_query, req.filters, user_id=uid)
     except Exception as e:
         return ChartExecuteResponse(error=_classify_error(e))
+
+    # Rename pivot custom SQL columns (_pcs_ prefix → original names)
+    df = _rename_pivot_custom_cols(df, chart_config)
 
     # Apply processing pipeline
     df = _apply_pipeline(df, chart_config, skip_metrics=_skip_metrics)

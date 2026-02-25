@@ -366,9 +366,16 @@ export function DataTab({
                           const fns = { ...((chartConfig.pivot_aggfuncs as Record<string, unknown>) || {}) };
                           delete fns[col];
                           updateConfig("pivot_aggfuncs", fns);
+                          // Clean up custom SQL for removed column
+                          const csql = { ...((chartConfig.pivot_custom_sql as Record<string, string>) || {}) };
+                          if (col in csql) { delete csql[col]; updateConfig("pivot_custom_sql", Object.keys(csql).length ? csql : null); }
                         }}
                         color="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
                         placeholder="Drop value columns here"
+                        getLabel={(col) => {
+                          const m = col.match(/^(.+)__(\d+)$/);
+                          return m ? `${m[1]} (${m[2]})` : col;
+                        }}
                         moveTargets={[
                           { key: "pivot_rows", label: "Move to Rows" },
                           { key: "pivot_columns", label: "Move to Columns" },
@@ -409,11 +416,14 @@ export function DataTab({
                           );
                         }}
                         renderExpanded={(col) => {
+                          const pivotCustomSql = (chartConfig.pivot_custom_sql as Record<string, string>) || {};
+                          const isCustomSql = col in pivotCustomSql;
+
                           const pctModes = (chartConfig.pivot_pct_modes as Record<string, string | null>) || {};
                           const globalPct = (chartConfig.pivot_pct_mode as string) || null;
                           const colPct = col in pctModes ? pctModes[col] : undefined;
 
-                          const options = [
+                          const pctOptions = [
                             { value: "_inherit_", label: `Default${globalPct ? ` (% ${globalPct})` : " (ABS)"}` },
                             { value: "_abs_", label: "ABS" },
                             { value: "row", label: "% Row" },
@@ -423,10 +433,51 @@ export function DataTab({
 
                           return (
                             <div className="space-y-2">
+                              {/* Custom SQL toggle */}
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] text-muted-foreground font-medium">Expression</span>
+                                  <div className="flex gap-0.5 rounded-md border border-border p-0.5">
+                                    <button
+                                      className={`px-1.5 py-0.5 text-[9px] rounded transition-colors ${
+                                        !isCustomSql ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground"
+                                      }`}
+                                      onClick={() => {
+                                        const next = { ...pivotCustomSql };
+                                        delete next[col];
+                                        updateConfig("pivot_custom_sql", Object.keys(next).length ? next : null);
+                                      }}
+                                    >
+                                      Simple
+                                    </button>
+                                    <button
+                                      className={`px-1.5 py-0.5 text-[9px] rounded transition-colors ${
+                                        isCustomSql ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground"
+                                      }`}
+                                      onClick={() => {
+                                        updateConfig("pivot_custom_sql", { ...pivotCustomSql, [col]: pivotCustomSql[col] || "" });
+                                      }}
+                                    >
+                                      SQL
+                                    </button>
+                                  </div>
+                                </div>
+                                {isCustomSql && (
+                                  <SqlInput
+                                    mono
+                                    className="h-6 text-[10px] bg-card"
+                                    placeholder="amount * quantity"
+                                    value={pivotCustomSql[col] || ""}
+                                    onChange={(v) => updateConfig("pivot_custom_sql", { ...pivotCustomSql, [col]: v })}
+                                  />
+                                )}
+                              </div>
+
+                              {/* Values As (pct mode) */}
                               <div className="space-y-1">
                                 <span className="text-[10px] text-muted-foreground font-medium">Values As</span>
                                 <div className="flex gap-1 flex-wrap">
-                                  {options.map((opt) => {
+                                  {pctOptions.map((opt) => {
                                     const isSelected =
                                       opt.value === "_inherit_" ? colPct === undefined :
                                       opt.value === "_abs_" ? colPct === null :

@@ -270,6 +270,16 @@ export default function ChartEditorPage({
         // Allow duplicate columns in y_columns (e.g. SUM(revenue) + AVG(revenue))
         const current = (chartConfig[targetZone] as string[]) || [];
         updateConfig(targetZone, [...current, col]);
+      } else if (targetZone === "pivot_values") {
+        // Allow duplicate columns in pivot_values (same column with different aggfuncs)
+        const current = (chartConfig[targetZone] as string[]) || [];
+        if (current.includes(col)) {
+          let suffix = 2;
+          while (current.includes(`${col}__${suffix}`)) suffix++;
+          updateConfig(targetZone, [...current, `${col}__${suffix}`]);
+        } else {
+          updateConfig(targetZone, [...current, col]);
+        }
       } else {
         const current = (chartConfig[targetZone] as string[]) || [];
         if (!current.includes(col)) {
