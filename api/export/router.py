@@ -751,7 +751,7 @@ def get_shared_dashboard(token: str, filters: str | None = Query(None)):
                 parsed_filters = json.loads(filters)
                 if not isinstance(parsed_filters, dict):
                     parsed_filters = None
-            except (json.JSONDecodeError, TypeError):
+            except (ValueError, TypeError):
                 parsed_filters = None
 
         chart_results = []
