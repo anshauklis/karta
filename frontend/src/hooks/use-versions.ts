@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { api } from "@/lib/api";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 interface VersionListItem {
   id: number;
   dashboard_id: number;
@@ -18,7 +20,7 @@ interface VersionDetail extends VersionListItem {
 
 export function useDashboardVersions(dashboardId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["dashboard-versions", dashboardId],
@@ -37,7 +39,7 @@ export function useVersionDetail(
   versionId: number | null
 ) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["dashboard-version-detail", dashboardId, versionId],
@@ -52,7 +54,7 @@ export function useVersionDetail(
 
 export function useCreateVersion() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -78,7 +80,7 @@ export function useCreateVersion() {
 
 export function useRestoreVersion() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -110,7 +112,7 @@ export function useRestoreVersion() {
 
 export function useUpdateVersionLabel() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -138,7 +140,7 @@ export function useUpdateVersionLabel() {
 
 export function useDeleteVersion() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
