@@ -4,6 +4,7 @@ Supports Jinja-like {{ variable_name }} syntax with safe substitution.
 Variables are replaced with type-aware quoted literal values before SQL execution,
 so the resulting SQL works with any database engine (PostgreSQL, MySQL, DuckDB, etc.).
 """
+import math
 import re
 from typing import Any
 
@@ -24,9 +25,11 @@ def _quote_value(val: Any, var_type: str = "text") -> str:
         # Validate numeric — strip and check
         s = s.strip()
         try:
-            float(s)
+            parsed = float(s)
         except ValueError:
             raise ValueError(f"Variable value '{s}' is not a valid number")
+        if not math.isfinite(parsed):
+            raise ValueError(f"Variable value '{s}' is not a finite number")
         return s
     # text and date — single-quote with escaping
     return "'" + s.replace("'", "''") + "'"

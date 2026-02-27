@@ -4,6 +4,8 @@ System prompt builder for the AI assistant.
 Injects business glossary, connection context, and behavioral instructions.
 """
 
+import json
+
 from sqlalchemy import text
 from api.database import engine
 
@@ -230,7 +232,6 @@ def build_suggest_chart_config_prompt(
         parts.append(f"## Current Chart Type: {current_chart_type}")
 
     if current_config:
-        import json
         parts.append("")
         parts.append("## Current Config")
         parts.append(json.dumps(current_config, indent=2))

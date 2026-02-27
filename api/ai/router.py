@@ -218,7 +218,7 @@ async def chat(req: AIChatRequest, current_user: dict = Depends(get_current_user
 
         except Exception as e:
             logger.exception("AI chat error")
-            yield _sse({"type": "error", "content": str(e)})
+            yield _sse({"type": "error", "content": "An internal error occurred. Please try again."})
 
     return StreamingResponse(
         event_stream(),
@@ -365,7 +365,7 @@ async def suggest_chart_config(
 # --- Parse filters (NL → structured) ---
 
 @router.post("/parse-filters", summary="Parse natural language into dashboard filters")
-async def parse_filters(req: dict, current_user: dict = Depends(get_current_user)):
+async def parse_filters(req: dict, current_user: dict = Depends(get_current_user)):  # TODO: replace dict with Pydantic model
     """Parse a natural-language filter description into structured filter objects.
 
     Expects: { prompt: str, columns: [{ name: str, type: str }] }

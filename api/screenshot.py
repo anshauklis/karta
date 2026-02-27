@@ -6,6 +6,7 @@ reachable at INTERNAL_URL.
 """
 
 import os
+import re
 import logging
 
 from playwright.async_api import async_playwright
@@ -31,6 +32,9 @@ async def capture_dashboard(token: str, format: str = "png",
     Returns:
         Screenshot bytes (PNG or PDF).
     """
+    if not re.match(r'^[A-Za-z0-9_-]+$', token):
+        raise ValueError(f"Invalid token format: {token}")
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             args=["--no-sandbox", "--disable-dev-shm-usage"]
