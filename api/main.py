@@ -33,6 +33,8 @@ async def lifespan(app: FastAPI):
     ensure_schema()
     ensure_migrations()
     ensure_system_connections()
+    from api.engine_specs import discover_and_register
+    discover_and_register()
     start_scheduler()
     yield
     shutdown_scheduler()
