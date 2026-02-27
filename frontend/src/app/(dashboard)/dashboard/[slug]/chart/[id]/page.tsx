@@ -80,6 +80,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useTranslations } from "next-intl";
 import { layoutAwareFilter } from "@/lib/layout-aware-filter";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useChartEditor } from "./hooks/use-chart-editor";
 import { CodeTab } from "./components/code-tab";
 import { CustomizeTab } from "./components/customize-tab";
@@ -155,7 +156,7 @@ export default function ChartEditorPage({
 
   const {
     // Route/identity
-    isNew, isStandalone, chartId, router, dashboard, allDashboards, connections, datasets, isDark,
+    isNew, isStandalone, chartId, router, dashboard, allDashboards, existingChart, connections, datasets, isDark,
     // Standalone dashboard selector
     selectedDashboardId, setSelectedDashboardId,
     // Tab selector
@@ -239,6 +240,36 @@ export default function ChartEditorPage({
     () => layoutAwareFilter(availableColumns, columnSearch, (c) => c),
     [availableColumns, columnSearch],
   );
+
+  // Loading gate: show skeleton while chart data is being fetched
+  if (!existingChart && id !== "new") {
+    return (
+      <div className="flex h-[calc(100vh-5.5rem)] flex-col">
+        <div className="flex items-center gap-3 border-b px-4 py-2">
+          <Skeleton className="h-6 w-48" />
+          <div className="ml-auto flex gap-2">
+            <Skeleton className="h-8 w-20" />
+            <Skeleton className="h-8 w-20" />
+          </div>
+        </div>
+        <div className="flex flex-1 overflow-hidden">
+          <div className="w-64 border-r p-3 space-y-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-6 w-full" />
+            ))}
+          </div>
+          <div className="flex-1 p-4">
+            <Skeleton className="h-full w-full rounded-lg" />
+          </div>
+          <div className="w-80 border-l p-3 space-y-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-full" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   function handleDragStart(event: DragStartEvent) {
     setActiveDragId(String(event.active.id));
