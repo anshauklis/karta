@@ -1,4 +1,4 @@
-import json
+import api.json_util as json
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import text
 
@@ -9,7 +9,7 @@ from api.auth.dependencies import get_current_user
 router = APIRouter(prefix="/api/drafts/charts", tags=["chart_drafts"])
 
 _DRAFT_COLS = """id, user_id, chart_id, dashboard_id, connection_id, dataset_id,
-    title, description, mode, chart_type, chart_config, chart_code, sql_query, updated_at"""
+    title, description, mode, chart_type, chart_config, chart_code, sql_query, variables, updated_at"""
 
 
 @router.get("/{chart_id}", response_model=ChartDraftResponse, summary="Get chart draft")
@@ -63,6 +63,7 @@ def upsert_draft(chart_id: str, req: ChartDraftUpsert, current_user: dict = Depe
                         mode = :mode, chart_type = :chart_type,
                         chart_config = CAST(:chart_config AS jsonb),
                         chart_code = :chart_code, sql_query = :sql_query,
+                        variables = CAST(:variables AS jsonb),
                         updated_at = NOW()
                     WHERE id = :id
                 """),
@@ -78,6 +79,7 @@ def upsert_draft(chart_id: str, req: ChartDraftUpsert, current_user: dict = Depe
                     "chart_config": config_json,
                     "chart_code": req.chart_code,
                     "sql_query": req.sql_query,
+                    "variables": json.dumps(req.variables) if req.variables else None,
                 },
             )
             draft_id = existing[0]
@@ -86,10 +88,11 @@ def upsert_draft(chart_id: str, req: ChartDraftUpsert, current_user: dict = Depe
                 text(f"""
                     INSERT INTO chart_drafts (user_id, chart_id, dashboard_id, connection_id,
                         dataset_id, title, description, mode, chart_type,
-                        chart_config, chart_code, sql_query)
+                        chart_config, chart_code, sql_query, variables)
                     VALUES (:uid, :cid, :dashboard_id, :connection_id,
                         :dataset_id, :title, :description, :mode, :chart_type,
-                        CAST(:chart_config AS jsonb), :chart_code, :sql_query)
+                        CAST(:chart_config AS jsonb), :chart_code, :sql_query,
+                        CAST(:variables AS jsonb))
                     RETURNING id
                 """),
                 {
@@ -105,6 +108,7 @@ def upsert_draft(chart_id: str, req: ChartDraftUpsert, current_user: dict = Depe
                     "chart_config": config_json,
                     "chart_code": req.chart_code,
                     "sql_query": req.sql_query,
+                    "variables": json.dumps(req.variables) if req.variables else None,
                 },
             )
             draft_id = result.scalar()

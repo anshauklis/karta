@@ -287,9 +287,12 @@ CREATE TABLE IF NOT EXISTS chart_drafts (
     chart_config    JSONB DEFAULT '{}',
     chart_code      TEXT DEFAULT '',
     sql_query       TEXT DEFAULT '',
+    variables       JSONB DEFAULT NULL,
     updated_at      TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id, chart_id)
 );
+
+ALTER TABLE chart_drafts ADD COLUMN IF NOT EXISTS variables JSONB DEFAULT NULL;
 
 ALTER TABLE dashboard_filters ADD COLUMN IF NOT EXISTS group_name TEXT;
 ALTER TABLE dashboards ADD COLUMN IF NOT EXISTS filter_layout JSONB DEFAULT '{}';

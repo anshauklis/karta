@@ -634,6 +634,7 @@ class ChartDraftUpsert(BaseModel):
     chart_config: dict = {}
     chart_code: str = ""
     sql_query: str = ""
+    variables: list[dict] | None = None
 
 class ChartDraftResponse(BaseModel):
     id: int
@@ -649,6 +650,7 @@ class ChartDraftResponse(BaseModel):
     chart_config: dict
     chart_code: str
     sql_query: str
+    variables: list[dict] | None = None
     updated_at: datetime
 
 

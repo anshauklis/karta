@@ -646,6 +646,7 @@ export interface ChartDraft {
   chart_config: Record<string, unknown>;
   chart_code: string;
   sql_query: string;
+  variables: ChartVariable[] | null;
   updated_at: string;
 }
 
@@ -660,4 +661,5 @@ export interface ChartDraftUpsert {
   chart_config?: Record<string, unknown>;
   chart_code?: string;
   sql_query?: string;
+  variables?: ChartVariable[] | null;
 }

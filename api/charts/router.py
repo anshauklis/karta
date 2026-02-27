@@ -1659,7 +1659,6 @@ def _execute_chart_full(
     user_id: int | None = None,
     skip_metrics: bool = False,
     cache_ttl: int | None = None,
-    extra_params: dict | None = None,
 ) -> tuple[list, list, pd.DataFrame, str | None]:
     """Execute chart via DuckDB pipeline: Parquet cache → CTE chain → small DataFrame.
 
@@ -1772,10 +1771,6 @@ def _execute_chart_full(
         skip_metrics=skip_metrics,
     )
 
-    # Merge extra params (e.g. SQL variable substitutions) into pipeline params
-    if extra_params:
-        params = {**(params or {}), **extra_params}
-
     # --- Execute via DuckDB ---
     if db_type == "duckdb":
         con = duckdb.connect(c["database_name"], read_only=True)
@@ -1827,6 +1822,7 @@ async def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, c
         "code": chart.get("chart_code", ""),
         "m": chart.get("mode"),
         "u": str(chart.get("updated_at", "")),
+        "vv": (req.variable_values if req else None) or {},
     }, sort_keys=True)
     _config_hash = hashlib.sha256(_config_hash_raw.encode()).hexdigest()[:16]
 
@@ -1870,15 +1866,15 @@ async def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, c
     if not sql_query or not connection_id:
         return ChartExecuteResponse(error={"code": "MISSING_CONFIG", "message": "Chart has no SQL query or connection"})
 
-    # Substitute {{ variable }} placeholders with DuckDB $param placeholders
+    # Substitute {{ variable }} placeholders with literal values
     from api.sql_params import extract_variables, substitute as var_substitute
-    _var_params: dict = {}
     chart_vars = chart.get("variables") or []
     var_defaults = {v["name"]: v.get("default") for v in chart_vars if v.get("name")}
+    var_types = {v["name"]: v.get("type", "text") for v in chart_vars if v.get("name")}
     runtime_values = (req.variable_values if req else None) or {}
     if extract_variables(sql_query):
         try:
-            sql_query, _var_params = var_substitute(sql_query, runtime_values, var_defaults)
+            sql_query = var_substitute(sql_query, runtime_values, var_defaults, var_types)
         except ValueError as e:
             return ChartExecuteResponse(error=_classify_error(e))
 
@@ -1912,7 +1908,7 @@ async def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, c
     try:
         columns, rows, df, pq_path = await asyncio.to_thread(
             _execute_chart_full, connection_id, sql_query, chart_config,
-            filters, uid, _skip_metrics, _pq_ttl, _var_params or None)
+            filters, uid, _skip_metrics, _pq_ttl)
     except Exception as e:
         return ChartExecuteResponse(error=_classify_error(e))
 
@@ -2002,15 +1998,15 @@ async def preview_chart(req: ChartPreviewRequest, current_user: dict = Depends(g
     if not sql_query or not connection_id:
         return ChartExecuteResponse(error={"code": "MISSING_CONFIG", "message": "SQL query and connection are required"})
 
-    # Substitute {{ variable }} placeholders with DuckDB $param placeholders
+    # Substitute {{ variable }} placeholders with literal values
     from api.sql_params import extract_variables, substitute as var_substitute
-    _var_params: dict = {}
     preview_vars = req.variables or []
     var_defaults = {v["name"]: v.get("default") for v in preview_vars if v.get("name")}
+    var_types = {v["name"]: v.get("type", "text") for v in preview_vars if v.get("name")}
     runtime_values = req.variable_values or {}
     if extract_variables(sql_query):
         try:
-            sql_query, _var_params = var_substitute(sql_query, runtime_values, var_defaults)
+            sql_query = var_substitute(sql_query, runtime_values, var_defaults, var_types)
         except ValueError as e:
             return ChartExecuteResponse(error=_classify_error(e))
 
@@ -2035,7 +2031,7 @@ async def preview_chart(req: ChartPreviewRequest, current_user: dict = Depends(g
     try:
         columns, rows, df, pq_path = await asyncio.to_thread(
             _execute_chart_full, connection_id, sql_query, chart_config,
-            req.filters, uid, _skip_metrics, _pq_ttl, _var_params or None)
+            req.filters, uid, _skip_metrics, _pq_ttl)
     except Exception as e:
         return ChartExecuteResponse(error=_classify_error(e))
 
@@ -2112,6 +2108,17 @@ async def chart_thumbnail(
     connection_id, sql_query = _resolve_chart_sql(chart)
     if not sql_query or not connection_id:
         raise HTTPException(status_code=400, detail="Chart has no SQL query or connection")
+
+    # Substitute {{ variable }} placeholders with literal values (defaults only for thumbnails)
+    from api.sql_params import extract_variables, substitute as var_substitute
+    chart_vars = chart.get("variables") or []
+    var_defaults = {v["name"]: v.get("default") for v in chart_vars if v.get("name")}
+    var_types = {v["name"]: v.get("type", "text") for v in chart_vars if v.get("name")}
+    if extract_variables(sql_query):
+        try:
+            sql_query = var_substitute(sql_query, {}, var_defaults, var_types)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Variable substitution error: {str(e)}")
 
     chart_config = chart.get("chart_config", {}) or {}
 

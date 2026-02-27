@@ -174,6 +174,7 @@ export function useChartEditor(slug: string, id: string) {
       configUndo.reset(draft.chart_config);
     }
     if (draft.chart_code) setChartCode(draft.chart_code);
+    if (draft.variables) setChartVariables(draft.variables);
   };
 
   // --- Unified initial load: draft-first ---
@@ -642,6 +643,7 @@ export function useChartEditor(slug: string, id: string) {
       chart_config: chartConfig,
       chart_code: chartCode,
       sql_query: sqlQuery,
+      variables: chartVariables.length > 0 ? chartVariables : null,
     };
 
     // Keep flush function up-to-date with latest data
@@ -652,7 +654,7 @@ export function useChartEditor(slug: string, id: string) {
       flushDraftRef.current = null; // saved — nothing to flush
     }, 3000);
     return () => clearTimeout(draftTimerRef.current);
-  }, [title, description, sqlQuery, mode, chartType, chartConfig, chartCode, connectionId, datasetId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [title, description, sqlQuery, mode, chartType, chartConfig, chartCode, connectionId, datasetId, chartVariables]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Flush unsaved draft immediately on unmount (only for new charts)
   useEffect(() => {
