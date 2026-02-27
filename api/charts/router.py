@@ -21,11 +21,49 @@ router = APIRouter(tags=["charts"])
 
 
 def _classify_error(error: str | Exception) -> dict:
-    """Classify a chart execution error into a structured response."""
+    """Classify a chart execution error into a structured response.
+
+    Returns a dict with:
+      - code: machine-readable error code
+      - message: user-friendly message (safe to show in UI)
+      - detail: original error text for debugging (optional)
+      - column / field / suggestion: extra context when available
+    """
     msg = str(error)
     msg_lower = msg.lower()
 
-    # Column not found
+    # --- Connection timeout ---
+    if any(kw in msg_lower for kw in (
+        "connection timed out", "connect timeout", "server closed the connection unexpectedly",
+        "canceling statement due to statement timeout", "statement_timeout",
+    )):
+        return {
+            "code": "CONNECTION_TIMEOUT",
+            "message": "Database is not responding. Check your connection settings.",
+            "detail": msg,
+        }
+
+    # --- Connection refused / unreachable ---
+    if any(kw in msg_lower for kw in (
+        "connection refused", "could not connect", "connection reset",
+        "no route to host", "network is unreachable", "name or service not known",
+        "could not translate host name",
+    )):
+        return {
+            "code": "CONNECTION_REFUSED",
+            "message": "Cannot connect to database. Verify host and port.",
+            "detail": msg,
+        }
+
+    # --- Permission denied ---
+    if "permission denied" in msg_lower or "access denied" in msg_lower or "insufficient privilege" in msg_lower:
+        return {
+            "code": "PERMISSION_DENIED",
+            "message": "Access denied. Contact your administrator.",
+            "detail": msg,
+        }
+
+    # --- Column not found ---
     if "column" in msg_lower and ("not found" in msg_lower or "does not exist" in msg_lower or "not in index" in msg_lower):
         match = re.search(r'column "([^"]+)"', msg) or re.search(r"column '([^']+)'", msg) or re.search(r'Key(?:Error)?: ["\']([^"\']+)', msg)
         field = None
@@ -33,56 +71,96 @@ def _classify_error(error: str | Exception) -> dict:
             field = "x_column"
         elif "y_column" in msg_lower:
             field = "y_columns"
+        col_name = match.group(1) if match else None
+        friendly = f'Column "{col_name}" not found.' if col_name else "Column not found."
         return {
             "code": "COLUMN_NOT_FOUND",
-            "message": msg,
-            "column": match.group(1) if match else None,
+            "message": friendly,
+            "detail": msg,
+            "column": col_name,
             "field": field,
         }
 
-    # SQL execution errors
-    if any(kw in msg_lower for kw in ("syntax error", "relation", "does not exist", "permission denied", "query execution failed")):
+    # --- SQL syntax error ---
+    if "syntax error" in msg_lower:
+        # Try to extract the relevant fragment near the syntax error
+        line_match = re.search(r'(?:at or near|near) "([^"]+)"', msg) or re.search(r"(?:at or near|near) '([^']+)'", msg)
+        fragment = line_match.group(1) if line_match else None
+        friendly = f'SQL syntax error near "{fragment}".' if fragment else "SQL syntax error in query."
+        return {
+            "code": "SQL_SYNTAX",
+            "message": friendly,
+            "detail": msg,
+        }
+
+    # --- Division by zero ---
+    if "division by zero" in msg_lower or "divide by zero" in msg_lower:
+        return {
+            "code": "DIVISION_BY_ZERO",
+            "message": "Division by zero in query.",
+            "detail": msg,
+        }
+
+    # --- Data type mismatch ---
+    if any(kw in msg_lower for kw in (
+        "invalid input syntax for type", "cannot cast", "type mismatch",
+        "operator does not exist", "could not convert", "incompatible types",
+    )):
+        return {
+            "code": "TYPE_MISMATCH",
+            "message": "Data type mismatch. Check column types.",
+            "detail": msg,
+        }
+
+    # --- Out of memory / resource limit ---
+    if any(kw in msg_lower for kw in (
+        "out of memory", "oom", "resource limit", "memory limit",
+        "too many rows", "result set too large", "exceeded memory",
+        "cannot allocate memory",
+    )):
+        return {
+            "code": "OUT_OF_MEMORY",
+            "message": "Query returns too much data. Try adding filters to reduce the result set.",
+            "detail": msg,
+        }
+
+    # --- General SQL execution errors (relation missing, etc.) ---
+    if any(kw in msg_lower for kw in ("relation", "does not exist", "query execution failed")):
         return {
             "code": "SQL_EXECUTION_ERROR",
             "message": msg,
         }
 
-    # Missing config
+    # --- General timeout (query ran too long) ---
+    if "timeout" in msg_lower or "timed out" in msg_lower:
+        return {
+            "code": "CONNECTION_TIMEOUT",
+            "message": "Database is not responding. Check your connection settings.",
+            "detail": msg,
+        }
+
+    # --- Missing config ---
     if "missing" in msg_lower and ("config" in msg_lower or "column" in msg_lower or "required" in msg_lower):
         return {
             "code": "MISSING_CONFIG",
             "message": msg,
         }
 
-    # Empty data
+    # --- Empty data ---
     if "empty" in msg_lower or "no data" in msg_lower or "no rows" in msg_lower:
         return {
             "code": "EMPTY_DATA",
             "message": msg,
         }
 
-    # Code execution errors (Python code mode)
+    # --- Code execution errors (Python code mode) ---
     if any(kw in msg_lower for kw in ("nameerror", "typeerror", "valueerror", "attributeerror", "indentationerror", "syntaxerror")):
         return {
             "code": "CODE_EXECUTION_ERROR",
             "message": msg,
         }
 
-    # Timeout
-    if "timeout" in msg_lower or "timed out" in msg_lower or "statement_timeout" in msg_lower:
-        return {
-            "code": "TIMEOUT",
-            "message": msg,
-        }
-
-    # Connection errors
-    if any(kw in msg_lower for kw in ("connection refused", "could not connect", "connection reset", "connection timed out")):
-        return {
-            "code": "CONNECTION_ERROR",
-            "message": msg,
-        }
-
-    # Generic fallback
+    # --- Generic fallback ---
     return {
         "code": "EXECUTION_ERROR",
         "message": msg,

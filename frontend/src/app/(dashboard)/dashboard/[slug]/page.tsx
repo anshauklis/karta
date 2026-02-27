@@ -8,6 +8,7 @@ import { useDashboardTabs } from "@/hooks/use-tabs";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDashboardCharts, useExecuteChart, useUpdateChart, chartResultKey } from "@/hooks/use-charts";
 import { ChartCard } from "@/components/charts/chart-card";
+import { ChartErrorBoundary } from "@/components/charts/chart-error-boundary";
 import { TabContainer } from "@/components/charts/tab-container";
 import { TextBlockEditor } from "@/components/text-block-editor";
 import { Badge } from "@/components/ui/badge";
@@ -567,33 +568,35 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
         >
           {visibleCharts.map((chart) => (
             <div key={String(chart.id)}>
-              {chart.chart_type === "tabs" ? (
-                <div className="h-full">
-                  <TabContainer
+              <ChartErrorBoundary chartTitle={chart.title} onRetry={() => handleRefreshChart(chart.id)}>
+                {chart.chart_type === "tabs" ? (
+                  <div className="h-full">
+                    <TabContainer
+                      chart={chart}
+                      allCharts={charts || []}
+                      results={results}
+                      executing={executing}
+                      isEditing={false}
+                      onUpdateConfig={(config) =>
+                        updateChart.mutate({ chartId: chart.id, data: { chart_config: config } })
+                      }
+                      onEdit={handleEditChart}
+                      onRefresh={handleRefreshChart}
+                    />
+                  </div>
+                ) : (
+                  <ChartCard
                     chart={chart}
-                    allCharts={charts || []}
-                    results={results}
-                    executing={executing}
-                    isEditing={false}
-                    onUpdateConfig={(config) =>
-                      updateChart.mutate({ chartId: chart.id, data: { chart_config: config } })
-                    }
-                    onEdit={handleEditChart}
+                    result={results[chart.id]}
+                    isExecuting={executing.has(chart.id)}
+                    editHref={chart.chart_type !== "text" ? `/dashboard/${slug}/chart/${chart.id}` : undefined}
                     onRefresh={handleRefreshChart}
+                    onEdit={handleEditChart}
+                    onDataPointClick={handleDataPointClick}
+                    onToggleComments={handleToggleComments}
                   />
-                </div>
-              ) : (
-                <ChartCard
-                  chart={chart}
-                  result={results[chart.id]}
-                  isExecuting={executing.has(chart.id)}
-                  editHref={chart.chart_type !== "text" ? `/dashboard/${slug}/chart/${chart.id}` : undefined}
-                  onRefresh={handleRefreshChart}
-                  onEdit={handleEditChart}
-                  onDataPointClick={handleDataPointClick}
-                  onToggleComments={handleToggleComments}
-                />
-              )}
+                )}
+              </ChartErrorBoundary>
             </div>
           ))}
         </ReactGridLayout>

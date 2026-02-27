@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { ChartCard } from "@/components/charts/chart-card";
+import { ChartErrorBoundary } from "@/components/charts/chart-error-boundary";
 import { TabContainer } from "@/components/charts/tab-container";
 import type { Chart, ChartExecuteResult } from "@/types";
 
@@ -54,16 +55,18 @@ export function MobileDashboard({
         if (chart.chart_type === "tabs") {
           return (
             <div key={chart.id} style={{ height: heightPx }}>
-              <TabContainer
-                chart={chart}
-                allCharts={allCharts}
-                results={results}
-                executing={executing}
-                isEditing={false}
-                onUpdateConfig={(config) => onUpdateTabConfig?.(chart.id, config)}
-                onEdit={onEdit}
-                onRefresh={onRefresh}
-              />
+              <ChartErrorBoundary chartTitle={chart.title} onRetry={() => onRefresh?.(chart.id)}>
+                <TabContainer
+                  chart={chart}
+                  allCharts={allCharts}
+                  results={results}
+                  executing={executing}
+                  isEditing={false}
+                  onUpdateConfig={(config) => onUpdateTabConfig?.(chart.id, config)}
+                  onEdit={onEdit}
+                  onRefresh={onRefresh}
+                />
+              </ChartErrorBoundary>
             </div>
           );
         }
@@ -74,21 +77,23 @@ export function MobileDashboard({
             className="w-full"
             style={{ height: heightPx }}
           >
-            <ChartCard
-              chart={chart}
-              result={results[chart.id]}
-              isExecuting={executing.has(chart.id)}
-              editHref={
-                editHrefPrefix && chart.chart_type !== "text"
-                  ? `${editHrefPrefix}/${chart.id}`
-                  : undefined
-              }
-              showActions={showActions}
-              onEdit={onEdit}
-              onRefresh={onRefresh}
-              onDataPointClick={onDataPointClick}
-              onToggleComments={onToggleComments}
-            />
+            <ChartErrorBoundary chartTitle={chart.title} onRetry={() => onRefresh?.(chart.id)}>
+              <ChartCard
+                chart={chart}
+                result={results[chart.id]}
+                isExecuting={executing.has(chart.id)}
+                editHref={
+                  editHrefPrefix && chart.chart_type !== "text"
+                    ? `${editHrefPrefix}/${chart.id}`
+                    : undefined
+                }
+                showActions={showActions}
+                onEdit={onEdit}
+                onRefresh={onRefresh}
+                onDataPointClick={onDataPointClick}
+                onToggleComments={onToggleComments}
+              />
+            </ChartErrorBoundary>
           </div>
         );
       })}

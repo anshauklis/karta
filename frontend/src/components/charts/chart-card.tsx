@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Pencil, RefreshCw, Loader2, Download, FileSpreadsheet, Info, MessageSquare, Maximize2, Copy, BarChart3, MoreHorizontal, Bot, ArrowRightLeft, Check } from "lucide-react";
+import { Pencil, RefreshCw, Loader2, Download, FileSpreadsheet, Info, MessageSquare, Maximize2, Copy, BarChart3, MoreHorizontal, Bot, ArrowRightLeft, Check, AlertTriangle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
   DropdownMenu,
@@ -259,8 +259,28 @@ export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, e
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : result?.error ? (
-          <div className="flex h-full items-center justify-center p-4">
-            <p className="text-center text-sm text-red-500">{typeof result.error === 'string' ? result.error : result.error?.message}</p>
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-4">
+            <AlertTriangle className="h-8 w-8 text-red-400" />
+            <p className="text-center text-sm text-red-500 max-w-xs">
+              {typeof result.error === "string"
+                ? result.error
+                : result.error?.message || "An error occurred"}
+            </p>
+            {typeof result.error === "object" && result.error?.code && (
+              <span className="text-[10px] text-muted-foreground font-mono">{result.error.code}</span>
+            )}
+            {onRefresh && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs mt-1"
+                onClick={handleRefresh}
+                disabled={isExecuting}
+              >
+                <RefreshCw className={`mr-1 h-3 w-3 ${isExecuting ? "animate-spin" : ""}`} />
+                Retry
+              </Button>
+            )}
           </div>
         ) : result?.figure ? (
           <PlotlyChart figure={result.figure} className="h-full w-full" onDataPointClick={handleDataPointClick} />

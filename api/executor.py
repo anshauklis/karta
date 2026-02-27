@@ -1,4 +1,5 @@
-import json
+import api.json_util as json
+import logging
 import multiprocessing
 import re
 import pandas as pd
@@ -6,6 +7,8 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
+log = logging.getLogger(__name__)
 from api.pivot_postprocessing import run_pipeline
 
 EXEC_TIMEOUT = 30
@@ -70,6 +73,7 @@ _DANGEROUS_CALL_PATTERNS = (
     "to_csv", "to_excel", "to_parquet",
     "subprocess", "os.", "sys.", "importlib",
     "read_file", "write_file",
+    "read_text", "read_blob", "ATTACH", "INSTALL", "LOAD",
 )
 
 # Explicit whitelist of allowed builtins (no exec, eval, open, getattr, etc.)
@@ -225,17 +229,36 @@ def build_visual_chart(chart_type: str, config: dict, df: pd.DataFrame) -> dict 
         color = color_col
         y = y_cols[0] if y_cols else None
 
-    # --- Render via registry ---
-    fig = renderer.render(df, x_col, y, color, config, df_melted)
-    if fig is None:
-        return None
+    # --- Render via registry (wrapped for graceful fallback) ---
+    try:
+        fig = renderer.render(df, x_col, y, color, config, df_melted)
+        if fig is None:
+            return None
+    except Exception as exc:
+        log.warning("Renderer %s crashed: %s", chart_type, exc, exc_info=True)
+        raise ValueError(f"Chart rendering failed for type '{chart_type}': {exc}") from exc
 
     # --- Common post-processing ---
-    _apply_overlays(fig, config, chart_type, df, x_col, y_cols)
-    _apply_tooltips(fig, config, chart_type, df)
-    _apply_reference_lines(fig, config)
-    _apply_styling(fig, config, color_palette, number_format, orientation, show_legend,
-                   x_label, y_label)
+    try:
+        _apply_overlays(fig, config, chart_type, df, x_col, y_cols)
+    except Exception as exc:
+        log.warning("Overlay failed for %s: %s", chart_type, exc)
+
+    try:
+        _apply_tooltips(fig, config, chart_type, df)
+    except Exception as exc:
+        log.warning("Tooltips failed for %s: %s", chart_type, exc)
+
+    try:
+        _apply_reference_lines(fig, config)
+    except Exception as exc:
+        log.warning("Reference lines failed for %s: %s", chart_type, exc)
+
+    try:
+        _apply_styling(fig, config, color_palette, number_format, orientation, show_legend,
+                       x_label, y_label)
+    except Exception as exc:
+        log.warning("Styling failed for %s: %s", chart_type, exc)
 
     return fig.to_plotly_json()
 
@@ -1128,7 +1151,7 @@ def _serialize_pivot_from_code(pivot: pd.DataFrame, max_columns: int = MAX_PIVOT
     }
 
 
-def _code_runner(code, df_data, result_queue):
+def _code_runner(code, df_data, result_queue, parquet_path=None):
     """Target function for subprocess: runs user code in restricted namespace."""
     import sys as _sys
     _sys.setrecursionlimit(200)
@@ -1141,6 +1164,13 @@ def _code_runner(code, df_data, result_queue):
         from plotly.subplots import make_subplots as _ms
 
         _df = _pd.DataFrame(df_data)
+
+        # Create DuckDB connection if Parquet path provided
+        _con = None
+        if parquet_path:
+            import duckdb as _duckdb
+            _con = _duckdb.connect()  # in-memory
+            _con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{parquet_path}')")
 
         # Build whitelist builtins
         _all = (
@@ -1155,10 +1185,14 @@ def _code_runner(code, df_data, result_queue):
             "pandas", "numpy", "plotly", "plotly.express", "plotly.graph_objects",
             "plotly.subplots", "plotly.figure_factory", "math", "datetime",
             "collections", "itertools", "functools", "statistics", "json", "re",
+            "duckdb",
         }
 
+        # Prefixes of allowed packages (internal submodule imports)
+        _ok_prefixes = ("numpy.", "plotly.", "pandas.", "duckdb.")
+
         def _si(name, *a, **kw):
-            if name not in _ok_modules:
+            if name not in _ok_modules and not any(name.startswith(p) for p in _ok_prefixes):
                 raise ImportError(f"Import of '{name}' is not allowed")
             return _real_import(name, *a, **kw)
 
@@ -1168,6 +1202,7 @@ def _code_runner(code, df_data, result_queue):
             "__builtins__": _safe,
             "df": _df, "pd": _pd, "px": _px, "go": _go, "np": _np,
             "make_subplots": _ms,
+            "con": _con,
         }
 
         exec(code, _rg)  # noqa: S102 — intentional sandboxed exec
@@ -1199,7 +1234,7 @@ def _code_runner(code, df_data, result_queue):
         result_queue.put({"_error": str(e)})
 
 
-def execute_chart_code(code: str, df: pd.DataFrame) -> dict:
+def execute_chart_code(code: str, df: pd.DataFrame, parquet_path: str | None = None) -> dict:
     """Execute user Python code in restricted subprocess. Returns Plotly figure dict."""
     if not code.strip():
         raise ValueError("Empty code")
@@ -1217,7 +1252,7 @@ def execute_chart_code(code: str, df: pd.DataFrame) -> dict:
     # Run in subprocess for real isolation and killable timeout
     result_queue = multiprocessing.Queue()
     df_data = df.to_dict("list")
-    proc = multiprocessing.Process(target=_code_runner, args=(code, df_data, result_queue))
+    proc = multiprocessing.Process(target=_code_runner, args=(code, df_data, result_queue, parquet_path))
     proc.start()
     proc.join(timeout=EXEC_TIMEOUT)
 
