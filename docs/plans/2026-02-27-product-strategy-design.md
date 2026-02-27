@@ -81,8 +81,8 @@
 - Plugin/extension system (custom chart types, custom connectors)
 - dbt integration (import models as datasets)
 - Dashboard versioning + undo (audit log exists, need snapshot/restore)
-- Community: Discord server, issue templates, CODE_OF_CONDUCT
-- First external contributors
+- ~~Community: Discord server, issue templates, CODE_OF_CONDUCT~~ (deferred — depends on external adoption)
+- ~~First external contributors~~ (deferred — depends on community growth)
 
 **Q2 outcome**: Ecosystem, AI copilot, integrations. 1,000+ GitHub stars.
 
