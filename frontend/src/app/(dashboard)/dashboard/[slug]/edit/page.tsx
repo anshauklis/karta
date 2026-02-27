@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo, use } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, use, forwardRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useDashboardBySlug, useUpdateDashboard } from "@/hooks/use-dashboards";
@@ -135,6 +135,50 @@ function SortableTabItem({ id, children }: { id: string; children: React.ReactNo
     </div>
   );
 }
+
+type ResizeHandleAxis = "s" | "w" | "e" | "n" | "se" | "sw" | "ne" | "nw";
+
+const ResizeHandle = forwardRef<HTMLDivElement, { axis: ResizeHandleAxis }>(
+  ({ axis, ...props }, ref) => {
+    const positionClasses: Record<string, string> = {
+      s: "bottom-0 left-0 right-0 h-1.5 cursor-ns-resize",
+      n: "top-0 left-0 right-0 h-1.5 cursor-ns-resize",
+      w: "top-0 bottom-0 left-0 w-1.5 cursor-ew-resize",
+      e: "top-0 bottom-0 right-0 w-1.5 cursor-ew-resize",
+      se: "bottom-0 right-0 h-3 w-3 cursor-nwse-resize",
+      sw: "bottom-0 left-0 h-3 w-3 cursor-nesw-resize",
+      ne: "top-0 right-0 h-3 w-3 cursor-nesw-resize",
+      nw: "top-0 left-0 h-3 w-3 cursor-nwse-resize",
+    };
+
+    const isEdge = axis.length === 1;
+    const isCorner = axis.length === 2;
+
+    return (
+      <div
+        ref={ref}
+        className={`react-resizable-handle absolute z-30 opacity-0 group-hover:opacity-100 transition-opacity ${positionClasses[axis] || ""}`}
+        {...props}
+      >
+        {isCorner && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="h-1.5 w-1.5 rounded-full bg-blue-400/70" />
+          </div>
+        )}
+        {isEdge && (
+          <div
+            className={`absolute ${
+              axis === "s" || axis === "n"
+                ? "left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 h-0.5 w-8 rounded-full bg-blue-400/50"
+                : "top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 w-0.5 h-8 rounded-full bg-blue-400/50"
+            }`}
+          />
+        )}
+      </div>
+    );
+  }
+);
+ResizeHandle.displayName = "ResizeHandle";
 
 export default function DashboardEditPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -793,6 +837,10 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
           onDragStop={handleDragStop}
           onResizeStop={handleResizeStop}
           draggableHandle=".drag-handle"
+          resizeHandles={["s", "w", "e", "n", "se", "sw", "ne", "nw"]}
+          resizeHandle={(axis: ResizeHandleAxis, ref: React.Ref<HTMLElement>) => (
+            <ResizeHandle key={axis} ref={ref as React.Ref<HTMLDivElement>} axis={axis} />
+          )}
         >
           {visibleCharts.map((chart) => (
             <div key={String(chart.id)}>
