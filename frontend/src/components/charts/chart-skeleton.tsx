@@ -25,10 +25,20 @@ export function ChartSkeleton({ chartType }: ChartSkeletonProps) {
     );
   }
 
-  if (chartType === "pie" || chartType === "donut" || chartType === "treemap") {
+  if (chartType === "pie" || chartType === "donut") {
     return (
       <div className="flex h-full items-center justify-center p-4">
         <Skeleton className="aspect-square w-3/5 rounded-full" />
+      </div>
+    );
+  }
+
+  if (chartType === "treemap" || chartType === "funnel") {
+    return (
+      <div className="grid h-full grid-cols-3 grid-rows-2 gap-1.5 p-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="rounded" />
+        ))}
       </div>
     );
   }

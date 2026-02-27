@@ -84,6 +84,7 @@ export function MobileDashboard({
                 chart={chart}
                 result={results[chart.id]}
                 isExecuting={executing.has(chart.id)}
+                isFetching={executing.has(chart.id) && !!results[chart.id]}
                 editHref={
                   editHrefPrefix && chart.chart_type !== "text"
                     ? `${editHrefPrefix}/${chart.id}`

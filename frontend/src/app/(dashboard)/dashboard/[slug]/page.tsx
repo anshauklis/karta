@@ -80,6 +80,10 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
   const [showInfo, setShowInfo] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Record<string, unknown>>({});
   const [drillFilters, setDrillFilters] = useState<Record<string, unknown>>({});
+  const activeFiltersRef = useRef(activeFilters);
+  activeFiltersRef.current = activeFilters;
+  const drillFiltersRef = useRef(drillFilters);
+  drillFiltersRef.current = drillFilters;
   const [commentsChartId, setCommentsChartId] = useState<number | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [showDashComments, setShowDashComments] = useState(false);
@@ -213,8 +217,7 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
     if (executedRef.current.has(chartId)) return;
     executedRef.current.add(chartId);
     executeChartById(chartId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [executeChartById]);
 
   // Re-execute already-loaded charts when filters change
   const filtersSnap = useRef<string>("");
@@ -258,13 +261,13 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [charts, activeFilters, drillFilters]);
 
-  const executeChartById = async (chartId: number, filters?: Record<string, unknown>, force?: boolean) => {
+  const executeChartById = useCallback(async (chartId: number, filters?: Record<string, unknown>, force?: boolean) => {
     startTransition(() => {
       setExecuting((prev) => new Set(prev).add(chartId));
     });
     try {
       // If no explicit resolved filters provided, resolve from current active + drill filters
-      const resolved = filters ?? resolveFiltersForChart(chartId, { ...activeFilters, ...drillFilters });
+      const resolved = filters ?? resolveFiltersForChart(chartId, { ...activeFiltersRef.current, ...drillFiltersRef.current });
       const result = await executeChart.mutateAsync({ chartId, filters: Object.keys(resolved).length > 0 ? resolved : undefined, force });
       // Persist to TanStack Query cache for cross-navigation
       queryClient.setQueryData(chartResultKey(chartId, Object.keys(resolved).length > 0 ? resolved : undefined), result);
@@ -287,12 +290,11 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
         });
       });
     }
-  };
+  }, [resolveFiltersForChart, executeChart, queryClient]);
 
   const handleRefreshChart = useCallback((chartId: number) => {
     executeChartById(chartId, undefined, true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [executeChartById]);
 
   const handleEditTextBlock = useCallback((chartId: number) => {
     setEditingTextChartId(chartId);

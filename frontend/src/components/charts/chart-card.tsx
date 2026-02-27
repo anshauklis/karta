@@ -290,7 +290,7 @@ export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, i
                 disabled={isExecuting}
               >
                 <RefreshCw className={`mr-1 h-3 w-3 ${isExecuting ? "animate-spin" : ""}`} />
-                Retry
+                {tc("refresh")}
               </Button>
             )}
           </div>
