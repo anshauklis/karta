@@ -30,6 +30,8 @@ from api.models import (
     AIGlossaryCreate,
     AIGlossaryUpdate,
     AIGlossaryResponse,
+    AISuggestChartConfigRequest,
+    AISuggestChartConfigResponse,
 )
 from api.ai.llm_client import is_ai_enabled, chat_completion
 from api.ai.prompts import (
@@ -37,6 +39,8 @@ from api.ai.prompts import (
     build_generate_sql_prompt,
     build_fix_sql_prompt,
     build_summarize_prompt,
+    build_suggest_chart_config_prompt,
+    SUGGEST_CHART_CONFIG_TOOL,
 )
 from api.ai.tools import get_schema as tool_get_schema, TOOL_DEFINITIONS, TOOL_MAP
 
@@ -280,6 +284,80 @@ async def summarize(req: AISummarizeRequest, current_user: dict = Depends(get_cu
     response = await chat_completion(messages)
     text_content = response["choices"][0]["message"]["content"]
     return AITextResponse(text=text_content)
+
+
+@router.post(
+    "/suggest-chart-config",
+    response_model=AISuggestChartConfigResponse,
+    summary="Suggest chart config from natural language",
+)
+async def suggest_chart_config(
+    req: AISuggestChartConfigRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate a chart configuration from a natural-language description.
+
+    Uses function calling to return structured output. The config is NOT saved
+    to the database — the frontend applies it in the chart editor so the user
+    can tweak before saving.
+    """
+    _require_ai_enabled()
+
+    system_prompt = build_suggest_chart_config_prompt(
+        columns=req.columns,
+        current_config=req.current_config,
+        current_chart_type=req.current_chart_type,
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": req.prompt},
+    ]
+
+    # Use function calling to get structured output
+    response = await chat_completion(
+        messages,
+        tools=[SUGGEST_CHART_CONFIG_TOOL],
+        temperature=0.1,
+    )
+
+    choice = response["choices"][0]
+    msg = choice["message"]
+
+    # Extract from tool call if the model used function calling
+    tool_calls = msg.get("tool_calls")
+    if tool_calls:
+        for tc in tool_calls:
+            if tc["function"]["name"] == "suggest_chart_config":
+                args = json.loads(tc["function"]["arguments"])
+                return AISuggestChartConfigResponse(
+                    chart_type=args.get("chart_type", "bar"),
+                    chart_config=args.get("chart_config", {}),
+                    title=args.get("title"),
+                    explanation=args.get("explanation"),
+                )
+
+    # Fallback: try to parse JSON from text content
+    content = msg.get("content", "")
+    try:
+        # Try to find JSON in the response
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            parsed = json.loads(json_match.group())
+            return AISuggestChartConfigResponse(
+                chart_type=parsed.get("chart_type", "bar"),
+                chart_config=parsed.get("chart_config", {}),
+                title=parsed.get("title"),
+                explanation=parsed.get("explanation"),
+            )
+    except (json.JSONDecodeError, AttributeError):
+        pass
+
+    # Last resort: return a basic config
+    raise HTTPException(
+        status_code=422,
+        detail="AI could not generate a valid chart configuration. Please try rephrasing your request.",
+    )
 
 
 # --- Glossary (admin only) ---

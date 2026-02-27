@@ -49,6 +49,8 @@ export interface ChartHeaderProps {
   previewing?: boolean;
   templates?: ChartTemplate[];
   onLoadTemplate?: (template: ChartTemplate) => void;
+  /** Optional AI builder component rendered between title and action buttons */
+  aiBuilder?: React.ReactNode;
 }
 
 export function ChartHeader({
@@ -71,6 +73,7 @@ export function ChartHeader({
   previewing,
   templates,
   onLoadTemplate,
+  aiBuilder,
 }: ChartHeaderProps) {
   const t = useTranslations("chart");
   const tc = useTranslations("common");
@@ -95,6 +98,13 @@ export function ChartHeader({
         />
         {previewing && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0" />}
       </div>
+
+      {/* AI Chart Builder */}
+      {aiBuilder && (
+        <div className="shrink-0">
+          {aiBuilder}
+        </div>
+      )}
 
       {/* Right: Undo/Redo + Save + overflow menu */}
       <div className="flex items-center gap-1 shrink-0">

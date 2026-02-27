@@ -239,6 +239,34 @@ export function useSummarizeChart() {
   });
 }
 
+// --- Suggest chart config hook ---
+
+export interface SuggestChartConfigParams {
+  prompt: string;
+  connection_id?: number;
+  dataset_id?: number;
+  columns: string[];
+  current_config?: Record<string, unknown>;
+  current_chart_type?: string;
+}
+
+export interface SuggestChartConfigResult {
+  chart_type: string;
+  chart_config: Record<string, unknown>;
+  sql_query?: string;
+  title?: string;
+  explanation?: string;
+}
+
+export function useSuggestChartConfig() {
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  return useMutation({
+    mutationFn: (params: SuggestChartConfigParams) =>
+      api.post<SuggestChartConfigResult>("/api/ai/suggest-chart-config", params, token),
+  });
+}
+
 // --- Glossary hooks ---
 
 export function useAIGlossary() {

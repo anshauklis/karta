@@ -720,6 +720,21 @@ class AIGlossaryResponse(BaseModel):
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+class AISuggestChartConfigRequest(BaseModel):
+    prompt: str
+    connection_id: Optional[int] = None
+    dataset_id: Optional[int] = None
+    columns: list[str] = []
+    current_config: Optional[dict] = None
+    current_chart_type: Optional[str] = None
+
+class AISuggestChartConfigResponse(BaseModel):
+    chart_type: str
+    chart_config: dict
+    sql_query: Optional[str] = None
+    title: Optional[str] = None
+    explanation: Optional[str] = None
+
 
 # --- Import/Export ---
 

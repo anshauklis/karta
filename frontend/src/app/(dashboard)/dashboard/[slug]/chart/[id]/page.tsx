@@ -85,6 +85,8 @@ import { CodeTab } from "./components/code-tab";
 import { CustomizeTab } from "./components/customize-tab";
 import { DataTab } from "./components/data-tab";
 import { useHotkey } from "@/hooks/use-hotkey";
+import { AIChartBuilder } from "@/components/ai/ai-chart-builder";
+import type { SuggestChartConfigResult } from "@/hooks/use-ai";
 
 const CHART_TYPE_ICONS: Record<string, { icon: React.ComponentType<{ className?: string }>; rotate?: boolean }> = {
   bar: { icon: BarChart3 },
@@ -198,6 +200,25 @@ export default function ChartEditorPage({
 
   // Ctrl+S / Cmd+S opens the save modal
   useHotkey("s", useCallback(() => setSaveModalOpen(true), [setSaveModalOpen]));
+
+  // AI chart builder: apply suggested config
+  const handleAISuggest = useCallback((suggestion: SuggestChartConfigResult) => {
+    if (suggestion.chart_type) {
+      setChartType(suggestion.chart_type);
+    }
+    if (suggestion.chart_config && typeof suggestion.chart_config === "object") {
+      setChartConfig((prev: Record<string, unknown>) => ({
+        ...prev,
+        ...suggestion.chart_config,
+      }));
+    }
+    if (suggestion.sql_query) {
+      setSqlQuery(suggestion.sql_query);
+    }
+    if (suggestion.title) {
+      setTitle(suggestion.title);
+    }
+  }, [setChartType, setChartConfig, setSqlQuery, setTitle]);
 
   // Auto-collapse header once connection + chart type are both selected
   useEffect(() => {
@@ -346,6 +367,16 @@ export default function ChartEditorPage({
           setChartType(t.chartType);
           setChartConfig((prev: Record<string, unknown>) => ({ ...prev, ...t.config }));
         }}
+        aiBuilder={
+          <AIChartBuilder
+            connectionId={connectionId}
+            datasetId={datasetId}
+            columns={availableColumns}
+            currentConfig={chartConfig as Record<string, unknown>}
+            currentChartType={chartType}
+            onSuggest={handleAISuggest}
+          />
+        }
       />
 
       {/* Source + Chart Type — top bar */}

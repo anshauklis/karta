@@ -148,6 +148,134 @@ def build_summarize_prompt() -> str:
     )
 
 
+def build_suggest_chart_config_prompt(
+    columns: list[str],
+    current_config: dict | None = None,
+    current_chart_type: str | None = None,
+) -> str:
+    """Build prompt for one-shot chart config suggestion from natural language."""
+    parts = [
+        "You are an expert data visualization assistant for Karta, a BI platform.",
+        "The user will describe the chart they want in natural language.",
+        "You must return a structured chart configuration by calling the `suggest_chart_config` function.",
+        "",
+        "## Available Chart Types",
+        "- bar: Vertical bar chart. Best for comparing categories.",
+        "- line: Line chart. Best for trends over time.",
+        "- area: Filled area chart. Good for cumulative trends.",
+        "- pie: Pie chart. Part-of-whole for <10 categories.",
+        "- donut: Donut chart (pie with hole).",
+        "- scatter: Scatter plot. X vs Y correlation.",
+        "- histogram: Distribution of a single column.",
+        "- kpi: Single big number metric.",
+        "- table: Data table with formatting.",
+        "- pivot: Pivot table with row/column grouping.",
+        "- bar_h: Horizontal bar. Good for long category names.",
+        "- combo: Bar + line overlay on dual Y axes.",
+        "- heatmap: 2D color grid showing intensity.",
+        "- box: Box plot for distribution quartiles.",
+        "- violin: Violin plot for distribution density.",
+        "- treemap: Hierarchical data as nested rectangles.",
+        "- funnel: Progressive reduction across stages.",
+        "- waterfall: Cumulative effect of sequential values.",
+        "- pareto: Bars sorted descending with cumulative % line.",
+        "- correlation: Correlation matrix heatmap.",
+        "- control: Statistical process control chart.",
+        "",
+        "## Key Config Fields",
+        "- x_column (string): Column for X axis",
+        "- y_columns (array of strings): Columns for Y axis / values",
+        "- color_column (string): Column for color grouping / series split",
+        "- show_legend (boolean): Show chart legend (default: true)",
+        "- show_values (boolean): Display data values on chart (default: false)",
+        "- color_palette (string): 'default', 'pastel', 'vivid', 'bold', 'dark', 'earth'",
+        "- number_format (string): '', 'percent', 'currency', 'compact'",
+        "- sort_order (string): 'none', 'asc', 'desc'",
+        "- stack_mode (string): 'none', 'stacked', 'grouped', 'percent' (bar/area)",
+        "- line_shape (string): 'linear', 'spline' (line charts)",
+        "- show_markers (boolean): Show data point markers (line charts)",
+        "- orientation (string): 'vertical', 'horizontal' (bar charts)",
+        "- bins (integer): Number of histogram bins (default: 20)",
+        "- kpi_target (number): Target value for KPI delta",
+        "- kpi_prefix (string): Prefix before KPI number (e.g. '$')",
+        "- kpi_suffix (string): Suffix after KPI number (e.g. '%')",
+        "- donut_hole (number): Donut hole size 0-1 (default: 0.4)",
+        "- x_axis_label (string): Custom X axis label",
+        "- y_axis_label (string): Custom Y axis label",
+        "- legend_position (string): 'auto', 'top', 'bottom', 'left', 'right'",
+        "- metrics (array): [{column, aggregate, label}] for aggregation",
+        "  - aggregate values: 'sum', 'avg', 'count', 'min', 'max', 'count_distinct'",
+        "- time_column (string): Column for time-based grouping",
+        "- time_grain (string): 'raw', 'day', 'week', 'month', 'quarter', 'year'",
+        "",
+        "## Rules",
+        "1. Choose the most appropriate chart type based on the user's description.",
+        "2. Map available columns to x_column, y_columns, color_column intelligently.",
+        "3. Only use columns that actually exist in the available columns list.",
+        "4. Set sensible defaults for styling (color_palette, show_legend, etc.).",
+        "5. If the user mentions aggregation (sum, average, count), add metrics.",
+        "6. If the user mentions time trends, set time_column and time_grain.",
+        "7. Optionally suggest a title that describes the chart.",
+        "8. If you cannot determine a good config, pick reasonable defaults.",
+        "9. Be concise in your explanation.",
+    ]
+
+    if columns:
+        parts.append("")
+        parts.append("## Available Columns")
+        parts.append(", ".join(columns))
+
+    if current_chart_type:
+        parts.append("")
+        parts.append(f"## Current Chart Type: {current_chart_type}")
+
+    if current_config:
+        import json
+        parts.append("")
+        parts.append("## Current Config")
+        parts.append(json.dumps(current_config, indent=2))
+
+    return "\n".join(parts)
+
+
+# Tool definition for structured output from suggest-chart-config endpoint
+SUGGEST_CHART_CONFIG_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "suggest_chart_config",
+        "description": "Return a structured chart configuration based on the user's description.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chart_type": {
+                    "type": "string",
+                    "enum": [
+                        "bar", "line", "area", "pie", "donut", "scatter",
+                        "histogram", "kpi", "table", "pivot", "bar_h",
+                        "combo", "heatmap", "box", "violin", "treemap",
+                        "funnel", "waterfall", "pareto", "correlation", "control",
+                    ],
+                    "description": "The chart type to use",
+                },
+                "chart_config": {
+                    "type": "object",
+                    "description": "Chart configuration object with fields like x_column, y_columns, color_column, metrics, etc.",
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Suggested chart title (optional)",
+                },
+                "explanation": {
+                    "type": "string",
+                    "description": "Brief explanation of why this config was chosen (1-2 sentences)",
+                },
+            },
+            "required": ["chart_type", "chart_config"],
+        },
+    },
+}
+
+
 def _load_glossary() -> list[dict]:
     """Load all glossary terms from database."""
     with engine.connect() as conn:
