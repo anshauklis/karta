@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { Copy, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,7 @@ function renderMarkdown(text: string): string {
 }
 
 export function ChatMessage({ role, content, sqlQuery, agentName }: ChatMessageProps) {
+  const t = useTranslations("copilot");
   const [copiedSql, setCopiedSql] = useState(false);
 
   const renderedContent = useMemo(() => renderMarkdown(content), [content]);
@@ -69,7 +71,7 @@ export function ChatMessage({ role, content, sqlQuery, agentName }: ChatMessageP
     if (!sqlQuery) return;
     navigator.clipboard.writeText(sqlQuery);
     setCopiedSql(true);
-    toast.success("SQL copied");
+    toast.success(t("sqlCopied"));
     setTimeout(() => setCopiedSql(false), 2000);
   };
 

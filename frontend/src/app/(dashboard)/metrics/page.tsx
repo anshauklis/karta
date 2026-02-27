@@ -193,10 +193,10 @@ export default function MetricsPage() {
                       {t("dimensions")}
                     </TableHead>
                     <TableHead className="hidden sm:table-cell w-[120px]">
-                      Updated
+                      {t("updated")}
                     </TableHead>
                     <TableHead className="w-[100px] text-right">
-                      Actions
+                      {t("actions")}
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -217,7 +217,7 @@ export default function MetricsPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {connectionMap.get(m.connection_id) ?? "Unknown"}
+                        {connectionMap.get(m.connection_id) ?? t("unknown")}
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-sm">
                         <Badge
@@ -246,7 +246,7 @@ export default function MetricsPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleOpenEdit(m)}
-                            title="Edit"
+                            title={tc("edit")}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -255,7 +255,7 @@ export default function MetricsPage() {
                             size="sm"
                             onClick={() => handleDelete(m)}
                             disabled={deletingId === m.id}
-                            title="Delete"
+                            title={tc("delete")}
                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                           >
                             {deletingId === m.id ? (

@@ -65,7 +65,7 @@ export function JoinEditor({
           <Label className="text-xs">{t("targetModel")} *</Label>
           <Select value={toModelId} onValueChange={setToModelId}>
             <SelectTrigger className="h-8 text-sm">
-              <SelectValue placeholder="Select model..." />
+              <SelectValue placeholder={t("selectModelPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="_none_">--</SelectItem>
@@ -100,7 +100,7 @@ export function JoinEditor({
           <Input
             value={fromColumn}
             onChange={(e) => setFromColumn(e.target.value)}
-            placeholder="e.g. customer_id"
+            placeholder={t("fromColumnPlaceholder")}
             className="h-8 text-sm font-mono"
           />
         </div>
@@ -109,7 +109,7 @@ export function JoinEditor({
           <Input
             value={toColumn}
             onChange={(e) => setToColumn(e.target.value)}
-            placeholder="e.g. id"
+            placeholder={t("toColumnPlaceholder")}
             className="h-8 text-sm font-mono"
           />
         </div>

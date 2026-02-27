@@ -90,7 +90,7 @@ export function MeasureForm({
           <Input
             value={label}
             onChange={(e) => handleLabelChange(e.target.value)}
-            placeholder="e.g. Total Revenue"
+            placeholder={t("labelPlaceholder")}
             className="h-8 text-sm"
           />
         </div>
@@ -99,7 +99,7 @@ export function MeasureForm({
           <Input
             value={name}
             onChange={(e) => handleNameChange(e.target.value)}
-            placeholder="e.g. total_revenue"
+            placeholder={t("nameSlugPlaceholder")}
             className="h-8 text-sm font-mono"
           />
         </div>
@@ -111,7 +111,7 @@ export function MeasureForm({
           <Input
             value={expression}
             onChange={(e) => setExpression(e.target.value)}
-            placeholder="e.g. SUM(amount)"
+            placeholder={t("expressionPlaceholder")}
             className="h-8 text-sm font-mono"
           />
         </div>
@@ -143,11 +143,11 @@ export function MeasureForm({
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Description</Label>
+          <Label className="text-xs">{t("descriptionLabel")}</Label>
           <Input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Optional description"
+            placeholder={t("optionalDescription")}
             className="h-8 text-sm"
           />
         </div>

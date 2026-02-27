@@ -90,7 +90,7 @@ export function DimensionForm({
           <Input
             value={label}
             onChange={(e) => handleLabelChange(e.target.value)}
-            placeholder="e.g. Order Date"
+            placeholder={t("dimLabelPlaceholder")}
             className="h-8 text-sm"
           />
         </div>
@@ -99,7 +99,7 @@ export function DimensionForm({
           <Input
             value={name}
             onChange={(e) => handleNameChange(e.target.value)}
-            placeholder="e.g. order_date"
+            placeholder={t("dimNamePlaceholder")}
             className="h-8 text-sm font-mono"
           />
         </div>
@@ -111,7 +111,7 @@ export function DimensionForm({
           <Input
             value={columnName}
             onChange={(e) => setColumnName(e.target.value)}
-            placeholder="e.g. order_date"
+            placeholder={t("dimColumnPlaceholder")}
             className="h-8 text-sm font-mono"
           />
         </div>
@@ -135,7 +135,7 @@ export function DimensionForm({
             <Label className="text-xs">{t("timeGrain")}</Label>
             <Select value={timeGrain} onValueChange={setTimeGrain}>
               <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="Select..." />
+                <SelectValue placeholder={t("selectPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="_none_">--</SelectItem>
@@ -156,7 +156,7 @@ export function DimensionForm({
           <Input
             value={format}
             onChange={(e) => setFormat(e.target.value)}
-            placeholder="Optional format"
+            placeholder={t("optionalFormat")}
             className="h-8 text-sm font-mono"
           />
         </div>

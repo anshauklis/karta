@@ -9,37 +9,36 @@ interface SuggestedQuestionsProps {
   onSelect: (question: string) => void;
 }
 
-const QUESTIONS: Record<string, string[]> = {
-  dashboard: [
-    "What trends are visible?",
-    "Which metric changed most?",
-    "Summarize this dashboard",
-  ],
-  chart: [
-    "Explain this chart's data",
-    "How can I improve this visualization?",
-    "What patterns do you see?",
-  ],
-  "sql-lab": [
-    "Help me write a query",
-    "Optimize this SQL",
-    "Explain this schema",
-  ],
-  default: [
-    "Show me the database schema",
-    "What data is available?",
-    "Create a chart",
-  ],
-};
-
 export function SuggestedQuestions({ context, onSelect }: SuggestedQuestionsProps) {
   const t = useTranslations("copilot");
 
-  const questions = useMemo(() => {
-    if (context?.type && QUESTIONS[context.type]) {
-      return QUESTIONS[context.type];
+  const questionKeys = useMemo(() => {
+    switch (context?.type) {
+      case "dashboard":
+        return [
+          "questionDashboardTrends",
+          "questionDashboardMetric",
+          "questionDashboardSummarize",
+        ] as const;
+      case "chart":
+        return [
+          "questionChartExplain",
+          "questionChartImprove",
+          "questionChartPatterns",
+        ] as const;
+      case "sql-lab":
+        return [
+          "questionSqlHelp",
+          "questionSqlOptimize",
+          "questionSqlSchema",
+        ] as const;
+      default:
+        return [
+          "questionDefaultSchema",
+          "questionDefaultData",
+          "questionDefaultChart",
+        ] as const;
     }
-    return QUESTIONS.default;
   }, [context?.type]);
 
   return (
@@ -47,15 +46,18 @@ export function SuggestedQuestions({ context, onSelect }: SuggestedQuestionsProp
       <Sparkles className="h-8 w-8 mx-auto text-muted-foreground/50 mb-3" />
       <p className="text-sm text-muted-foreground mb-4">{t("suggestedTitle")}</p>
       <div className="space-y-2 px-2">
-        {questions.map((question) => (
-          <button
-            key={question}
-            onClick={() => onSelect(question)}
-            className="block w-full rounded-lg border border-border px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-          >
-            {question}
-          </button>
-        ))}
+        {questionKeys.map((key) => {
+          const question = t(key);
+          return (
+            <button
+              key={key}
+              onClick={() => onSelect(question)}
+              className="block w-full rounded-lg border border-border px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+            >
+              {question}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

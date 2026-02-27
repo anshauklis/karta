@@ -183,10 +183,10 @@ function ModelEditorForm({
     try {
       if (isEdit && modelId) {
         await updateModel.mutateAsync({ id: modelId, data: payload });
-        toast.success("Model updated");
+        toast.success(t("modelUpdated"));
       } else {
         await createModel.mutateAsync(payload);
-        toast.success("Model created");
+        toast.success(t("modelCreated"));
         onOpenChange(false);
       }
     } catch {
@@ -297,7 +297,7 @@ function ModelEditorForm({
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Orders"
+                  placeholder={t("namePlaceholder")}
                 />
               </div>
               <div className="space-y-2">
@@ -308,7 +308,7 @@ function ModelEditorForm({
                   disabled={isEdit}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select connection..." />
+                    <SelectValue placeholder={t("selectConnectionPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_none_">--</SelectItem>
@@ -324,11 +324,11 @@ function ModelEditorForm({
 
             {/* Description */}
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{t("descriptionLabel")}</Label>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional description of this model"
+                placeholder={t("descriptionPlaceholder")}
                 rows={2}
               />
             </div>
@@ -356,7 +356,7 @@ function ModelEditorForm({
                   <Input
                     value={sourceTable}
                     onChange={(e) => setSourceTable(e.target.value)}
-                    placeholder="e.g. public.orders"
+                    placeholder={t("sourceTablePlaceholder")}
                   />
                 </div>
               )}

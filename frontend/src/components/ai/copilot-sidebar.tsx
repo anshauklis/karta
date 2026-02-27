@@ -155,7 +155,7 @@ export function CopilotSidebar({
                         className="flex items-center justify-between"
                       >
                         <span className="truncate text-sm">
-                          {s.title || `Chat #${s.id}`}
+                          {s.title || t("chatFallbackTitle", { id: s.id })}
                         </span>
                       </DropdownMenuItem>
                     ))
