@@ -44,7 +44,8 @@ export function ShareDialog({ dashboardId, chartId, onClose }: ShareDialogProps)
   };
 
   const copyToClipboard = (token: string, id: number) => {
-    const url = `${window.location.origin}/shared/${token}`;
+    const path = chartId ? `/embed/chart/${token}` : `/shared/${token}`;
+    const url = `${window.location.origin}${path}`;
     navigator.clipboard.writeText(url);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);

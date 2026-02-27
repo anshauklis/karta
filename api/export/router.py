@@ -816,7 +816,7 @@ def get_shared_dashboard(token: str, filters: str | None = Query(None)):
 
     with engine.connect() as conn:
         link = conn.execute(text("""
-            SELECT * FROM shared_links WHERE token = :token
+            SELECT * FROM shared_links WHERE token = :token AND dashboard_id IS NOT NULL
         """), {"token": token}).mappings().first()
 
         if not link:
