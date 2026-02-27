@@ -249,6 +249,8 @@ CREATE INDEX IF NOT EXISTS idx_rls_rules_conn_user ON rls_rules(connection_id, u
 CREATE INDEX IF NOT EXISTS idx_view_events_viewed_at ON view_events(viewed_at);
 
 ALTER TABLE connections ADD COLUMN IF NOT EXISTS is_system BOOLEAN DEFAULT FALSE;
+ALTER TABLE connections ADD COLUMN IF NOT EXISTS sqlalchemy_uri TEXT;
+ALTER TABLE connections ADD COLUMN IF NOT EXISTS extra_params JSONB DEFAULT '{}';
 
 ALTER TABLE charts ALTER COLUMN dashboard_id DROP NOT NULL;
 
@@ -451,6 +453,17 @@ CREATE TABLE IF NOT EXISTS model_joins (
     to_column       TEXT NOT NULL,
     UNIQUE(from_model_id, to_model_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_dashboard_filters_dashboard ON dashboard_filters(dashboard_id);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_user_dashboard ON bookmarks(user_id, dashboard_id);
+CREATE INDEX IF NOT EXISTS idx_ai_messages_session ON ai_messages(session_id);
+CREATE INDEX IF NOT EXISTS idx_sql_tabs_user ON sql_tabs(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_sessions_user ON ai_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_dashboard_filters_dashboard_order ON dashboard_filters(dashboard_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_charts_dataset ON charts(dataset_id);
+CREATE INDEX IF NOT EXISTS idx_charts_dashboard_order ON charts(dashboard_id, position_order);
+CREATE INDEX IF NOT EXISTS idx_scheduled_reports_active ON scheduled_reports(is_active, id);
+CREATE INDEX IF NOT EXISTS idx_alert_rules_active ON alert_rules(is_active, id);
 """
 
 

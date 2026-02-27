@@ -1,5 +1,5 @@
 import ipaddress
-import json
+import api.json_util as json
 import re as _re
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
@@ -51,7 +51,7 @@ def _validate_identifier(name: str, label: str = "identifier") -> None:
         raise HTTPException(400, f"Invalid {label}: {name!r}")
 
 _CONN_COLS = """id, name, db_type, host, port, database_name, username,
-    ssl_enabled, is_system, created_by, created_at, updated_at"""
+    ssl_enabled, is_system, sqlalchemy_uri, extra_params, created_by, created_at, updated_at"""
 
 
 def _build_url(db_type: str, host: str, port: int, database_name: str,
@@ -101,12 +101,44 @@ def is_mssql(db_type: str) -> bool:
     return db_type == "mssql"
 
 
+def get_engine_for_connection(c: dict):
+    """Central engine resolver. Returns (engine, spec).
+
+    Uses engine spec registry to build URL and create engine.
+    For DuckDB, engine is still created via SQLAlchemy but test/schema use native API.
+    """
+    from api.engine_specs import get_spec
+    from api.engine_specs.base import BaseEngineSpec
+
+    spec = get_spec(c["db_type"]) or BaseEngineSpec()
+
+    if c.get("sqlalchemy_uri"):
+        # Path A — raw URI
+        url = c["sqlalchemy_uri"]
+    else:
+        # Path B — spec builds URL from fields
+        params = {
+            "host": c.get("host", ""),
+            "port": c.get("port", 0),
+            "username": c.get("username", ""),
+            "password": c.get("password", ""),
+            "database_name": c.get("database_name", ""),
+            "ssl_enabled": c.get("ssl_enabled", False),
+            **(c.get("extra_params") or {}),
+        }
+        url = spec.build_url(params)
+
+    engine = spec.create_engine(url, c.get("id"))
+    return engine, spec
+
+
 def _get_connection_with_password(conn_id: int):
     """Get connection details including decrypted password."""
     with engine.connect() as conn:
         result = conn.execute(text(
             "SELECT id, name, db_type, host, port, database_name, username, "
-            "password_encrypted, ssl_enabled FROM connections WHERE id = :id"
+            "password_encrypted, ssl_enabled, sqlalchemy_uri, extra_params "
+            "FROM connections WHERE id = :id"
         ), {"id": conn_id})
         row = result.mappings().fetchone()
     if not row:
@@ -114,6 +146,28 @@ def _get_connection_with_password(conn_id: int):
     row = dict(row)
     row["password"] = decrypt_password_safe(row["password_encrypted"])
     return row
+
+
+def _get_connections_with_password(conn_ids: list[int]) -> dict[int, dict]:
+    """Batch fetch connection details including decrypted password.
+    Returns a dict keyed by connection id."""
+    if not conn_ids:
+        return {}
+    placeholders = ", ".join(f":id{i}" for i in range(len(conn_ids)))
+    params = {f"id{i}": cid for i, cid in enumerate(conn_ids)}
+    with engine.connect() as conn:
+        result = conn.execute(text(
+            "SELECT id, name, db_type, host, port, database_name, username, "
+            "password_encrypted, ssl_enabled, sqlalchemy_uri, extra_params "
+            f"FROM connections WHERE id IN ({placeholders})"
+        ), params)
+        rows = result.mappings().all()
+    out = {}
+    for row in rows:
+        r = dict(row)
+        r["password"] = decrypt_password_safe(r["password_encrypted"])
+        out[r["id"]] = r
+    return out
 
 
 @router.get("", summary="List connections", response_model=list[ConnectionResponse])
@@ -144,16 +198,19 @@ def list_connections(
 
     with engine.connect() as conn:
         if use_pagination:
-            total = conn.execute(
-                text(f"SELECT COUNT(*) FROM connections{where_clause}"), params
-            ).scalar()
-
             effective_limit = min(limit or 50, 200)
             params["lim"] = effective_limit
             params["off"] = offset
-            result = conn.execute(text(base_query + " LIMIT :lim OFFSET :off"), params)
-            items = [dict(row) for row in result.mappings().all()]
-            content = json.loads(json.dumps(items, default=str))
+            paginated_query = f"""
+                SELECT *, COUNT(*) OVER() as _total FROM (
+                    {base_query}
+                ) _q LIMIT :lim OFFSET :off
+            """
+            rows = [dict(row) for row in conn.execute(text(paginated_query), params).mappings().all()]
+            total = rows[0]["_total"] if rows else 0
+            for r in rows:
+                del r["_total"]
+            content = json.loads(json.dumps(rows, default=str))
             return JSONResponse(content=content, headers={"X-Total-Count": str(total)})
         else:
             result = conn.execute(text(base_query), params)
@@ -220,6 +277,8 @@ def update_connection(conn_id: int, req: ConnectionUpdate, current_user: dict = 
 
     from api.engine_cache import invalidate
     invalidate(conn_id)
+    from api.parquet_cache import invalidate_connection
+    invalidate_connection(conn_id)
 
     with engine.connect() as conn:
         result = conn.execute(text(f"SELECT {_CONN_COLS} FROM connections WHERE id = :id"), {"id": conn_id})
@@ -243,6 +302,8 @@ def delete_connection(conn_id: int, current_user: dict = Depends(require_admin))
         conn.commit()
     from api.engine_cache import invalidate
     invalidate(conn_id)
+    from api.parquet_cache import invalidate_connection
+    invalidate_connection(conn_id)
 
 
 @router.get("/{conn_id}/datasets", summary="List datasets using this connection")
@@ -261,19 +322,10 @@ def test_connection(conn_id: int, current_user: dict = Depends(get_current_user)
     """Test a database connection by executing a simple query."""
     try:
         c = _get_connection_with_password(conn_id)
-        # DuckDB: use native API to stay consistent (no mixed access)
-        if c["db_type"] == "duckdb":
-            import duckdb
-            duck = duckdb.connect(c["database_name"], read_only=True)
-            duck.execute("SELECT 1")
-            duck.close()
-            return ConnectionTestResult(success=True, message="Connection successful")
-        url = _build_url(c["db_type"], c["host"], c["port"], c["database_name"],
-                         c["username"], c["password"], c["ssl_enabled"])
-        test_engine = _create_ext_engine(url, c["db_type"])
-        with test_engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        test_engine.dispose()
+        eng, spec = get_engine_for_connection(c)
+        spec.test_connection(eng)
+        if hasattr(eng, 'dispose'):
+            eng.dispose()
         return ConnectionTestResult(success=True, message="Connection successful")
     except HTTPException:
         raise
@@ -281,128 +333,32 @@ def test_connection(conn_id: int, current_user: dict = Depends(get_current_user)
         import logging
         logging.getLogger("karta.connections").exception("Connection test failed for conn_id=%s", conn_id)
         msg = str(e)
-        # Strip connection URLs and credentials from error messages
         if "://" in msg:
             msg = msg.split("://")[0] + "://<redacted>"
         return ConnectionTestResult(success=False, message=msg)
-
-
-def _get_duckdb_schema(db_path: str, schema: str | None = None) -> list[SchemaTable]:
-    """Get schema from DuckDB using native API."""
-    import duckdb
-    conn = duckdb.connect(db_path, read_only=True)
-    schema_filter = schema or "main"
-    try:
-        table_rows = conn.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = ?",
-            [schema_filter],
-        ).fetchall()
-        tables = []
-        for (tname,) in table_rows:
-            col_rows = conn.execute(
-                "SELECT column_name, data_type, is_nullable "
-                "FROM information_schema.columns "
-                "WHERE table_schema = ? AND table_name = ? "
-                "ORDER BY ordinal_position",
-                [schema_filter, tname],
-            ).fetchall()
-            columns = [
-                SchemaColumn(name=cname, type=ctype, nullable=(nullable == "YES"))
-                for cname, ctype, nullable in col_rows
-            ]
-            tables.append(SchemaTable(table_name=tname, columns=columns))
-        return tables
-    finally:
-        conn.close()
 
 
 @router.get("/{conn_id}/schemas", summary="List schemas", response_model=list[str])
 def get_schemas(conn_id: int, current_user: dict = Depends(get_current_user)):
     """List available database schemas for a connection."""
     c = _get_connection_with_password(conn_id)
-
-    if c["db_type"] == "duckdb":
-        import duckdb
-        duck = duckdb.connect(c["database_name"], read_only=True)
-        try:
-            rows = duck.execute(
-                "SELECT DISTINCT table_schema FROM information_schema.tables ORDER BY table_schema"
-            ).fetchall()
-            return [r[0] for r in rows]
-        finally:
-            duck.close()
-
-    url = _build_url(c["db_type"], c["host"], c["port"], c["database_name"],
-                     c["username"], c["password"], c["ssl_enabled"])
-    ext_engine = _create_ext_engine(url, c["db_type"], c["id"])
-
-    if is_postgres(c["db_type"]):
-        with ext_engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT schema_name FROM information_schema.schemata "
-                "WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'pg_toast') "
-                "AND schema_name NOT LIKE 'pg_temp%' "
-                "AND schema_name NOT LIKE 'pg_toast_temp%' "
-                "ORDER BY schema_name"
-            )).fetchall()
-            return [r[0] for r in rows]
-    elif c["db_type"] == "mysql":
-        with ext_engine.connect() as conn:
-            rows = conn.execute(text("SHOW DATABASES")).fetchall()
-            return [r[0] for r in rows if r[0] not in ("information_schema", "performance_schema", "mysql", "sys")]
-    elif is_clickhouse(c["db_type"]):
-        with ext_engine.connect() as conn:
-            rows = conn.execute(text("SELECT name FROM system.databases ORDER BY name")).fetchall()
-            return [r[0] for r in rows if r[0] not in ("system", "information_schema", "INFORMATION_SCHEMA")]
-    else:
-        # MSSQL or unknown — use SQLAlchemy inspector
-        insp = inspect(ext_engine)
-        return sorted(insp.get_schema_names())
+    eng, spec = get_engine_for_connection(c)
+    return spec.get_schemas(eng)
 
 
 @router.get("/{conn_id}/schema", summary="Get schema", response_model=list[SchemaTable])
 def get_schema(conn_id: int, schema: str | None = None, current_user: dict = Depends(get_current_user)):
     """Get all tables and their columns with data types."""
     c = _get_connection_with_password(conn_id)
-
-    # DuckDB: use native API instead of SQLAlchemy inspector
-    if c["db_type"] == "duckdb":
-        return _get_duckdb_schema(c["database_name"], schema)
-
-    url = _build_url(c["db_type"], c["host"], c["port"], c["database_name"],
-                     c["username"], c["password"], c["ssl_enabled"])
-    ext_engine = _create_ext_engine(url, c["db_type"], c["id"])
-
-    # Use a single information_schema query for PostgreSQL (much faster than inspector)
-    if is_postgres(c["db_type"]):
-        schema_filter = schema or "public"
-        with ext_engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT table_name, column_name, data_type, is_nullable "
-                "FROM information_schema.columns "
-                "WHERE table_schema = :schema "
-                "ORDER BY table_name, ordinal_position"
-            ), {"schema": schema_filter}).fetchall()
-        tables_map: dict[str, list[SchemaColumn]] = {}
-        for tname, cname, ctype, nullable in rows:
-            tables_map.setdefault(tname, []).append(
-                SchemaColumn(name=cname, type=ctype, nullable=(nullable == "YES"))
-            )
-        return [SchemaTable(table_name=t, columns=cols) for t, cols in tables_map.items()]
-
-    # Fallback: SQLAlchemy inspector for MySQL, MSSQL, ClickHouse
-    inspector = inspect(ext_engine)
-    tables = []
-    for table_name in inspector.get_table_names(schema=schema):
-        columns = []
-        for col in inspector.get_columns(table_name, schema=schema):
-            columns.append(SchemaColumn(
-                name=col["name"],
-                type=str(col["type"]),
-                nullable=col.get("nullable", True),
-            ))
-        tables.append(SchemaTable(table_name=table_name, columns=columns))
-    return tables
+    eng, spec = get_engine_for_connection(c)
+    raw = spec.get_schema(eng, schema)
+    return [
+        SchemaTable(
+            table_name=t["table_name"],
+            columns=[SchemaColumn(name=col["name"], type=col["type"], nullable=col["nullable"]) for col in t["columns"]]
+        )
+        for t in raw
+    ]
 
 
 import os
