@@ -1,9 +1,9 @@
 import io
-import json
+import api.json_util as json
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import text
 
@@ -709,9 +709,9 @@ def revoke_share_link(link_id: int, current_user: dict = require_role("editor", 
 
 
 @router.get("/api/shared/{token}", summary="Get shared dashboard")
-def get_shared_dashboard(token: str):
+def get_shared_dashboard(token: str, filters: str | None = Query(None)):
     """Public endpoint (no auth). Resolve a share token and return the dashboard with executed charts."""
-    from api.charts.router import _execute_chart_sql
+    from api.charts.router import _execute_chart_full
     from api.executor import build_visual_chart, build_pivot_table, execute_chart_code
 
     with engine.connect() as conn:
@@ -744,23 +744,37 @@ def get_shared_dashboard(token: str):
         # Apply RLS using the share link creator's identity
         share_creator_id = link["created_by"]
 
+        # Parse embed filters
+        parsed_filters = None
+        if filters:
+            try:
+                parsed_filters = json.loads(filters)
+                if not isinstance(parsed_filters, dict):
+                    parsed_filters = None
+            except (json.JSONDecodeError, TypeError):
+                parsed_filters = None
+
         chart_results = []
         for chart in charts:
             chart_dict = dict(chart)
             result = {"figure": None, "columns": [], "rows": [], "row_count": 0, "error": None, "formatting": []}
             try:
                 if chart["sql_query"] and chart["connection_id"]:
-                    columns, rows, df = _execute_chart_sql(chart["connection_id"], chart["sql_query"], user_id=share_creator_id)
+                    chart_config = chart["chart_config"] or {}
+                    columns, rows, df, pq_path = _execute_chart_full(
+                        chart["connection_id"], chart["sql_query"], chart_config,
+                        filters=parsed_filters,
+                        user_id=share_creator_id)
                     figure = None
                     if chart["mode"] == "visual" and chart["chart_type"] == "pivot":
-                        p_cols, p_rows, p_count, p_fmt = build_pivot_table(chart["chart_config"], df)
-                        result = {"figure": None, "columns": p_cols, "rows": p_rows[:500], "row_count": p_count, "error": None, "formatting": p_fmt}
+                        pivot_result = build_pivot_table(chart_config, df)
+                        result = {"figure": None, "columns": pivot_result["columns"], "rows": pivot_result["rows"][:500], "row_count": pivot_result["row_count"], "error": None, "formatting": pivot_result.get("formatting", [])}
                     else:
                         if chart["mode"] == "visual":
-                            figure = build_visual_chart(chart["chart_type"], chart["chart_config"], df)
+                            figure = build_visual_chart(chart["chart_type"], chart_config, df)
                         elif chart["mode"] == "code":
-                            figure = execute_chart_code(chart["chart_code"], df)
-                        formatting = chart["chart_config"].get("conditional_formatting", []) if chart["chart_config"] else []
+                            figure = execute_chart_code(chart["chart_code"], df, parquet_path=pq_path)
+                        formatting = chart_config.get("conditional_formatting", []) if chart_config else []
                         result = {"figure": figure, "columns": columns, "rows": [list(r) for r in rows[:200]], "row_count": len(rows), "error": None, "formatting": formatting}
             except Exception as e:
                 result["error"] = str(e)
