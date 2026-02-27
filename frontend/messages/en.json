@@ -986,6 +986,7 @@
     "toColumnPlaceholder": "e.g. id",
     "updated": "Updated",
     "actions": "Actions",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "modelFallback": "Model #{id}"
   }
 }

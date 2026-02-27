@@ -986,6 +986,7 @@
     "toColumnPlaceholder": "напр. id",
     "updated": "Обновлено",
     "actions": "Действия",
-    "unknown": "Неизвестно"
+    "unknown": "Неизвестно",
+    "modelFallback": "Модель #{id}"
   }
 }

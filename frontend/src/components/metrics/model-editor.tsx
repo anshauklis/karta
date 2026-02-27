@@ -635,7 +635,7 @@ function ModelEditorForm({
                         </span>
                         <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
                         <span className="text-xs font-medium truncate">
-                          {j.to_model_name ?? `Model #${j.to_model_id}`}
+                          {j.to_model_name ?? t("modelFallback", { id: j.to_model_id })}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           .
