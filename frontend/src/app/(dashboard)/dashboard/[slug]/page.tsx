@@ -41,6 +41,8 @@ import { useHotkey } from "@/hooks/use-hotkey";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRoles } from "@/hooks/use-roles";
 import { NLFilterBar } from "@/components/dashboard/nl-filter-bar";
+import { MobileDashboard } from "@/components/dashboard/mobile-dashboard";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const VISUAL_TYPES = new Set(["text", "divider", "header", "spacer", "tabs"]);
 const CHART_CONCURRENCY = 3;
@@ -63,6 +65,7 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
   const { data: charts, isLoading: chartsLoading } = useDashboardCharts(dashboard?.id);
   const { data: session } = useSession();
   const { canEdit } = useRoles();
+  const isMobile = useIsMobile();
   const executeChart = useExecuteChart();
   const updateChart = useUpdateChart();
   const queryClient = useQueryClient();
@@ -322,7 +325,7 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
     return (
       <div className="space-y-4">
         <Skeleton className="h-10 w-64" />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-64 rounded-lg" />
           ))}
@@ -343,21 +346,21 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
   return (
     <div>
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <nav className="flex items-center gap-1 text-sm">
-            <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <nav className="flex items-center gap-1 text-sm min-w-0">
+            <Link href="/" className="hidden sm:inline text-muted-foreground hover:text-foreground transition-colors shrink-0">
               {tn("dashboards")}
             </Link>
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-2xl leading-none">{dashboard.icon}</span>
-            <h1 className="text-xl font-semibold text-foreground">{dashboard.title}</h1>
+            <ChevronRight className="hidden sm:block h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-2xl leading-none shrink-0">{dashboard.icon}</span>
+            <h1 className="text-lg sm:text-xl font-semibold text-foreground truncate">{dashboard.title}</h1>
           </nav>
           {dashboard.description && (
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-7 w-7 shrink-0"
               onClick={() => setShowInfo((v) => !v)}
               title="Dashboard info"
             >
@@ -365,7 +368,7 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
             </Button>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
           {/* Overflow menu — secondary actions */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -419,22 +422,22 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
           </DropdownMenu>
           {canEdit && <FilterEditor dashboardId={dashboard.id} dashboard={dashboard} />}
           <Button size="sm" variant="ghost" onClick={() => setShowShare(true)}>
-            <Share2 className="mr-1 h-4 w-4" />
-            {t("share")}
+            <Share2 className="h-4 w-4" />
+            <span className="hidden sm:inline ml-1">{t("share")}</span>
           </Button>
           {canEdit && (
             <Link href={`/dashboard/${slug}/chart/new`}>
               <Button size="sm" variant="default">
-                <Plus className="mr-1 h-4 w-4" />
-                {t("addChart")}
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline ml-1">{t("addChart")}</span>
               </Button>
             </Link>
           )}
           {canEdit && (
             <Link href={`/dashboard/${slug}/edit`}>
               <Button size="sm" variant="secondary">
-                <Pencil className="mr-1 h-4 w-4" />
-                {tc("edit")}
+                <Pencil className="h-4 w-4" />
+                <span className="hidden sm:inline ml-1">{tc("edit")}</span>
               </Button>
             </Link>
           )}
@@ -530,6 +533,23 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
               {t("editDashboard")}
             </Button>
           </Link>
+        </div>
+      ) : isMobile ? (
+        <div ref={gridRef}>
+          <MobileDashboard
+            charts={visibleCharts}
+            allCharts={charts || []}
+            results={results}
+            executing={executing}
+            editHrefPrefix={`/dashboard/${slug}/chart`}
+            onEdit={handleEditChart}
+            onRefresh={handleRefreshChart}
+            onDataPointClick={handleDataPointClick}
+            onToggleComments={handleToggleComments}
+            onUpdateTabConfig={(chartId, config) =>
+              updateChart.mutate({ chartId, data: { chart_config: config } })
+            }
+          />
         </div>
       ) : (
         <div ref={containerRef} className="-mx-6">
