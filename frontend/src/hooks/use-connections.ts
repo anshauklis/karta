@@ -4,7 +4,18 @@ import { useSession } from "next-auth/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import type { Connection, ConnectionCreate, ConnectionTestResult, SchemaTable } from "@/types";
+import type { Connection, ConnectionCreate, ConnectionTestResult, EngineSpec, SchemaTable } from "@/types";
+
+export function useEngineSpecs() {
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  return useQuery({
+    queryKey: ["engine-specs"],
+    queryFn: () => api.get<EngineSpec[]>("/api/connections/engine-specs", token),
+    enabled: !!token,
+    staleTime: Infinity,
+  });
+}
 
 export function useConnections() {
   const { data: session } = useSession();

@@ -142,11 +142,30 @@ export interface ConnectionCreate {
   username: string;
   password: string;
   ssl_enabled?: boolean;
+  sqlalchemy_uri?: string;
+  extra_params?: Record<string, unknown>;
 }
 
 export interface ConnectionTestResult {
   success: boolean;
   message: string;
+}
+
+export interface FieldDef {
+  name: string;
+  label: string;
+  type: "text" | "password" | "number" | "boolean";
+  required: boolean;
+  default: unknown;
+  placeholder: string;
+}
+
+export interface EngineSpec {
+  db_type: string;
+  display_name: string;
+  icon: string;
+  sqlalchemy_uri_placeholder: string;
+  connection_fields: FieldDef[];
 }
 
 export interface SchemaColumn {

@@ -301,7 +301,10 @@
     "username": "Логин",
     "password": "Пароль",
     "ssl": "SSL",
-    "connection": "Подключение"
+    "connection": "Подключение",
+    "sqlalchemyUri": "SQLAlchemy URI",
+    "otherDatabase": "Другое (SQLAlchemy URI)",
+    "filePath": "Путь к файлу"
   },
   "dataset": {
     "new": "Новый датасет",

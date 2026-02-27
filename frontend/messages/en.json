@@ -301,7 +301,10 @@
     "username": "Username",
     "password": "Password",
     "ssl": "SSL Enabled",
-    "connection": "Connection"
+    "connection": "Connection",
+    "sqlalchemyUri": "SQLAlchemy URI",
+    "otherDatabase": "Other (SQLAlchemy URI)",
+    "filePath": "File Path"
   },
   "dataset": {
     "new": "New Dataset",
