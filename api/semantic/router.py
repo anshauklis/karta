@@ -1,9 +1,14 @@
+import logging
+
 import api.json_util as json
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import text
 
 from api.database import engine
 from api.auth.dependencies import get_current_user
+from api.semantic.query_builder import build_semantic_query
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/semantic", tags=["semantic"])
 
@@ -356,3 +361,66 @@ def delete_join(join_id: int, current_user: dict = Depends(get_current_user)):
         if not result.fetchone():
             raise HTTPException(status_code=404, detail="Join not found")
         conn.commit()
+
+
+# ===== Query ===============================================================
+
+@router.post("/query", summary="Execute semantic query")
+async def semantic_query(req: dict, current_user: dict = Depends(get_current_user)):
+    """Build SQL from a semantic model definition and execute it.
+
+    Request body::
+
+        {
+            "model_id": 1,
+            "measures": ["revenue", "order_count"],
+            "dimensions": ["region", "order_date"],
+            "filters": [{"dimension": "region", "operator": "=", "value": "US"}],
+            "order_by": "revenue DESC",
+            "limit": 100
+        }
+
+    Returns ``{"sql": "...", "data": {"columns": [...], "rows": [...], "row_count": N}}``.
+    """
+    model_id = req.get("model_id")
+    if not model_id:
+        raise HTTPException(status_code=400, detail="model_id is required")
+
+    measure_names = req.get("measures", [])
+    dimension_names = req.get("dimensions", [])
+    filters = req.get("filters")
+    order_by = req.get("order_by")
+    limit = req.get("limit")
+
+    # Build the SQL from semantic definitions
+    try:
+        sql = build_semantic_query(
+            model_id=model_id,
+            measure_names=measure_names,
+            dimension_names=dimension_names,
+            filters=filters,
+            order_by=order_by,
+            limit=limit,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Look up connection_id for this model
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT connection_id FROM semantic_models WHERE id = :id"),
+            {"id": model_id},
+        ).mappings().first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Semantic model not found")
+        connection_id = row["connection_id"]
+
+    # Execute against the model's connection
+    from api.ai.tools import execute_sql as ai_execute_sql
+
+    result = await ai_execute_sql(connection_id, sql)
+
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return {"sql": sql, "data": result}
