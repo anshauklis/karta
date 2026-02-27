@@ -568,7 +568,8 @@
     "alignRight": "Align right",
     "sameWidth": "Same width",
     "sameHeight": "Same height",
-    "distributeH": "Distribute horizontally"
+    "distributeH": "Distribute horizontally",
+    "versionHistory": "Version History"
   },
   "share": {
     "dashboard": "Share Dashboard",
@@ -988,5 +989,23 @@
     "actions": "Actions",
     "unknown": "Unknown",
     "modelFallback": "Model #{id}"
+  },
+  "versions": {
+    "title": "Version History",
+    "saveVersion": "Save Version",
+    "labelPlaceholder": "Version label (optional)",
+    "noVersions": "No versions yet. Versions are created automatically when you edit the dashboard.",
+    "autoLabel": "auto",
+    "manualLabel": "manual",
+    "noLabel": "No label",
+    "restore": "Restore",
+    "restoreConfirm": "Restore this version?",
+    "restoreDescription": "This will replace the current dashboard state with this version. A backup of the current state will be saved automatically.",
+    "cancel": "Cancel",
+    "restored": "Dashboard restored to selected version",
+    "versionSaved": "Version saved",
+    "versionDeleted": "Version deleted",
+    "labelUpdated": "Label updated",
+    "delete": "Delete"
   }
 }

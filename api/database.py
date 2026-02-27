@@ -454,6 +454,20 @@ CREATE TABLE IF NOT EXISTS model_joins (
     UNIQUE(from_model_id, to_model_id)
 );
 
+CREATE TABLE IF NOT EXISTS dashboard_versions (
+    id              SERIAL PRIMARY KEY,
+    dashboard_id    INTEGER NOT NULL REFERENCES dashboards(id) ON DELETE CASCADE,
+    version_number  INTEGER NOT NULL,
+    label           TEXT DEFAULT '',
+    is_auto         BOOLEAN DEFAULT TRUE,
+    snapshot        JSONB NOT NULL,
+    created_by      INTEGER REFERENCES users(id),
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(dashboard_id, version_number)
+);
+CREATE INDEX IF NOT EXISTS idx_dashboard_versions_dashboard
+    ON dashboard_versions(dashboard_id, version_number DESC);
+
 CREATE INDEX IF NOT EXISTS idx_dashboard_filters_dashboard ON dashboard_filters(dashboard_id);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_user_dashboard ON bookmarks(user_id, dashboard_id);
 CREATE INDEX IF NOT EXISTS idx_ai_messages_session ON ai_messages(session_id);

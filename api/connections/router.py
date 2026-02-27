@@ -124,6 +124,57 @@ def _get_connections_with_password(conn_ids: list[int]) -> dict[int, dict]:
     return out
 
 
+
+@router.get("/engine-specs", summary="List available engine specs")
+def list_engine_specs(current_user: dict = Depends(get_current_user)):
+    """Return all registered engine specs with their form field definitions."""
+    from dataclasses import asdict
+    from api.engine_specs import get_all_specs
+    result = []
+    for _db_type, spec in get_all_specs().items():
+        result.append({
+            "db_type": spec.db_type,
+            "display_name": spec.display_name,
+            "icon": spec.icon,
+            "sqlalchemy_uri_placeholder": spec.sqlalchemy_uri_placeholder,
+            "connection_fields": [asdict(f) for f in spec.connection_fields],
+        })
+    # Ensure _sqlalchemy is always last
+    result.sort(key=lambda x: (x["db_type"] == "_sqlalchemy", x["display_name"]))
+    return result
+
+
+@router.get("/plugins", summary="List installed connector plugins")
+def list_plugins(current_user: dict = Depends(require_admin)):
+    """Return installed connector plugins with source info. Admin only."""
+    from api.engine_specs import get_all_specs
+    from importlib.metadata import entry_points
+
+    # Map external entry_points to package info
+    external = {}
+    for ep in entry_points(group="karta.engine_specs"):
+        try:
+            external[ep.name] = {
+                "package": ep.dist.name if ep.dist else ep.value,
+                "version": ep.dist.metadata["Version"] if ep.dist else "unknown",
+            }
+        except Exception:
+            external[ep.name] = {"package": ep.value, "version": "unknown"}
+
+    result = []
+    for db_type, spec in get_all_specs().items():
+        info = external.get(db_type)
+        result.append({
+            "db_type": spec.db_type,
+            "display_name": spec.display_name,
+            "type": "connector",
+            "source": f"{info['package']} {info['version']}" if info else "built-in",
+            "status": "active",
+        })
+    result.sort(key=lambda x: (x["source"] != "built-in", x["display_name"]))
+    return result
+
+
 @router.get("", summary="List connections", response_model=list[ConnectionResponse])
 def list_connections(
     q: str | None = None,

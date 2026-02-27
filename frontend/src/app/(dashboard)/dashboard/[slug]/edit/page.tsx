@@ -80,6 +80,7 @@ import {
   Settings2,
   Undo2,
   Redo2,
+  Clock,
   AlignStartVertical,
   AlignEndVertical,
   ArrowLeftRight,
@@ -88,6 +89,7 @@ import {
 import { useTranslations } from "next-intl";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { HistoryPanel } from "@/components/history-panel";
+import { VersionHistoryPanel } from "@/components/dashboard/version-history-panel";
 import { DashboardPropertiesDialog } from "@/components/dashboard/dashboard-properties-dialog";
 import { useContainerWidth } from "@/hooks/use-container-width";
 import { useHotkey } from "@/hooks/use-hotkey";
@@ -230,6 +232,7 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
   const [showDescEditor, setShowDescEditor] = useState(false);
   const [descValue, setDescValue] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
   const [showProperties, setShowProperties] = useState(false);
   const [compactType, setCompactType] = useState<"vertical" | null>("vertical");
   const [textEditorOpen, setTextEditorOpen] = useState(false);
@@ -815,6 +818,14 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
             </button>
           </div>
 
+          <button
+            onClick={() => setShowVersions(true)}
+            className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-foreground"
+            title={tl("versionHistory")}
+          >
+            <Clock className="h-3.5 w-3.5" />
+          </button>
+
           <div className="mx-1 h-4 w-px bg-border" />
 
           <Button size="sm" variant="outline" onClick={() => setShowDescEditor((v) => !v)}>
@@ -1141,6 +1152,15 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
       {showHistory && dashboard && (
         <HistoryPanel entityType="dashboard" entityId={dashboard.id} onClose={() => setShowHistory(false)} />
       )}
+      <VersionHistoryPanel
+        dashboardId={dashboard.id}
+        open={showVersions}
+        onOpenChange={setShowVersions}
+        onRestored={() => {
+          setShowVersions(false);
+          router.refresh();
+        }}
+      />
       {/* Text block editor modal */}
       <TextBlockEditor
         open={textEditorOpen}
