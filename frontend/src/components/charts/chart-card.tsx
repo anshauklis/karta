@@ -72,7 +72,7 @@ export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, e
   if (chart.chart_type === "text") {
     const textContent = (chart.chart_config?.content as string) || "";
     return (
-      <Card className="flex h-full flex-col overflow-hidden">
+      <Card className="flex h-full min-h-[200px] flex-col overflow-hidden md:min-h-0">
         <div className="flex-1 overflow-auto p-4">
           {textContent ? (
             <RichTextView html={textContent} prose />
@@ -133,7 +133,7 @@ export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, e
   }
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden">
+    <Card className="flex h-full min-h-[200px] flex-col overflow-hidden md:min-h-0">
       {/* Title bar */}
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div className="flex items-center gap-1.5 min-w-0">

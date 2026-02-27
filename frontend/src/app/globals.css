@@ -234,3 +234,13 @@ th:hover .resizer::after,
   width: 2px;
   left: 3px;
 }
+
+/* Mobile dashboard — touch-friendly charts */
+@media (max-width: 767px) {
+  .react-grid-item {
+    display: none;
+  }
+  .react-grid-placeholder {
+    display: none;
+  }
+}
