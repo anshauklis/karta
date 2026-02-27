@@ -1,6 +1,6 @@
-# Q1 Implementation Plan (March–May 2026)
+# Q1 Implementation Plan (March–May 2026) — COMPLETED
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+**Status: ✅ ALL TASKS COMPLETE** (as of 2026-02-27)
 
 **Goal:** Ship Karta as a publicly launched open-source BI platform with AI, embedding, PDF reports, and polished UX — ready for GitHub + Docker Hub + Product Hunt.
 
@@ -10,9 +10,7 @@
 
 ---
 
-## What's Already Done (skip these)
-
-These were originally in Q1 scope but are already complete:
+## Pre-Plan (completed before plan was written)
 
 - ✅ DuckDB + Parquet pipeline (`api/parquet_cache.py`, `api/pipeline_sql.py`, `_execute_chart_full`)
 - ✅ Text-to-SQL in SQL Lab (`useGenerateSQL()`, `useFixSQL()`, `/api/ai/generate-sql`)
@@ -21,11 +19,16 @@ These were originally in Q1 scope but are already complete:
 - ✅ Scheduled reports (cron → Excel → Slack/Telegram/Email)
 - ✅ Shared dashboard links (`/shared/[token]`, JWT tokens, expiration)
 - ✅ Data table component (TanStack Table v8, sorting, conditional formatting)
-- ✅ Lazy chart rendering on dashboards (recent commit)
+- ✅ Lazy chart rendering on dashboards (viewport-gated `onVisible` callback)
+
+## Bonus (completed beyond plan scope)
+
+- ✅ Loading skeletons & performance polish — route-level `loading.tsx`, chart-type-aware `ChartSkeleton`, background refetch shimmer, unified spinners
+- ✅ Dashboard DnD polish — multi-directional resize handles (8 directions), column grid guides, layout undo/redo (`Cmd+Z`/`Cmd+Shift+Z`), multi-select + align/distribute toolbar
 
 ---
 
-## Task 1: SQL Variables / Parameters
+## ✅ Task 1: SQL Variables / Parameters
 
 **Goal:** Add Jinja-like `{{ variable_name }}` syntax to SQL queries. Users define variables with defaults; dashboards can pass values at runtime.
 
@@ -114,7 +117,7 @@ git commit -m "feat: add SQL variables/parameters with {{ var_name }} syntax"
 
 ---
 
-## Task 2: AI Chart Builder Enhancement
+## ✅ Task 2: AI Chart Builder Enhancement
 
 **Goal:** User describes a chart in natural language → AI produces a complete chart config (chart_type, x_column, y_columns, metrics, colors, title) → renders immediately in the editor.
 
@@ -181,7 +184,7 @@ git commit -m "feat: AI chart builder — describe a chart, get it instantly"
 
 ---
 
-## Task 3: Dashboard Iframe Embed
+## ✅ Task 3: Dashboard Iframe Embed
 
 **Goal:** Generate embeddable `<iframe>` code for dashboards. Embed route has no chrome (no header, no nav), supports theme and filter params.
 
@@ -234,7 +237,7 @@ git commit -m "feat: dashboard iframe embedding with theme and filter params"
 
 ---
 
-## Task 4: PDF/PNG Report Export
+## ✅ Task 4: PDF/PNG Report Export
 
 **Goal:** Extend scheduled reports to send dashboard screenshots (PNG/PDF) in addition to Excel. Uses headless Chromium via Playwright.
 
@@ -299,7 +302,7 @@ git commit -m "feat: PDF/PNG report export via headless Chromium"
 
 ---
 
-## Task 5: Natural Language Dashboard Filters
+## ✅ Task 5: Natural Language Dashboard Filters
 
 **Goal:** Add an AI-powered filter bar to dashboards. User types "show last 30 days for USA" → AI parses → applies filters to dashboard charts.
 
@@ -355,7 +358,7 @@ git commit -m "feat: natural language dashboard filters via AI"
 
 ---
 
-## Task 6: AI Auto-Insights
+## ✅ Task 6: AI Auto-Insights
 
 **Goal:** Automatic anomaly detection and trend analysis on chart data. Shows insight badges on charts ("↑ 23% vs last month", "Anomaly detected in Q3").
 
@@ -417,7 +420,7 @@ git commit -m "feat: AI auto-insights — anomaly detection and trend analysis"
 
 ---
 
-## Task 7: Responsive Mobile Dashboard View
+## ✅ Task 7: Responsive Mobile Dashboard View
 
 **Goal:** Dashboards readable on mobile (< 768px). Single-column stack, no drag/resize, swipe between charts, touch-friendly filters.
 
@@ -465,7 +468,7 @@ git commit -m "feat: responsive mobile dashboard view — single-column stack"
 
 ---
 
-## Task 8: Error Handling & Polish Sweep
+## ✅ Task 8: Error Handling & Polish Sweep
 
 **Goal:** Audit all chart types for edge cases, improve error messages, add graceful fallbacks.
 
@@ -506,7 +509,7 @@ git commit -m "fix: improve error handling across all chart types"
 
 ---
 
-## Task 9: CI/CD — Docker Hub + GitHub Actions
+## ✅ Task 9: CI/CD — Docker Hub + GitHub Actions
 
 **Goal:** Automated Docker image builds on push to main. Published to Docker Hub (or GitHub Container Registry).
 
@@ -593,7 +596,7 @@ git commit -m "ci: add Docker build/push and lint workflows"
 
 ---
 
-## Task 10: Public Launch Prep
+## ✅ Task 10: Public Launch Prep
 
 **Goal:** Everything needed for a credible open-source launch: LICENSE, README with screenshots, contributing guide, docker-compose quickstart.
 
@@ -652,41 +655,23 @@ git commit -m "docs: add LICENSE (AGPL-3.0), README, contributing guide, quickst
 
 ---
 
-## Implementation Order
+## Summary
 
-Tasks are ordered by dependency and impact:
+All 10 planned tasks + 2 bonus features completed. Q1 is fully closed.
 
-| # | Task | Effort | Dependencies | Impact |
-|---|------|--------|-------------|--------|
-| 1 | SQL Variables/Parameters | 2-3 days | None | High — unlocks reusable charts |
-| 2 | AI Chart Builder | 2-3 days | None | Very High — wow factor |
-| 3 | Dashboard Iframe Embed | 2-3 days | None | High — enterprise must-have |
-| 4 | PDF/PNG Report Export | 2-3 days | None | Medium — completes reports |
-| 5 | NL Dashboard Filters | 2-3 days | None | High — differentiator |
-| 6 | AI Auto-Insights | 3-4 days | None | Medium — differentiator |
-| 7 | Responsive Mobile | 1-2 days | None | Medium — polish |
-| 8 | Error Handling Sweep | 2-3 days | None | High — stability |
-| 9 | CI/CD | 1 day | None | High — launch blocker |
-| 10 | Launch Prep | 1-2 days | Tasks 1-9 | Critical — launch blocker |
+| # | Task | Status |
+|---|------|--------|
+| 1 | SQL Variables/Parameters | ✅ Done |
+| 2 | AI Chart Builder Enhancement | ✅ Done |
+| 3 | Dashboard Iframe Embed | ✅ Done |
+| 4 | PDF/PNG Report Export | ✅ Done |
+| 5 | Natural Language Dashboard Filters | ✅ Done |
+| 6 | AI Auto-Insights | ✅ Done |
+| 7 | Responsive Mobile Dashboard View | ✅ Done |
+| 8 | Error Handling & Polish Sweep | ✅ Done |
+| 9 | CI/CD — Docker Hub + GitHub Actions | ✅ Done |
+| 10 | Public Launch Prep | ✅ Done |
+| — | Loading Skeletons & Performance Polish | ✅ Bonus |
+| — | Dashboard DnD Polish (resize/guides/undo/align) | ✅ Bonus |
 
-**Total estimate: ~20-25 working days** (1 month for fulltime solo+AI dev).
-
-Tasks 1-8 can be done in any order (no dependencies between them). Tasks 9-10 should be last.
-
----
-
-## Verification
-
-After all tasks complete:
-
-1. `docker compose up --build -d` — all services start clean
-2. Create chart with `{{ date_start }}` variable → variable UI appears, substitution works
-3. Ask AI to "create a bar chart of revenue by month" → full chart renders
-4. Generate embed code for dashboard → iframe renders without chrome
-5. Schedule PDF report → receive email with dashboard screenshot
-6. Type "show last 30 days" in dashboard filter bar → filters apply
-7. Chart card shows "↑ 12% MoM" insight badge
-8. Open dashboard on mobile → single-column readable layout
-9. Trigger intentional SQL error → friendly error message + "Fix with AI" button
-10. `git push` → GitHub Actions builds and pushes Docker images
-11. New user can `docker compose -f docker-compose.prod.yml up` with published images
+**Next: Q2 — Growth + Ecosystem + Advanced AI** (see `2026-02-27-product-strategy-design.md`)

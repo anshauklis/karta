@@ -39,37 +39,31 @@
 
 ## Roadmap
 
-### Q1 (March–May 2026): Foundation + Launch + AI Basics
+### ✅ Q1 (March–May 2026): Foundation + Launch + AI Basics — COMPLETED
 
-**Goal**: Public launch — Karta is stable, looks professional, has basic AI, documentation, and presence on GitHub/Docker Hub.
+**Status**: All planned features shipped + 2 bonus features. Completed ahead of schedule (2026-02-27).
 
-**Month 1 — Foundation + AI Core**:
-- Complete DuckDB + Parquet pipeline (40M+ rows without OOM)
-- Text-to-SQL in SQL Lab (BYO API key)
-- AI Chart Builder (description → chart config + visualization)
-- Error handling sweep across all chart types
-- Table chart type (data table with sorting/search/pagination)
-- Variables/Parameters in SQL (`{{ date_start }}`)
+**Delivered**:
+- ✅ DuckDB + Parquet pipeline (40M+ rows without OOM)
+- ✅ Text-to-SQL in SQL Lab (BYO API key)
+- ✅ AI Chat with tools (20+ tools, SSE streaming, session management)
+- ✅ AI Chart Builder (description → chart config + visualization)
+- ✅ Error handling sweep across all chart types
+- ✅ Table chart type (TanStack Table v8, sorting, conditional formatting)
+- ✅ Variables/Parameters in SQL (`{{ date_start }}`)
+- ✅ Dashboard embed (iframe + token)
+- ✅ Scheduled reports (cron → Excel/PNG/PDF → Slack/Telegram/Email)
+- ✅ Dark/light/system theme
+- ✅ Natural language dashboard filters
+- ✅ AI auto-insights (anomalies, trends on dashboard)
+- ✅ Responsive mobile view (read-only)
+- ✅ Shared dashboard links (JWT tokens, expiration)
+- ✅ CI/CD — Docker Hub + GitHub Actions
+- ✅ Public launch prep (LICENSE, README, CONTRIBUTING, quickstart)
+- ✅ **Bonus**: Loading skeletons & performance polish (route-level, chart-type-aware)
+- ✅ **Bonus**: Dashboard DnD polish (8-direction resize, grid guides, layout undo/redo, multi-select + align/distribute)
 
-**Month 2 — Differentiation + Polish**:
-- Dashboard embed (iframe + token)
-- Scheduled email reports (cron → PNG/PDF)
-- Dark theme + theming engine
-- Natural language dashboard filters ("show last month")
-- AI auto-insights (anomalies, trends on dashboard)
-- Responsive mobile view (read-only)
-- Loading skeletons and performance polish
-
-**Month 3 — Public Launch**:
-- README, docs site, architecture guide
-- Docker Hub + GitHub Actions CI
-- Landing page (karta.dev)
-- Live demo instance
-- License: AGPL-3.0
-- Product Hunt / Hacker News launch
-- Intro video / demo GIF
-
-**Q1 outcome**: Public open-source product with AI, 21+ chart types, embedding, reports. Competitive with Superset on features, superior on UX and AI.
+**Q1 outcome**: Public open-source product with AI, 21+ chart types, embedding, reports, professional edit UX. Competitive with Superset on features, superior on UX and AI.
 
 ---
 
