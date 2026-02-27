@@ -144,7 +144,7 @@ postgres (:5432)  → api (internal metadata)
 | Service    | Stack                | Purpose              | Memory Limit |
 |------------|----------------------|----------------------|-------------|
 | **postgres** | PostgreSQL 16 Alpine | Internal metadata DB | 1 GB |
-| **api**      | Python 3.11, FastAPI | REST API backend     | 512 MB |
+| **api**      | Python 3.13, FastAPI | REST API backend     | 512 MB |
 | **frontend** | Node 20, Next.js 16  | Web UI               | 512 MB |
 | **nginx**    | nginx:alpine         | Reverse proxy + SSL  | 256 MB |
 | **redis**    | Redis 7 Alpine       | Query result cache   | 256 MB |
