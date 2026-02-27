@@ -562,10 +562,12 @@ class StoryDetailResponse(StoryResponse):
 
 class SharedLinkCreate(BaseModel):
     expires_in_hours: Optional[int] = None
+    chart_id: Optional[int] = None
 
 class SharedLinkResponse(BaseModel):
     id: int
-    dashboard_id: int
+    dashboard_id: Optional[int] = None
+    chart_id: Optional[int] = None
     token: str
     created_by: Optional[int]
     expires_at: Optional[datetime]

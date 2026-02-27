@@ -708,6 +708,106 @@ def revoke_share_link(link_id: int, current_user: dict = require_role("editor", 
     return {"ok": True}
 
 
+@router.post("/api/charts/{chart_id}/share", response_model=SharedLinkResponse, summary="Create chart share link")
+def create_chart_share_link(chart_id: int, body: SharedLinkCreate, current_user: dict = require_role("editor", "admin")):
+    """Generate a unique share token for a single chart."""
+    uid = int(current_user["sub"])
+    token = secrets.token_urlsafe(32)
+    expires_at = None
+    if body.expires_in_hours:
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=body.expires_in_hours)
+
+    with engine.connect() as conn:
+        chart = conn.execute(text("SELECT id, dashboard_id FROM charts WHERE id = :id"), {"id": chart_id}).mappings().first()
+        if not chart:
+            raise HTTPException(404, "Chart not found")
+
+        row = conn.execute(text("""
+            INSERT INTO shared_links (dashboard_id, chart_id, token, created_by, expires_at)
+            VALUES (:did, :cid, :token, :uid, :expires)
+            RETURNING *
+        """), {"did": chart["dashboard_id"], "cid": chart_id, "token": token, "uid": uid, "expires": expires_at})
+        conn.commit()
+        return dict(row.mappings().first())
+
+
+@router.get("/api/shared/chart/{token}", summary="Get shared chart")
+def get_shared_chart(token: str, filters: str | None = Query(None)):
+    """Public endpoint (no auth). Resolve a chart share token and return the chart with executed data."""
+    from api.charts.router import _execute_chart_full
+    from api.executor import build_visual_chart, build_pivot_table, execute_chart_code
+
+    with engine.connect() as conn:
+        link = conn.execute(text("""
+            SELECT * FROM shared_links WHERE token = :token AND chart_id IS NOT NULL
+        """), {"token": token}).mappings().first()
+
+        if not link:
+            raise HTTPException(404, "Share link not found")
+
+        if link["expires_at"] and link["expires_at"] < datetime.now(timezone.utc):
+            raise HTTPException(410, "Share link has expired")
+
+        chart = conn.execute(text("""
+            SELECT id, title, description, chart_type, chart_config, sql_query,
+                   connection_id, mode, chart_code, created_by, created_at, updated_at
+            FROM charts WHERE id = :id
+        """), {"id": link["chart_id"]}).mappings().first()
+
+        if not chart:
+            raise HTTPException(404, "Chart not found")
+
+        # Parse embed filters
+        parsed_filters = None
+        if filters:
+            try:
+                parsed_filters = json.loads(filters)
+                if not isinstance(parsed_filters, dict):
+                    parsed_filters = None
+            except (ValueError, TypeError):
+                parsed_filters = None
+
+        share_creator_id = link["created_by"]
+        chart_dict = dict(chart)
+        result = {"figure": None, "columns": [], "rows": [], "row_count": 0, "error": None, "formatting": []}
+
+        try:
+            if chart["sql_query"] and chart["connection_id"]:
+                chart_config = chart["chart_config"] or {}
+                columns, rows, df, pq_path = _execute_chart_full(
+                    chart["connection_id"], chart["sql_query"], chart_config,
+                    filters=parsed_filters,
+                    user_id=share_creator_id)
+                figure = None
+                if chart["mode"] == "visual" and chart["chart_type"] == "pivot":
+                    pivot_result = build_pivot_table(chart_config, df)
+                    result = {"figure": None, "columns": pivot_result["columns"], "rows": pivot_result["rows"][:500], "row_count": pivot_result["row_count"], "error": None, "formatting": pivot_result.get("formatting", [])}
+                else:
+                    if chart["mode"] == "visual":
+                        figure = build_visual_chart(chart["chart_type"], chart_config, df)
+                    elif chart["mode"] == "code":
+                        figure = execute_chart_code(chart["chart_code"], df, parquet_path=pq_path)
+                    formatting = chart_config.get("conditional_formatting", []) if chart_config else []
+                    result = {"figure": figure, "columns": columns, "rows": [list(r) for r in rows[:200]], "row_count": len(rows), "error": None, "formatting": formatting}
+        except Exception as e:
+            result["error"] = str(e)
+
+        chart_dict["result"] = result
+        return {"chart": chart_dict}
+
+
+@router.get("/api/charts/{chart_id}/shares", response_model=list[SharedLinkResponse], summary="List chart share links")
+def list_chart_share_links(chart_id: int, current_user: dict = Depends(get_current_user)):
+    """Return all share links for a chart."""
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT * FROM shared_links
+            WHERE chart_id = :cid
+            ORDER BY created_at DESC
+        """), {"cid": chart_id})
+        return [dict(r) for r in rows.mappings().all()]
+
+
 @router.get("/api/shared/{token}", summary="Get shared dashboard")
 def get_shared_dashboard(token: str, filters: str | None = Query(None)):
     """Public endpoint (no auth). Resolve a share token and return the dashboard with executed charts."""

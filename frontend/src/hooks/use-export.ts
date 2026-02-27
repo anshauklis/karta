@@ -43,6 +43,31 @@ export function useRevokeShareLink(dashboardId: number | undefined) {
   });
 }
 
+export function useChartShareLinks(chartId: number | undefined) {
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  return useQuery({
+    queryKey: ["chart-share-links", chartId],
+    queryFn: () => api.get<SharedLink[]>(`/api/charts/${chartId}/shares`, token),
+    enabled: !!chartId && !!token,
+  });
+}
+
+export function useCreateChartShareLink(chartId: number | undefined) {
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { expires_in_hours?: number }) =>
+      api.post<SharedLink>(`/api/charts/${chartId}/share`, body, token),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chart-share-links", chartId] });
+      toast.success("Chart share link created");
+    },
+    onError: () => toast.error("Failed to create chart share link"),
+  });
+}
+
 // ── Import / Export ──────────────────────────────────────────────────
 
 export interface ImportPreviewConnection {

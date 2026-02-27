@@ -574,7 +574,8 @@ export interface StorySlideCreate {
 
 export interface SharedLink {
   id: number;
-  dashboard_id: number;
+  dashboard_id: number | null;
+  chart_id: number | null;
   token: string;
   created_by: number | null;
   expires_at: string | null;

@@ -261,6 +261,9 @@ CREATE TABLE IF NOT EXISTS shared_links (
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE shared_links ADD COLUMN IF NOT EXISTS chart_id INTEGER REFERENCES charts(id) ON DELETE CASCADE;
+ALTER TABLE shared_links ALTER COLUMN dashboard_id DROP NOT NULL;
+
 CREATE TABLE IF NOT EXISTS sql_tabs (
     id            SERIAL PRIMARY KEY,
     user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
