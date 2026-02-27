@@ -82,6 +82,7 @@ app = FastAPI(
         {"name": "reports", "description": "Scheduled chart reports"},
         {"name": "stories", "description": "Narrative presentations"},
         {"name": "ai", "description": "AI assistant, SQL generation, glossary"},
+        {"name": "semantic", "description": "Semantic layer: models, measures, dimensions, joins"},
         {"name": "rls", "description": "Row-Level Security rules (admin)"},
         {"name": "analytics", "description": "Usage analytics (admin)"},
         {"name": "lineage", "description": "Data lineage graph"},
@@ -143,6 +144,7 @@ from api.favorites.router import router as favorites_router
 from api.templates.router import router as templates_router
 from api.tabs.router import router as tabs_router
 from api.meta.router import router as meta_router
+from api.semantic.router import router as semantic_router
 
 app.include_router(auth_router)
 app.include_router(dashboards_router)
@@ -169,6 +171,7 @@ app.include_router(favorites_router)
 app.include_router(templates_router)
 app.include_router(tabs_router)
 app.include_router(meta_router)
+app.include_router(semantic_router)
 
 
 @app.get("/api/health", summary="Health check", tags=["system"])
