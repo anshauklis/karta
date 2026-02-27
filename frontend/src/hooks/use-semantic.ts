@@ -114,11 +114,7 @@ export function useUpdateMeasure() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      id,
-      modelId,
-      ...data
-    }: { id: number; modelId: number } & Partial<ModelMeasure>) =>
+    mutationFn: ({ id, ...data }: { id: number; modelId: number } & Partial<ModelMeasure>) =>
       api.put<ModelMeasure>(`/api/semantic/measures/${id}`, data, token),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
@@ -175,11 +171,7 @@ export function useUpdateDimension() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      id,
-      modelId,
-      ...data
-    }: { id: number; modelId: number } & Partial<ModelDimension>) =>
+    mutationFn: ({ id, ...data }: { id: number; modelId: number } & Partial<ModelDimension>) =>
       api.put<ModelDimension>(`/api/semantic/dimensions/${id}`, data, token),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({

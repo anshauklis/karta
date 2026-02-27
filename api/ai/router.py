@@ -232,7 +232,7 @@ async def chat(req: AIChatRequest, current_user: dict = Depends(get_current_user
                 yield _sse({"type": "done", "session_id": session_id})
                 break
 
-        except Exception as e:
+        except Exception:
             logger.exception("AI chat error")
             yield _sse({"type": "error", "content": "An internal error occurred. Please try again."})
 
