@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   FileText, Plus, Trash2, Send, Pencil,
-  Bell as ChannelIcon, Settings,
+  Bell as ChannelIcon, Settings, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -164,7 +164,7 @@ export default function ReportsPage() {
       {/* Reports List */}
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : reports.length === 0 ? (
         <Card className="flex flex-col items-center justify-center py-16 text-center">
