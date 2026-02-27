@@ -561,7 +561,13 @@
     "compact": "Compact",
     "freePlace": "Free",
     "undo": "Undo",
-    "redo": "Redo"
+    "redo": "Redo",
+    "selected": "selected",
+    "alignLeft": "Align left",
+    "alignRight": "Align right",
+    "sameWidth": "Same width",
+    "sameHeight": "Same height",
+    "distributeH": "Distribute horizontally"
   },
   "share": {
     "dashboard": "Share Dashboard",

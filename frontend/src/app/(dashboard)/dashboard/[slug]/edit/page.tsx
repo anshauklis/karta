@@ -80,6 +80,10 @@ import {
   Settings2,
   Undo2,
   Redo2,
+  AlignStartVertical,
+  AlignEndVertical,
+  ArrowLeftRight,
+  RulerIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { RichTextEditor } from "@/components/rich-text-editor";
@@ -619,6 +623,81 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  const applyAlignOperation = useCallback(
+    (op: "alignLeft" | "alignRight" | "sameWidth" | "sameHeight" | "distributeH") => {
+      if (selectedIds.size < 2 || !visibleCharts.length || !dashboard) return;
+
+      const selected = visibleCharts.filter((c) => selectedIds.has(c.id));
+      if (selected.length < 2) return;
+
+      const items: LayoutItem[] = visibleCharts.map((c) => ({
+        id: c.id,
+        grid_x: c.grid_x,
+        grid_y: c.grid_y,
+        grid_w: c.grid_w,
+        grid_h: c.grid_h,
+      }));
+
+      const selectedMap = new Map(selected.map((c) => [c.id, c]));
+
+      switch (op) {
+        case "alignLeft": {
+          const minX = Math.min(...selected.map((c) => c.grid_x));
+          for (const item of items) {
+            if (selectedMap.has(item.id)) item.grid_x = minX;
+          }
+          break;
+        }
+        case "alignRight": {
+          const maxRight = Math.max(...selected.map((c) => c.grid_x + c.grid_w));
+          for (const item of items) {
+            if (selectedMap.has(item.id)) {
+              item.grid_x = maxRight - item.grid_w;
+            }
+          }
+          break;
+        }
+        case "sameWidth": {
+          const firstW = selected[0].grid_w;
+          for (const item of items) {
+            if (selectedMap.has(item.id)) item.grid_w = firstW;
+          }
+          break;
+        }
+        case "sameHeight": {
+          const firstH = selected[0].grid_h;
+          for (const item of items) {
+            if (selectedMap.has(item.id)) item.grid_h = firstH;
+          }
+          break;
+        }
+        case "distributeH": {
+          const sorted = [...selected].sort((a, b) => a.grid_x - b.grid_x);
+          const first = sorted[0];
+          const last = sorted[sorted.length - 1];
+          const totalSpan = (last.grid_x + last.grid_w) - first.grid_x;
+          const totalWidths = sorted.reduce((sum, c) => sum + c.grid_w, 0);
+          const gap = sorted.length > 2
+            ? (totalSpan - totalWidths) / (sorted.length - 1)
+            : 0;
+          let x = first.grid_x;
+          for (const chart of sorted) {
+            const item = items.find((it) => it.id === chart.id);
+            if (item) {
+              item.grid_x = Math.round(x);
+              x += chart.grid_w + gap;
+            }
+          }
+          break;
+        }
+      }
+
+      layoutHistory.push(items);
+      saveLayout.mutate(items);
+    },
+    [selectedIds, visibleCharts, dashboard, layoutHistory, saveLayout]
+  );
+
   const handleTabDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id || !tabs) return;
@@ -910,6 +989,62 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
         onFiltersChange={setActiveFilters}
         isEditing={true}
       />
+
+      {/* Multi-select alignment toolbar */}
+      {selectedIds.size >= 2 && (
+        <div className="sticky top-0 z-40 flex items-center justify-center py-2">
+          <div className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50/95 px-3 py-1.5 shadow-md dark:border-blue-800 dark:bg-blue-950/95">
+            <span className="mr-2 text-xs text-blue-600 dark:text-blue-400">
+              {selectedIds.size} {tl("selected")}
+            </span>
+            <button
+              onClick={() => applyAlignOperation("alignLeft")}
+              className="rounded p-1 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
+              title={tl("alignLeft")}
+            >
+              <AlignStartVertical className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => applyAlignOperation("alignRight")}
+              className="rounded p-1 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
+              title={tl("alignRight")}
+            >
+              <AlignEndVertical className="h-4 w-4" />
+            </button>
+            <div className="mx-0.5 h-4 w-px bg-blue-200 dark:bg-blue-800" />
+            <button
+              onClick={() => applyAlignOperation("sameWidth")}
+              className="rounded p-1 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
+              title={tl("sameWidth")}
+            >
+              <ArrowLeftRight className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => applyAlignOperation("sameHeight")}
+              className="rounded p-1 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
+              title={tl("sameHeight")}
+            >
+              <RulerIcon className="h-4 w-4" />
+            </button>
+            <div className="mx-0.5 h-4 w-px bg-blue-200 dark:bg-blue-800" />
+            <button
+              onClick={() => applyAlignOperation("distributeH")}
+              className="rounded p-1 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
+              title={tl("distributeH")}
+            >
+              <Columns3 className="h-4 w-4" />
+            </button>
+            <div className="mx-0.5 h-4 w-px bg-blue-200 dark:bg-blue-800" />
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="rounded p-1 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
+              title={tc("cancel")}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Chart grid — draggable & resizable */}
       {!charts || charts.length === 0 ? (
