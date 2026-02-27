@@ -1,7 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ChartSkeletonProps {
-  chartType?: string;
+  chartType?: string | null;
 }
 
 export function ChartSkeleton({ chartType }: ChartSkeletonProps) {
