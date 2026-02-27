@@ -1,4 +1,4 @@
-import json
+import api.json_util as json
 import re
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import text
@@ -161,6 +161,94 @@ def get_charts_columns(dashboard_id: int, current_user: dict = Depends(get_curre
                 result[str(chart_id)] = []
 
     return result
+
+
+@router.get("/api/dashboards/{dashboard_id}/columns-typed", summary="Get typed columns for dashboard charts")
+def get_dashboard_columns_typed(dashboard_id: int, current_user: dict = Depends(get_current_user)):
+    """Return deduplicated column names with types across all charts in the dashboard.
+
+    Used by the NL filter bar to provide column context to the AI.
+    Returns: [{ name: str, type: str }]
+    """
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT c.id, c.dataset_id, c.connection_id, c.sql_query,
+                       d.connection_id AS ds_connection_id, d.sql_query AS ds_sql_query
+                FROM charts c
+                LEFT JOIN datasets d ON d.id = c.dataset_id
+                WHERE c.dashboard_id = :dashboard_id
+                  AND c.chart_type NOT IN ('text', 'divider', 'header', 'spacer', 'tabs')
+            """),
+            {"dashboard_id": dashboard_id},
+        ).mappings().all()
+
+    # Group by (connection_id, sql_query) to deduplicate
+    query_map: dict[tuple, list[int]] = {}
+    for row in rows:
+        cid = row["ds_connection_id"] or row["connection_id"]
+        sql = row["ds_sql_query"] or row["sql_query"]
+        if not cid or not sql:
+            continue
+        key = (cid, sql)
+        query_map.setdefault(key, []).append(row["id"])
+
+    seen: dict[str, str] = {}  # column_name -> type
+
+    for (connection_id, sql_query), _chart_ids in query_map.items():
+        try:
+            c = _get_connection_with_password(connection_id)
+            if c["db_type"] == "duckdb":
+                import duckdb
+                duck = duckdb.connect(c["database_name"], read_only=True)
+                try:
+                    res = duck.execute(f"SELECT * FROM ({sql_query}) _t LIMIT 0")
+                    for desc in res.description:
+                        col_name = desc[0]
+                        col_type = _normalize_type(str(desc[1]) if desc[1] else "text")
+                        if col_name not in seen:
+                            seen[col_name] = col_type
+                finally:
+                    duck.close()
+            else:
+                url = _build_url(c["db_type"], c["host"], c["port"], c["database_name"],
+                                 c["username"], c["password"], c["ssl_enabled"])
+                ext_engine = _create_ext_engine(url, c["db_type"], c["id"])
+                with ext_engine.connect() as ext_conn:
+                    res = ext_conn.execute(text(f"SELECT * FROM ({sql_query}) _t LIMIT 0"))
+                    cursor = res.cursor
+                    if cursor and hasattr(cursor, "description") and cursor.description:
+                        for desc in cursor.description:
+                            col_name = desc[0]
+                            col_type = _normalize_type(str(desc[1]) if desc[1] else "text")
+                            if col_name not in seen:
+                                seen[col_name] = col_type
+                    else:
+                        for col_name in res.keys():
+                            if col_name not in seen:
+                                seen[col_name] = "text"
+        except Exception:
+            pass
+
+    return [{"name": name, "type": typ} for name, typ in seen.items()]
+
+
+def _normalize_type(raw: str) -> str:
+    """Map database type names to simplified type categories."""
+    r = raw.lower()
+    if any(kw in r for kw in ("int", "serial", "bigint", "smallint")):
+        return "integer"
+    if any(kw in r for kw in ("float", "double", "decimal", "numeric", "real", "number")):
+        return "number"
+    if any(kw in r for kw in ("timestamp", "datetime")):
+        return "timestamp"
+    if "date" in r:
+        return "date"
+    if "time" in r:
+        return "time"
+    if "bool" in r:
+        return "boolean"
+    return "text"
 
 
 @router.get("/api/dashboards/{dashboard_id}/filter-datasets", summary="List datasets used by dashboard charts")

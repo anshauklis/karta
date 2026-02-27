@@ -267,6 +267,24 @@ export function useSuggestChartConfig() {
   });
 }
 
+// --- Parse dashboard filters (NL → structured) ---
+
+export function useParseDashboardFilters() {
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  return useMutation({
+    mutationFn: (params: {
+      prompt: string;
+      columns: { name: string; type: string }[];
+    }) =>
+      api.post<{ filters: Array<{ column: string; value: unknown }> }>(
+        "/api/ai/parse-filters",
+        params,
+        token,
+      ),
+  });
+}
+
 // --- Glossary hooks ---
 
 export function useAIGlossary() {

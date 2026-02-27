@@ -276,6 +276,80 @@ SUGGEST_CHART_CONFIG_TOOL = {
 }
 
 
+def build_parse_filters_prompt(columns: list[dict]) -> str:
+    """Build prompt for natural-language dashboard filter parsing."""
+    from datetime import date
+
+    today = date.today().isoformat()
+
+    col_lines = []
+    for col in columns:
+        col_lines.append(f"- {col['name']} (type: {col['type']})")
+
+    return "\n".join([
+        "You are an expert filter parser for a BI dashboard.",
+        f"Today's date is {today}.",
+        "The user will describe filters in natural language.",
+        "You must call the `apply_filters` function with structured filter objects.",
+        "",
+        "## Available Columns",
+        *col_lines,
+        "",
+        "## Filter Value Formats",
+        "- Text column exact match: value is a string, e.g. \"USA\"",
+        "- Text column multi-match: value is an array, e.g. [\"USA\", \"UK\"]",
+        "- Date/timestamp range: value is {\"from\": \"YYYY-MM-DD\", \"to\": \"YYYY-MM-DD\"}",
+        "- Number range: value is {\"from\": number, \"to\": number}",
+        "- Number exact: value is a number",
+        "",
+        "## Date Interpretation Rules",
+        "- \"last N days\" → {\"from\": \"<today - N days>\", \"to\": \"<today>\"}",
+        "- \"last month\" → {\"from\": \"<first day of previous month>\", \"to\": \"<last day of previous month>\"}",
+        "- \"this month\" → {\"from\": \"<first day of current month>\", \"to\": \"<today>\"}",
+        "- \"this year\" → {\"from\": \"<Jan 1 of current year>\", \"to\": \"<today>\"}",
+        "- \"yesterday\" → {\"from\": \"<yesterday>\", \"to\": \"<yesterday>\"}",
+        "",
+        "## Rules",
+        "1. Only use column names from the Available Columns list above.",
+        "2. Match user mentions to the closest column name (case-insensitive).",
+        "3. For text filters, match the user's value to the column (e.g., \"for USA\" → country = \"USA\").",
+        "4. For date filters, calculate actual dates relative to today.",
+        "5. If a phrase is ambiguous, use the most likely interpretation.",
+        "6. Return at least one filter. If nothing matches, return an empty filters array.",
+    ])
+
+
+PARSE_FILTERS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "apply_filters",
+        "description": "Apply filters to the dashboard based on the user's request",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filters": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "column": {
+                                "type": "string",
+                                "description": "Column name from the available columns list",
+                            },
+                            "value": {
+                                "description": "Filter value: string, number, array, or object with from/to for ranges",
+                            },
+                        },
+                        "required": ["column", "value"],
+                    },
+                },
+            },
+            "required": ["filters"],
+        },
+    },
+}
+
+
 def _load_glossary() -> list[dict]:
     """Load all glossary terms from database."""
     with engine.connect() as conn:

@@ -35,10 +35,12 @@ import { downloadDashboardPDF } from "@/lib/export-pdf";
 import { DashboardPropertiesDialog } from "@/components/dashboard/dashboard-properties-dialog";
 import { useConnections } from "@/hooks/use-connections";
 import { useDatasets } from "@/hooks/use-datasets";
+import { useDashboardColumnsTyped } from "@/hooks/use-filters";
 import type { ChartExecuteResult } from "@/types";
 import { useHotkey } from "@/hooks/use-hotkey";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRoles } from "@/hooks/use-roles";
+import { NLFilterBar } from "@/components/dashboard/nl-filter-bar";
 
 const VISUAL_TYPES = new Set(["text", "divider", "header", "spacer", "tabs"]);
 const CHART_CONCURRENCY = 3;
@@ -129,6 +131,7 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
   const { data: allConnections } = useConnections();
   const { data: allDatasets } = useDatasets();
   const { data: dashFilters } = useDashboardFilters(dashboard?.id);
+  const { data: typedColumns } = useDashboardColumnsTyped(dashboard?.id);
   const defaultsApplied = useRef(false);
 
   // Apply default filter values on first load
@@ -462,6 +465,16 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
             </TabsList>
           </Tabs>
         </div>
+      )}
+
+      {/* NL Filter Bar (AI) */}
+      {typedColumns && typedColumns.length > 0 && (
+        <NLFilterBar
+          columns={typedColumns}
+          onFiltersApplied={(filters) => {
+            setDrillFilters((prev) => ({ ...prev, ...filters }));
+          }}
+        />
       )}
 
       {/* Filters */}

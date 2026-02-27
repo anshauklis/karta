@@ -107,6 +107,22 @@ export function useDashboardChartColumns(dashboardId: number | undefined) {
   });
 }
 
+export function useDashboardColumnsTyped(dashboardId: number | undefined) {
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+
+  return useQuery({
+    queryKey: ["dashboard-columns-typed", dashboardId],
+    queryFn: () =>
+      api.get<{ name: string; type: string }[]>(
+        `/api/dashboards/${dashboardId}/columns-typed`,
+        token,
+      ),
+    enabled: !!token && !!dashboardId,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useDatasetColumns(datasetId: number | undefined) {
   const { data: session } = useSession();
   const token = (session as any)?.accessToken;

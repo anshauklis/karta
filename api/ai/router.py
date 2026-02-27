@@ -40,7 +40,9 @@ from api.ai.prompts import (
     build_fix_sql_prompt,
     build_summarize_prompt,
     build_suggest_chart_config_prompt,
+    build_parse_filters_prompt,
     SUGGEST_CHART_CONFIG_TOOL,
+    PARSE_FILTERS_TOOL,
 )
 from api.ai.tools import get_schema as tool_get_schema, TOOL_DEFINITIONS, TOOL_MAP
 
@@ -358,6 +360,63 @@ async def suggest_chart_config(
         status_code=422,
         detail="AI could not generate a valid chart configuration. Please try rephrasing your request.",
     )
+
+
+# --- Parse filters (NL → structured) ---
+
+@router.post("/parse-filters", summary="Parse natural language into dashboard filters")
+async def parse_filters(req: dict, current_user: dict = Depends(get_current_user)):
+    """Parse a natural-language filter description into structured filter objects.
+
+    Expects: { prompt: str, columns: [{ name: str, type: str }] }
+    Returns: { filters: [{ column: str, value: any }] }
+    """
+    _require_ai_enabled()
+
+    prompt = req.get("prompt", "").strip()
+    columns = req.get("columns", [])
+
+    if not prompt:
+        raise HTTPException(status_code=400, detail="prompt is required")
+    if not columns:
+        raise HTTPException(status_code=400, detail="columns list is required")
+
+    system_prompt = build_parse_filters_prompt(columns)
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": prompt},
+    ]
+
+    response = await chat_completion(
+        messages,
+        tools=[PARSE_FILTERS_TOOL],
+        temperature=0.1,
+    )
+
+    choice = response["choices"][0]
+    msg = choice["message"]
+
+    # Extract from tool call
+    tool_calls = msg.get("tool_calls")
+    if tool_calls:
+        for tc in tool_calls:
+            if tc["function"]["name"] == "apply_filters":
+                args = json.loads(tc["function"]["arguments"])
+                return {"filters": args.get("filters", [])}
+
+    # Fallback: try to parse JSON from text content
+    content = msg.get("content", "")
+    try:
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            parsed = json.loads(json_match.group())
+            if "filters" in parsed:
+                return {"filters": parsed["filters"]}
+    except (json.JSONDecodeError, AttributeError):
+        pass
+
+    return {"filters": []}
 
 
 # --- Glossary (admin only) ---
