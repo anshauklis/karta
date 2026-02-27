@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { Connection, ConnectionCreate, ConnectionTestResult, EngineSpec, SchemaTable } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useEngineSpecs() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useQuery({
     queryKey: ["engine-specs"],
     queryFn: () => api.get<EngineSpec[]>("/api/connections/engine-specs", token),
@@ -19,7 +21,7 @@ export function useEngineSpecs() {
 
 export function useConnections() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["connections"],
@@ -31,7 +33,7 @@ export function useConnections() {
 
 export function useCreateConnection() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -46,7 +48,7 @@ export function useCreateConnection() {
 
 export function useDeleteConnection() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -60,7 +62,7 @@ export function useDeleteConnection() {
 
 export function useUpdateConnection() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -75,7 +77,7 @@ export function useUpdateConnection() {
 
 export function useTestConnection() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useMutation({
     mutationFn: (id: number) =>
@@ -85,7 +87,7 @@ export function useTestConnection() {
 
 export function useConnectionSchema(connectionId: number | null, schema?: string | null) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   const params = schema ? `?schema=${encodeURIComponent(schema)}` : "";
   return useQuery({
@@ -98,7 +100,7 @@ export function useConnectionSchema(connectionId: number | null, schema?: string
 
 export function useConnectionSchemas(connectionId: number | null) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["schemas", connectionId],

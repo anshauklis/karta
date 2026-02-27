@@ -96,7 +96,7 @@ function buildFormFromSpec(spec: EngineSpec, keepName: string): ConnectionCreate
 
   for (const field of spec.connection_fields) {
     if (STANDARD_FIELDS.has(field.name)) {
-      (form as Record<string, unknown>)[field.name] = field.default ?? getFieldZero(field);
+      (form as unknown as Record<string, unknown>)[field.name] = field.default ?? getFieldZero(field);
     } else {
       extra[field.name] = field.default ?? getFieldZero(field);
     }
@@ -442,7 +442,7 @@ function ConnectionDialogInner({
   /** Get the current value for a field, checking standard keys first, then extra_params. */
   const getFieldValue = (field: FieldDef): unknown => {
     if (STANDARD_FIELDS.has(field.name)) {
-      return (form as Record<string, unknown>)[field.name];
+      return (form as unknown as Record<string, unknown>)[field.name];
     }
     return form.extra_params?.[field.name] ?? "";
   };

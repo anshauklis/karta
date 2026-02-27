@@ -23,9 +23,20 @@ dependencies = [
     "redis>=5.0.0",
     "pymssql>=2.2.0",
     "duckdb>=1.4.0",
+    "duckdb-engine>=0.15.0",
     "pyarrow>=14.0.0",
     "scipy>=1.11.0",
     "slowapi>=0.1.9",
     "orjson>=3.10.0",
     "playwright>=1.40.0",
 ]
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"main.py" = ["E402"]
+"renderers/__init__.py" = ["E402"]
+"executor.py" = ["E402"]
+"connections/router.py" = ["E402"]
