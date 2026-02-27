@@ -1,4 +1,4 @@
-import json
+import api.json_util as json
 import os
 import re
 
@@ -51,16 +51,19 @@ def list_datasets(
 
     with engine.connect() as conn:
         if use_pagination:
-            total = conn.execute(
-                text(f"SELECT COUNT(*) FROM datasets{where_clause}"), params
-            ).scalar()
-
             effective_limit = min(limit or 50, 200)
             params["lim"] = effective_limit
             params["off"] = offset
-            result = conn.execute(text(base_query + " LIMIT :lim OFFSET :off"), params)
-            items = [dict(row) for row in result.mappings().all()]
-            content = json.loads(json.dumps(items, default=str))
+            paginated_query = f"""
+                SELECT *, COUNT(*) OVER() as _total FROM (
+                    {base_query}
+                ) _q LIMIT :lim OFFSET :off
+            """
+            rows = [dict(row) for row in conn.execute(text(paginated_query), params).mappings().all()]
+            total = rows[0]["_total"] if rows else 0
+            for r in rows:
+                del r["_total"]
+            content = json.loads(json.dumps(rows, default=str))
             return JSONResponse(content=content, headers={"X-Total-Count": str(total)})
         else:
             result = conn.execute(text(base_query), params)
@@ -220,27 +223,21 @@ def get_dataset_columns(dataset_id: int, current_user: dict = Depends(get_curren
     if not connection_id or not sql_query:
         return {"columns": []}
 
-    from api.connections.router import _get_connection_with_password, _build_url, _create_ext_engine
+    from api.connections.router import _get_connection_with_password, get_engine_for_connection
     c = _get_connection_with_password(connection_id)
+    ext_engine, spec = get_engine_for_connection(c)
 
     if c["db_type"] == "duckdb":
-        duck = duckdb.connect(c["database_name"], read_only=True)
-        try:
-            result = duck.execute(f"SELECT * FROM ({sql_query}) _t LIMIT 0")
-            columns = [{"name": desc[0], "type": str(desc[1]).lower()} for desc in result.description]
-        finally:
-            duck.close()
+        df = spec.execute_native(c["database_name"], f"SELECT * FROM ({sql_query}) _t LIMIT 0")
+        columns = [{"name": col, "type": str(df[col].dtype)} for col in df.columns]
         return {"columns": columns}
 
-    url = _build_url(c["db_type"], c["host"], c["port"], c["database_name"],
-                     c["username"], c["password"], c["ssl_enabled"])
-    ext_engine = _create_ext_engine(url, c["db_type"], c["id"])
     with ext_engine.connect() as ext_conn:
         from api.sql_validator import validate_sql
         clean = validate_sql(sql_query)
         result = ext_conn.execute(text(f"SELECT * FROM ({clean}) _t LIMIT 0"))
         cursor_desc = result.cursor.description
-        if c["db_type"] == "postgresql" and cursor_desc:
+        if c["db_type"] in ("postgresql", "postgres") and cursor_desc:
             oids = [d.type_code for d in cursor_desc]
             type_rows = ext_conn.execute(
                 text("SELECT oid, typname FROM pg_type WHERE oid = ANY(:oids)"),

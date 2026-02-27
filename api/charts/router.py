@@ -1763,7 +1763,7 @@ def _execute_chart_full(
     if db_type != "duckdb":
         ext_engine, _spec = get_engine_for_connection(c)
         pq_path = parquet_cache.get_or_populate(
-            connection_id, clean_sql, db_type, ext_engine, ttl=cache_ttl,
+            connection_id, clean_sql, db_type, ext_engine, ttl=cache_ttl, spec=_spec,
         )
 
     # --- Column metadata for time_grain ---

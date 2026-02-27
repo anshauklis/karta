@@ -15,25 +15,11 @@ from sqlalchemy import text
 from api.database import engine
 from api.connections.router import (
     _get_connection_with_password,
-    _build_url,
-    _create_ext_engine,
+    get_engine_for_connection,
 )
 from api.sql_validator import validate_sql, SQLValidationError
 
 logger = logging.getLogger(__name__)
-
-
-def _url_from_row(row: dict) -> str:
-    """Build SQLAlchemy URL from a connection row dict."""
-    return _build_url(
-        db_type=row["db_type"],
-        host=row["host"],
-        port=row["port"],
-        database_name=row["database_name"],
-        username=row["username"],
-        password=row["password"],
-        ssl_enabled=row.get("ssl_enabled", False),
-    )
 
 
 def _build_chart_config(
@@ -121,82 +107,35 @@ async def get_connections(user_id: int) -> dict:
 async def get_schema(connection_id: int) -> dict:
     """Get tables and columns with types for a connection."""
     row = _get_connection_with_password(connection_id)
-    db_type = row["db_type"]
-
-    if db_type == "duckdb":
-        import duckdb
-        con = duckdb.connect(row["database_name"], read_only=True)
-        try:
-            tables_df = con.execute(
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = 'main'"
-            ).fetchdf()
-            result = []
-            for tbl in tables_df["table_name"].tolist():
-                cols_df = con.execute(
-                    "SELECT column_name, data_type FROM information_schema.columns "
-                    "WHERE table_schema = 'main' AND table_name = ?",
-                    [tbl],
-                ).fetchdf()
-                result.append({
-                    "table_name": tbl,
-                    "columns": [
-                        {"name": r["column_name"], "type": r["data_type"]}
-                        for _, r in cols_df.iterrows()
-                    ],
-                })
-            return {"tables": result}
-        finally:
-            con.close()
-    else:
-        url = _url_from_row(row)
-        eng = _create_ext_engine(url, db_type, connection_id)
-        with eng.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT table_name, column_name, data_type "
-                "FROM information_schema.columns "
-                "WHERE table_schema NOT IN ('information_schema', 'pg_catalog') "
-                "ORDER BY table_name, ordinal_position"
-            ))
-            tables: dict[str, list] = {}
-            for r in rows.mappings().all():
-                tbl = r["table_name"]
-                if tbl not in tables:
-                    tables[tbl] = []
-                tables[tbl].append({"name": r["column_name"], "type": r["data_type"]})
-            return {"tables": [
-                {"table_name": t, "columns": cols}
-                for t, cols in tables.items()
-            ]}
+    eng, spec = get_engine_for_connection(row)
+    tables = spec.get_schema(eng)
+    return {"tables": [
+        {"table_name": t["table_name"],
+         "columns": [{"name": c["name"], "type": c["type"]} for c in t["columns"]]}
+        for t in tables
+    ]}
 
 
 async def get_sample(connection_id: int, table_name: str, limit: int = 10) -> dict:
     """Get first N rows of a table."""
     limit = min(limit, 50)
     row = _get_connection_with_password(connection_id)
-    db_type = row["db_type"]
 
     # Validate table_name: alphanumeric + underscore only
     if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_.]*$', table_name):
         return {"error": "Invalid table name"}
 
     sql = f'SELECT * FROM "{table_name}" LIMIT {limit}'
+    eng, spec = get_engine_for_connection(row)
 
-    if db_type == "duckdb":
-        import duckdb
-        con = duckdb.connect(row["database_name"], read_only=True)
-        try:
-            df = con.execute(sql).fetchdf()
-            return {
-                "columns": df.columns.tolist(),
-                "rows": df.values.tolist()[:limit],
-                "row_count": len(df),
-            }
-        finally:
-            con.close()
+    if row["db_type"] == "duckdb":
+        df = spec.execute_native(row["database_name"], sql)
+        return {
+            "columns": df.columns.tolist(),
+            "rows": df.values.tolist()[:limit],
+            "row_count": len(df),
+        }
     else:
-        url = _url_from_row(row)
-        eng = _create_ext_engine(url, db_type, connection_id)
         with eng.connect() as conn:
             result = conn.execute(text(sql))
             columns = list(result.keys())
@@ -213,8 +152,7 @@ async def get_table_profile(connection_id: int, table_name: str) -> dict:
         return {"error": "Invalid table name"}
 
     row = _get_connection_with_password(connection_id)
-    url = _url_from_row(row)
-    ext_engine = _create_ext_engine(url, row["db_type"], connection_id)
+    ext_engine, spec = get_engine_for_connection(row)
 
     with ext_engine.connect() as conn:
         from sqlalchemy import inspect as sa_inspect
@@ -312,24 +250,17 @@ async def execute_sql(connection_id: int, sql: str) -> dict:
         return {"error": str(e)}
 
     row = _get_connection_with_password(connection_id)
-    db_type = row["db_type"]
+    eng, spec = get_engine_for_connection(row)
 
     try:
-        if db_type == "duckdb":
-            import duckdb
-            con = duckdb.connect(row["database_name"], read_only=True)
-            try:
-                df = con.execute(validated).fetchdf()
-                return {
-                    "columns": df.columns.tolist(),
-                    "rows": df.values.tolist(),
-                    "row_count": len(df),
-                }
-            finally:
-                con.close()
+        if row["db_type"] == "duckdb":
+            df = spec.execute_native(row["database_name"], validated)
+            return {
+                "columns": df.columns.tolist(),
+                "rows": df.values.tolist(),
+                "row_count": len(df),
+            }
         else:
-            url = _url_from_row(row)
-            eng = _create_ext_engine(url, db_type, connection_id)
             with eng.connect() as conn:
                 result = conn.execute(text(validated))
                 columns = list(result.keys())
@@ -656,17 +587,11 @@ async def validate_sql_tool(connection_id: int, sql: str) -> dict:
 
     try:
         row = _get_connection_with_password(connection_id)
+        eng, spec = get_engine_for_connection(row)
         if row["db_type"] == "duckdb":
-            import duckdb
-            con = duckdb.connect(row["database_name"], read_only=True)
-            try:
-                result = con.execute(f"SELECT * FROM ({clean}) _t LIMIT 0")
-                columns = [{"name": d[0], "type": str(d[1]).lower()} for d in result.description]
-            finally:
-                con.close()
+            df = spec.execute_native(row["database_name"], f"SELECT * FROM ({clean}) _t LIMIT 0")
+            columns = [{"name": col, "type": str(df[col].dtype)} for col in df.columns]
         else:
-            url = _url_from_row(row)
-            eng = _create_ext_engine(url, row["db_type"], connection_id)
             with eng.connect() as conn:
                 result = conn.execute(text(f"SELECT * FROM ({clean}) _t LIMIT 0"))
                 columns = [{"name": k, "type": "unknown"} for k in result.keys()]
