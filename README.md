@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/anshauklis/karta/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License" /></a>
+  <a href="https://github.com/anshauklis/karta/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License" /></a>
   <img src="https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker" />
   <img src="https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/next.js-16-000000?logo=next.js&logoColor=white" alt="Next.js" />
@@ -28,11 +28,23 @@
 - **Code Charts** — write Python with pandas, Plotly, NumPy for full control in a sandboxed environment
 - **Chart Templates** — save and reuse chart configurations across dashboards
 
+### AI Features (BYO API Key)
+
+- **Text-to-SQL** — describe what you want in plain language, get SQL
+- **AI Chart Builder** — describe a visualization, AI generates chart config + SQL
+- **Natural Language Filters** — type "show last 30 days for USA" on any dashboard
+- **AI Auto-Insights** — automatic trend detection, anomaly alerts, MoM changes on chart cards
+- **AI SQL Fix** — automatic error diagnosis and fix suggestions
+- **BYO Key** — works with OpenAI, Anthropic, or local Ollama. Zero server cost.
+
 ### Data & Analytics
 
 - **SQL Lab** — Monaco editor with syntax highlighting, schema browser, autocomplete, CSV export
+- **SQL Variables** — `{{ variable_name }}` syntax with type-safe substitution across all database engines
 - **Statistical Overlays** — trendlines (linear, polynomial, exponential), moving averages, EMA, confidence bands, anomaly detection
 - **Data Transforms** — moving average, year-over-year, cumulative sum, z-score normalization, forecasting (Holt-Winters)
+- **DuckDB + Parquet Pipeline** — query 40M+ rows without OOM via automatic Parquet caching
+- **Pivot Tables** — cross-tabulation with subtotals, custom SQL expressions, percentage modes
 - **Column Formatting** — number, percent, currency, date formats with custom decimals, prefix/suffix, thousands separator
 - **Conditional Formatting** — threshold rules and color scales for table/pivot cells
 - **Datasets** — save and reuse SQL queries as named datasets
@@ -55,6 +67,8 @@ All connection credentials are encrypted at rest with AES-256-GCM.
 - **CSV** — with column formatting applied
 - **PDF** — full dashboard export to PDF (A4 landscape, via html2canvas + jsPDF)
 - **Shared Links** — public read-only dashboard links with optional expiration, fully rendered charts
+- **Dashboard Embed** — iframe embedding with JWT tokens, theme support, URL-based filters
+- **PDF/PNG Reports** — scheduled dashboard screenshots via Playwright, delivered by email/Slack/Telegram
 
 ### Collaboration
 
@@ -85,6 +99,7 @@ All connection credentials are encrypted at rest with AES-256-GCM.
 - **Sortable Tables** — click column headers to sort, sticky headers during scroll
 - **Duplicate Charts** — one-click chart duplication with all configuration
 - **Welcome Wizard** — guided 3-step onboarding for new users
+- **Responsive Mobile View** — single-column dashboard layout on mobile devices
 
 ### Infrastructure
 
@@ -289,6 +304,6 @@ All chart types support: color palettes (6 built-in), conditional formatting, Ex
 
 ## License
 
-Licensed under the [Apache License, Version 2.0](LICENSE).
+Licensed under the [GNU Affero General Public License v3.0](LICENSE).
 
-Copyright 2026 Karta Contributors. See [NOTICE](NOTICE) for third-party attributions.
+Copyright 2026 Karta Contributors.
