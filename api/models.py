@@ -753,3 +753,24 @@ class ExcelExportRequest(BaseModel):
     filename: str = "data"
     column_formats: dict | None = None
     formatting: list[dict] | None = None
+
+
+# --- Dashboard Versions ---
+
+class VersionCreate(BaseModel):
+    label: str = ""
+
+class VersionLabelUpdate(BaseModel):
+    label: str
+
+class VersionListItem(BaseModel):
+    id: int
+    dashboard_id: int
+    version_number: int
+    label: str
+    is_auto: bool
+    created_by: Optional[int]
+    created_at: datetime
+
+class VersionDetail(VersionListItem):
+    snapshot: dict

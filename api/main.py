@@ -90,6 +90,7 @@ app = FastAPI(
         {"name": "lineage", "description": "Data lineage graph"},
         {"name": "favorites", "description": "User favorites"},
         {"name": "export", "description": "Dashboard share links"},
+        {"name": "dashboard_versions", "description": "Dashboard version history and restore"},
         {"name": "Meta", "description": "Chart configuration schemas and metadata"},
     ],
 )
@@ -147,6 +148,7 @@ from api.templates.router import router as templates_router
 from api.tabs.router import router as tabs_router
 from api.meta.router import router as meta_router
 from api.semantic.router import router as semantic_router
+from api.versions.router import router as versions_router
 
 app.include_router(auth_router)
 app.include_router(dashboards_router)
@@ -174,6 +176,7 @@ app.include_router(templates_router)
 app.include_router(tabs_router)
 app.include_router(meta_router)
 app.include_router(semantic_router)
+app.include_router(versions_router)
 
 
 @app.get("/api/health", summary="Health check", tags=["system"])

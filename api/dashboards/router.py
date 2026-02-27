@@ -1,4 +1,4 @@
-import json
+import api.json_util as json
 import re
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
@@ -7,6 +7,7 @@ from sqlalchemy import text
 from api.database import engine
 from api.models import DashboardCreate, DashboardUpdate, DashboardResponse
 from api.auth.dependencies import get_current_user, require_role
+from api.cache import get_cached, set_cached
 
 router = APIRouter(prefix="/api/dashboards", tags=["dashboards"])
 
@@ -51,19 +52,19 @@ def _get_dashboard_roles(conn, dashboard_id: int) -> list[str]:
 
 def _set_dashboard_owners(conn, dashboard_id: int, owner_ids: list[int]):
     conn.execute(text("DELETE FROM dashboard_owners WHERE dashboard_id = :did"), {"did": dashboard_id})
-    for uid in owner_ids:
-        conn.execute(text(
-            "INSERT INTO dashboard_owners (dashboard_id, user_id) VALUES (:did, :uid)"
-        ), {"did": dashboard_id, "uid": uid})
+    if owner_ids:
+        values = ", ".join(f"(:did, :uid{i})" for i in range(len(owner_ids)))
+        params = {"did": dashboard_id, **{f"uid{i}": uid for i, uid in enumerate(owner_ids)}}
+        conn.execute(text(f"INSERT INTO dashboard_owners (dashboard_id, user_id) VALUES {values}"), params)
 
 
 def _set_dashboard_roles(conn, dashboard_id: int, roles: list[str]):
     conn.execute(text("DELETE FROM dashboard_roles WHERE dashboard_id = :did"), {"did": dashboard_id})
-    for role in roles:
-        if role.strip():
-            conn.execute(text(
-                "INSERT INTO dashboard_roles (dashboard_id, group_name) VALUES (:did, :gn)"
-            ), {"did": dashboard_id, "gn": role.strip()})
+    clean = [r.strip() for r in roles if r.strip()]
+    if clean:
+        values = ", ".join(f"(:did, :gn{i})" for i in range(len(clean)))
+        params = {"did": dashboard_id, **{f"gn{i}": gn for i, gn in enumerate(clean)}}
+        conn.execute(text(f"INSERT INTO dashboard_roles (dashboard_id, group_name) VALUES {values}"), params)
 
 
 def _enrich_dashboard(conn, dashboard: dict) -> dict:
@@ -140,7 +141,11 @@ def _get_user_groups(user_id: int) -> list[str]:
 
 @router.get("/groups", summary="List dashboard groups")
 def list_groups(current_user: dict = Depends(get_current_user)):
-    """List all unique group names used by dashboards."""
+    """List all unique group names used by dashboards. Cached 1h in Redis."""
+    cache_key = "groups:all"
+    cached = get_cached(cache_key)
+    if cached is not None:
+        return cached
     with engine.connect() as conn:
         result = conn.execute(text("SELECT DISTINCT groups FROM users WHERE groups IS NOT NULL AND groups != ''"))
         all_groups: set[str] = set()
@@ -149,7 +154,9 @@ def list_groups(current_user: dict = Depends(get_current_user)):
                 g = g.strip()
                 if g:
                     all_groups.add(g)
-    return sorted(all_groups)
+    groups = sorted(all_groups)
+    set_cached(cache_key, groups, ttl=3600)
+    return groups
 
 
 @router.get("", response_model=list[DashboardResponse], summary="List dashboards")
@@ -367,6 +374,13 @@ def update_dashboard(dashboard_id: int, req: DashboardUpdate, current_user: dict
             if roles is not None:
                 _set_dashboard_roles(conn, dashboard_id, roles)
             conn.commit()
+
+    # Auto-version (best-effort, never blocks the save)
+    try:
+        from api.versions.router import create_auto_version
+        create_auto_version(dashboard_id, int(current_user["sub"]))
+    except Exception:
+        pass
 
     return get_dashboard(dashboard_id, current_user)
 

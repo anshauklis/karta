@@ -5,7 +5,7 @@ import re
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Depends, Body
 from fastapi.responses import JSONResponse
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
 from api.database import engine
 from api.models import (
@@ -168,20 +168,25 @@ def _classify_error(error: str | Exception) -> dict:
 
 
 def _sanitize_rows(df: pd.DataFrame) -> list:
-    """Convert DataFrame rows to JSON-safe Python types (no numpy)."""
+    """Convert DataFrame rows to JSON-safe Python types (no numpy).
+    Converts per column dtype (O(columns) type checks) instead of per cell."""
     import numpy as np
-    rows = df.values.tolist()
-    for i, row in enumerate(rows):
-        for j, val in enumerate(row):
-            if isinstance(val, (np.integer,)):
-                rows[i][j] = int(val)
-            elif isinstance(val, (np.floating,)):
-                rows[i][j] = None if pd.isna(val) else float(val)
-            elif isinstance(val, np.ndarray):
-                rows[i][j] = val.tolist()
-            elif isinstance(val, np.bool_):
-                rows[i][j] = bool(val)
-    return rows
+    cols = []
+    for col in df.columns:
+        series = df[col]
+        dtype = series.dtype
+        if np.issubdtype(dtype, np.integer):
+            cols.append([int(v) if pd.notna(v) else None for v in series])
+        elif np.issubdtype(dtype, np.floating):
+            cols.append([float(v) if pd.notna(v) else None for v in series])
+        elif dtype == np.bool_:
+            cols.append([bool(v) if pd.notna(v) else None for v in series])
+        else:
+            cols.append([v.tolist() if isinstance(v, np.ndarray) else v for v in series])
+    if not cols:
+        return []
+    n = len(cols[0])
+    return [[cols[c][r] for c in range(len(cols))] for r in range(n)]
 
 
 def _sanitize_figure(figure) -> dict | None:
@@ -277,16 +282,19 @@ def list_all_charts(
 
     with engine.connect() as conn:
         if use_pagination:
-            total = conn.execute(
-                text(f"SELECT COUNT(*) FROM charts c{where_clause}"), params
-            ).scalar()
-
             effective_limit = min(limit or 50, 200)
             params["lim"] = effective_limit
             params["off"] = offset
-            result = conn.execute(text(base_query + " LIMIT :lim OFFSET :off"), params)
-            items = [dict(row) for row in result.mappings().all()]
-            content = json.loads(json.dumps(items, default=str))
+            paginated_query = f"""
+                SELECT *, COUNT(*) OVER() as _total FROM (
+                    {base_query}
+                ) _q LIMIT :lim OFFSET :off
+            """
+            rows = [dict(row) for row in conn.execute(text(paginated_query), params).mappings().all()]
+            total = rows[0]["_total"] if rows else 0
+            for r in rows:
+                del r["_total"]
+            content = json.loads(json.dumps(rows, default=str))
             return JSONResponse(content=content, headers={"X-Total-Count": str(total)})
         else:
             result = conn.execute(text(base_query), params)
@@ -454,7 +462,7 @@ def create_standalone_chart(req: ChartCreate, current_user: dict = require_role(
 
 def _auto_detect_columns(connection_id: int, sql_query: str) -> dict:
     """Detect column types from SQL and suggest chart config fields."""
-    from api.connections.router import _get_connection_with_password, _build_url, _create_ext_engine
+    from api.connections.router import _get_connection_with_password, get_engine_for_connection
 
     c = _get_connection_with_password(connection_id)
 
@@ -467,9 +475,7 @@ def _auto_detect_columns(connection_id: int, sql_query: str) -> dict:
         finally:
             duck.close()
     else:
-        url = _build_url(c["db_type"], c["host"], c["port"], c["database_name"],
-                         c["username"], c["password"], c["ssl_enabled"])
-        ext_engine = _create_ext_engine(url, c["db_type"], c["id"])
+        ext_engine, _spec = get_engine_for_connection(c)
         with ext_engine.connect() as conn:
             result = conn.execute(text(f"SELECT * FROM ({sql_query}) _t LIMIT 0"))
             # Use cursor.description to get actual column types (type_code → PG OID)
@@ -934,6 +940,13 @@ def update_layout(dashboard_id: int, req: LayoutUpdate, current_user: dict = req
             )
         conn.commit()
 
+    # Auto-version (best-effort)
+    try:
+        from api.versions.router import create_auto_version
+        create_auto_version(dashboard_id, int(current_user["sub"]))
+    except Exception:
+        pass
+
     return {"status": "ok"}
 
 
@@ -957,7 +970,7 @@ def _execute_chart_sql(connection_id: int, sql_query: str, filters: dict | None 
                        time_range_config: dict | None = None):
     """Execute SQL on external DB, return (columns, rows, dataframe)."""
     from api.sql_validator import validate_sql, SQLValidationError
-    from api.connections.router import _get_connection_with_password, _build_url, _create_ext_engine, is_postgres, is_clickhouse, is_mssql
+    from api.connections.router import _get_connection_with_password, get_engine_for_connection
     from api.cache import cache_key, get_cached, set_cached
     from api.rls.router import get_rls_filters
 
@@ -1086,17 +1099,9 @@ def _execute_chart_sql(connection_id: int, sql_query: str, filters: dict | None 
         # Caching 500MB+ JSON to Redis would be slower than re-querying.
         return columns, [], df
 
-    url = _build_url(c["db_type"], c["host"], c["port"], c["database_name"],
-                     c["username"], c["password"], c["ssl_enabled"])
-
-    ext_engine = _create_ext_engine(url, c["db_type"], connection_id)
+    ext_engine, spec = get_engine_for_connection(c)
     with ext_engine.connect() as conn:
-        if is_postgres(c["db_type"]):
-            conn.execute(text("SET statement_timeout = 30000"))
-        elif is_clickhouse(c["db_type"]):
-            conn.execute(text("SET max_execution_time = 30"))
-        elif is_mssql(c["db_type"]):
-            conn.execute(text("SET LOCK_TIMEOUT 30000"))
+        spec.set_timeout(conn, 30)
         result = conn.execute(text(clean_sql), filter_params)
         columns = list(result.keys())
         rows_raw = result.fetchall()
@@ -1206,7 +1211,7 @@ def _apply_time_grain_df(df, config: dict):
 def _apply_time_range_df(df, config: dict):
     """Filter DataFrame by time range preset (7d/30d/90d/1y/all)."""
     import pandas as pd
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
     time_col = config.get("time_column")
     time_range = config.get("time_range", "all")
@@ -1248,6 +1253,8 @@ def _build_time_range_sql(base_sql: str, config: dict, db_type: str) -> str | No
     Returns wrapped SQL string, or None if push-down is not applicable.
     Uses MAX(col) as reference point (same semantics as _apply_time_range_df).
     """
+    from api.engine_specs import get_spec
+
     time_col = config.get("time_column")
     time_range = config.get("time_range", "all")
     if not time_col or time_range == "all":
@@ -1262,17 +1269,9 @@ def _build_time_range_sql(base_sql: str, config: dict, db_type: str) -> str | No
         return None
 
     col = f'"{time_col}"'
-    db = (db_type or "").lower()
-
-    if db in ("postgresql", "postgres", "duckdb"):
-        date_expr = f"MAX({col}) - INTERVAL '{days} days'"
-    elif db == "clickhouse":
-        date_expr = f"subtractDays(MAX({col}), {days})"
-    elif db == "mysql":
-        date_expr = f"DATE_SUB(MAX({col}), INTERVAL {days} DAY)"
-    elif db == "mssql":
-        date_expr = f"DATEADD(day, -{days}, MAX({col}))"
-    else:
+    spec = get_spec(db_type)
+    date_expr = spec.time_range_expression(col, days) if spec else None
+    if date_expr is None:
         return None
 
     return (
@@ -1471,12 +1470,18 @@ def _apply_metrics_df(df, config: dict):
             if agg == "COUNT" and col == "*":
                 result[label] = [len(df)]
             elif col in df.columns:
-                if agg == "SUM": result[label] = [df[col].sum()]
-                elif agg == "AVG": result[label] = [df[col].mean()]
-                elif agg == "COUNT": result[label] = [df[col].count()]
-                elif agg == "MIN": result[label] = [df[col].min()]
-                elif agg == "MAX": result[label] = [df[col].max()]
-                elif agg == "COUNT_DISTINCT": result[label] = [df[col].nunique()]
+                if agg == "SUM":
+                    result[label] = [df[col].sum()]
+                elif agg == "AVG":
+                    result[label] = [df[col].mean()]
+                elif agg == "COUNT":
+                    result[label] = [df[col].count()]
+                elif agg == "MIN":
+                    result[label] = [df[col].min()]
+                elif agg == "MAX":
+                    result[label] = [df[col].max()]
+                elif agg == "COUNT_DISTINCT":
+                    result[label] = [df[col].nunique()]
         return pd.DataFrame(result) if result else df
 
     # Build aggregation dict using NamedAgg to support duplicate columns
@@ -1606,10 +1611,6 @@ def _build_custom_sql_query(base_sql: str, config: dict) -> tuple[str, bool]:
     if not select_parts and not where_parts:
         return base_sql, False
 
-    has_custom_metrics = any(
-        m.get("expressionType") == "custom_sql" and m.get("sqlExpression", "").strip()
-        for m in metrics
-    )
     has_any_metrics = bool(metrics)
 
     if not select_parts:
@@ -1744,7 +1745,7 @@ def _execute_chart_full(
     """
     import duckdb
     from api.sql_validator import validate_sql, SQLValidationError
-    from api.connections.router import _get_connection_with_password, _build_url, _create_ext_engine, is_postgres
+    from api.connections.router import _get_connection_with_password, get_engine_for_connection
     from api.rls.router import get_rls_filters
     import api.parquet_cache as parquet_cache
     import api.pipeline_sql as pipeline_sql
@@ -1760,9 +1761,7 @@ def _execute_chart_full(
     # --- Get or populate Parquet cache ---
     pq_path = None
     if db_type != "duckdb":
-        url = _build_url(db_type, c["host"], c["port"], c["database_name"],
-                         c["username"], c["password"], c["ssl_enabled"])
-        ext_engine = _create_ext_engine(url, db_type, connection_id)
+        ext_engine, _spec = get_engine_for_connection(c)
         pq_path = parquet_cache.get_or_populate(
             connection_id, clean_sql, db_type, ext_engine, ttl=cache_ttl,
         )
@@ -1914,8 +1913,9 @@ async def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, c
         if _cached:
             return ChartExecuteResponse(**_cached)
 
-    # --- Resolve TTL ---
+    # --- Resolve TTL (fetch dataset cache_ttl once, reuse for Parquet too) ---
     chart_config = chart.get("chart_config", {}) or {}
+    _ds_cache_ttl = None
     _ttl = chart_config.get("cache_ttl")
     if _ttl is None and chart.get("dataset_id"):
         with engine.connect() as conn:
@@ -1924,7 +1924,8 @@ async def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, c
                 {"id": chart["dataset_id"]}
             ).mappings().fetchone()
             if _ds:
-                _ttl = _ds["cache_ttl"]
+                _ds_cache_ttl = _ds["cache_ttl"]
+                _ttl = _ds_cache_ttl
     if _ttl is None:
         _ttl = CACHE_TTL
     _ttl = int(_ttl)
@@ -1971,16 +1972,8 @@ async def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, c
         except Exception as e:
             return ChartExecuteResponse(error=_classify_error(e))
 
-    # Resolve Parquet cache TTL from dataset
-    _pq_ttl = None
-    if chart.get("dataset_id"):
-        with engine.connect() as conn:
-            _ds_ttl = conn.execute(
-                text("SELECT cache_ttl FROM datasets WHERE id = :id"),
-                {"id": chart["dataset_id"]}
-            ).mappings().fetchone()
-            if _ds_ttl:
-                _pq_ttl = _ds_ttl["cache_ttl"]
+    # Parquet cache TTL — reuse dataset value fetched above
+    _pq_ttl = _ds_cache_ttl
 
     # Execute full pipeline via DuckDB (IO-bound — run in thread pool)
     try:
