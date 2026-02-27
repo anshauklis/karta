@@ -88,6 +88,7 @@ import { DataTab } from "./components/data-tab";
 import { useHotkey } from "@/hooks/use-hotkey";
 import { AIChartBuilder } from "@/components/ai/ai-chart-builder";
 import { MetricsBrowser } from "@/components/metrics/metrics-browser";
+import { useSemanticModels } from "@/hooks/use-semantic";
 import type { SuggestChartConfigResult } from "@/hooks/use-ai";
 
 const CHART_TYPE_ICONS: Record<string, { icon: React.ComponentType<{ className?: string }>; rotate?: boolean }> = {
@@ -200,6 +201,17 @@ export default function ChartEditorPage({
     codeEditingRef, codeEditTimerRef,
   } = editor;
 
+  // Semantic models — show metrics tab only when models exist for current connection
+  const { data: semanticModels } = useSemanticModels(connectionId);
+  const hasMetrics = (semanticModels?.length ?? 0) > 0;
+
+  // If user is on metrics tab but no models exist anymore, reset to data tab
+  useEffect(() => {
+    if (activeTab === "metrics" && !hasMetrics) {
+      setActiveTab("data");
+    }
+  }, [activeTab, hasMetrics, setActiveTab]);
+
   // Ctrl+S / Cmd+S opens the save modal
   useHotkey("s", useCallback(() => setSaveModalOpen(true), [setSaveModalOpen]));
 
@@ -290,23 +302,30 @@ export default function ChartEditorPage({
     const activeId = String(active.id);
     const overId = String(over.id);
 
-    // Dragged from metrics browser
+    // Dragged from metrics browser — validate target drop zone
     if (activeId.startsWith("metric-measure-")) {
-      // Extract measure name: "metric-measure-{modelId}-{name}"
-      const parts = activeId.replace("metric-measure-", "").split("-");
-      const measureName = parts.slice(1).join("-");
-      if (measureName) {
-        const current = (chartConfig.y_columns as string[]) || [];
-        updateConfig("y_columns", [...current, measureName]);
+      // Measures can only be dropped on zone-y or items already in y_columns
+      const yItems = (chartConfig.y_columns as string[]) || [];
+      if (overId === "zone-y" || yItems.includes(overId)) {
+        // Extract measure name: "metric-measure-{modelId}-{name}"
+        const parts = activeId.replace("metric-measure-", "").split("-");
+        const measureName = parts.slice(1).join("-");
+        if (measureName) {
+          updateConfig("y_columns", [...yItems, measureName]);
+        }
       }
       return;
     }
     if (activeId.startsWith("metric-dimension-")) {
-      // Extract dimension column_name: "metric-dimension-{modelId}-{columnName}"
+      // Dimensions can be dropped on zone-x (sets x_column) or zone-color (sets color_column)
       const parts = activeId.replace("metric-dimension-", "").split("-");
       const columnName = parts.slice(1).join("-");
       if (columnName) {
-        updateConfig("x_column", columnName);
+        if (overId === "zone-x" || overId === chartConfig.x_column) {
+          updateConfig("x_column", columnName);
+        } else if (overId === "zone-color" || overId === chartConfig.color_column) {
+          updateConfig("color_column", columnName);
+        }
       }
       return;
     }
@@ -720,10 +739,12 @@ export default function ChartEditorPage({
                 <Code2 className="h-4 w-4" />
                 {t("code")}
               </TabsTrigger>
-              <TabsTrigger value="metrics" className="px-3 py-1.5 text-sm">
-                <Layers className="h-4 w-4" />
-                {t("metrics")}
-              </TabsTrigger>
+              {hasMetrics && (
+                <TabsTrigger value="metrics" className="px-3 py-1.5 text-sm">
+                  <Layers className="h-4 w-4" />
+                  {t("metrics")}
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 

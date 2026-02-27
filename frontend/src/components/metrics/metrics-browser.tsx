@@ -27,15 +27,17 @@ function DraggableMeasure({
   name,
   label,
   aggType,
+  expression,
 }: {
   modelId: number;
   name: string;
   label: string;
   aggType: string;
+  expression: string;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `metric-measure-${modelId}-${name}`,
-    data: { type: "measure", modelId, name },
+    data: { type: "measure", modelId, name, expression },
   });
 
   return (
@@ -141,6 +143,7 @@ function ModelSection({ model }: { model: SemanticModel }) {
                     name={m.name}
                     label={m.label}
                     aggType={m.agg_type}
+                    expression={m.expression}
                   />
                 ))}
               </div>
