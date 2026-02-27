@@ -943,6 +943,13 @@
     "noMeasures": "No measures defined",
     "noDimensions": "No dimensions defined",
     "noJoins": "No joins defined",
-    "model": "Model"
+    "model": "Model",
+    "browser_title": "Metrics Browser",
+    "measures_group": "Measures",
+    "dimensions_group": "Dimensions",
+    "no_models": "No semantic models for this connection",
+    "go_to_metrics": "Create models",
+    "select_connection": "Select a connection first",
+    "drag_hint": "Drag measures to Y-axis, dimensions to X-axis"
   }
 }

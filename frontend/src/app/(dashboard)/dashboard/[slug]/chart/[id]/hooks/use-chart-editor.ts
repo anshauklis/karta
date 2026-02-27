@@ -53,7 +53,7 @@ export function useChartEditor(slug: string, id: string) {
   const [connectionId, setConnectionId] = useState<number | undefined>();
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<"data" | "customize" | "code">("data");
+  const [activeTab, setActiveTab] = useState<"data" | "customize" | "code" | "metrics">("data");
   const [codeSubTab, setCodeSubTab] = useState<"editor" | "output">("editor");
   const [customizeSubTab, setCustomizeSubTab] = useState<"formatting" | "overlays" | "advanced">("formatting");
   const [execTime, setExecTime] = useState<number | null>(null);

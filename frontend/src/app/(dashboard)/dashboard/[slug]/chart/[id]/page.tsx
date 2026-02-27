@@ -87,6 +87,7 @@ import { CustomizeTab } from "./components/customize-tab";
 import { DataTab } from "./components/data-tab";
 import { useHotkey } from "@/hooks/use-hotkey";
 import { AIChartBuilder } from "@/components/ai/ai-chart-builder";
+import { MetricsBrowser } from "@/components/metrics/metrics-browser";
 import type { SuggestChartConfigResult } from "@/hooks/use-ai";
 
 const CHART_TYPE_ICONS: Record<string, { icon: React.ComponentType<{ className?: string }>; rotate?: boolean }> = {
@@ -288,6 +289,27 @@ export default function ChartEditorPage({
 
     const activeId = String(active.id);
     const overId = String(over.id);
+
+    // Dragged from metrics browser
+    if (activeId.startsWith("metric-measure-")) {
+      // Extract measure name: "metric-measure-{modelId}-{name}"
+      const parts = activeId.replace("metric-measure-", "").split("-");
+      const measureName = parts.slice(1).join("-");
+      if (measureName) {
+        const current = (chartConfig.y_columns as string[]) || [];
+        updateConfig("y_columns", [...current, measureName]);
+      }
+      return;
+    }
+    if (activeId.startsWith("metric-dimension-")) {
+      // Extract dimension column_name: "metric-dimension-{modelId}-{columnName}"
+      const parts = activeId.replace("metric-dimension-", "").split("-");
+      const columnName = parts.slice(1).join("-");
+      if (columnName) {
+        updateConfig("x_column", columnName);
+      }
+      return;
+    }
 
     // Dragged from column list to a drop zone
     if (activeId.startsWith("source-")) {
@@ -698,6 +720,10 @@ export default function ChartEditorPage({
                 <Code2 className="h-4 w-4" />
                 {t("code")}
               </TabsTrigger>
+              <TabsTrigger value="metrics" className="px-3 py-1.5 text-sm">
+                <Layers className="h-4 w-4" />
+                {t("metrics")}
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -783,6 +809,10 @@ export default function ChartEditorPage({
             />
           </TabsContent>
 
+          <TabsContent value="metrics" className="flex-1 overflow-y-auto p-3 space-y-1 mt-0" style={{ zoom: editorZoom }}>
+            <MetricsBrowser connectionId={connectionId} />
+          </TabsContent>
+
           </Tabs>{/* end tabs */}
         </div>{/* end flex h-full flex-col */}
         </Panel>
@@ -866,6 +896,18 @@ export default function ChartEditorPage({
           <div className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs font-medium shadow-lg">
             <GripVertical className="h-3 w-3 text-muted-foreground/40" />
             <span>{activeDragId.replace("source-", "")}</span>
+          </div>
+        ) : activeDragId?.startsWith("metric-measure-") ? (
+          <div className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs font-medium shadow-lg">
+            <GripVertical className="h-3 w-3 text-muted-foreground/40" />
+            <Hash className="h-3 w-3 text-primary" />
+            <span>{activeDragId.replace(/^metric-measure-\d+-/, "")}</span>
+          </div>
+        ) : activeDragId?.startsWith("metric-dimension-") ? (
+          <div className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs font-medium shadow-lg">
+            <GripVertical className="h-3 w-3 text-muted-foreground/40" />
+            <Calendar className="h-3 w-3 text-primary" />
+            <span>{activeDragId.replace(/^metric-dimension-\d+-/, "")}</span>
           </div>
         ) : activeDragId ? (
           <div className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium shadow-lg">
