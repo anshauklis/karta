@@ -256,12 +256,14 @@ class ChartConfigValidateResponse(BaseModel):
 class ConnectionCreate(BaseModel):
     name: str
     db_type: str
-    host: str
-    port: int
-    database_name: str
-    username: str
-    password: str
+    host: str = ""
+    port: int = 0
+    database_name: str = ""
+    username: str = ""
+    password: str = ""
     ssl_enabled: bool = False
+    sqlalchemy_uri: Optional[str] = None
+    extra_params: Optional[dict] = None
 
 class ConnectionUpdate(BaseModel):
     name: Optional[str] = None
@@ -271,6 +273,8 @@ class ConnectionUpdate(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     ssl_enabled: Optional[bool] = None
+    sqlalchemy_uri: Optional[str] = None
+    extra_params: Optional[dict] = None
 
 class ConnectionResponse(BaseModel):
     id: int
@@ -282,6 +286,8 @@ class ConnectionResponse(BaseModel):
     username: str
     ssl_enabled: bool
     is_system: bool = False
+    sqlalchemy_uri: Optional[str] = None
+    extra_params: Optional[dict] = None
     created_by: Optional[int]
     created_at: datetime
     updated_at: datetime

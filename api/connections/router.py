@@ -99,6 +99,8 @@ def _get_connection_with_password(conn_id: int):
         raise HTTPException(status_code=404, detail="Connection not found")
     row = dict(row)
     row["password"] = decrypt_password_safe(row["password_encrypted"])
+    if row.get("sqlalchemy_uri"):
+        row["sqlalchemy_uri"] = decrypt_password_safe(row["sqlalchemy_uri"])
     return row
 
 
@@ -120,6 +122,8 @@ def _get_connections_with_password(conn_ids: list[int]) -> dict[int, dict]:
     for row in rows:
         r = dict(row)
         r["password"] = decrypt_password_safe(r["password_encrypted"])
+        if r.get("sqlalchemy_uri"):
+            r["sqlalchemy_uri"] = decrypt_password_safe(r["sqlalchemy_uri"])
         out[r["id"]] = r
     return out
 
@@ -225,24 +229,28 @@ def list_connections(
 @router.post("", summary="Create connection", response_model=ConnectionResponse, status_code=201)
 def create_connection(req: ConnectionCreate, current_user: dict = Depends(require_admin)):
     """Create a new database connection. Admin only. Password is encrypted with AES-256-GCM."""
-    _validate_connection_host(req.host)
+    if req.host:
+        _validate_connection_host(req.host)
     user_id = int(current_user["sub"])
-    password_encrypted = encrypt_password_safe(req.password)
+    password_encrypted = encrypt_password_safe(req.password) if req.password else ""
+    uri_encrypted = encrypt_password_safe(req.sqlalchemy_uri) if req.sqlalchemy_uri else None
+    extra = json.dumps(req.extra_params) if req.extra_params else "{}"
 
     with engine.connect() as conn:
         result = conn.execute(
             text(f"""
                 INSERT INTO connections (name, db_type, host, port, database_name,
-                    username, password_encrypted, ssl_enabled, created_by)
+                    username, password_encrypted, ssl_enabled, sqlalchemy_uri, extra_params, created_by)
                 VALUES (:name, :db_type, :host, :port, :database_name,
-                    :username, :password_encrypted, :ssl_enabled, :created_by)
+                    :username, :password_encrypted, :ssl_enabled, :sqlalchemy_uri, :extra_params::jsonb, :created_by)
                 RETURNING {_CONN_COLS}
             """),
             {
                 "name": req.name, "db_type": req.db_type, "host": req.host,
                 "port": req.port, "database_name": req.database_name,
                 "username": req.username, "password_encrypted": password_encrypted,
-                "ssl_enabled": req.ssl_enabled, "created_by": user_id,
+                "ssl_enabled": req.ssl_enabled, "sqlalchemy_uri": uri_encrypted,
+                "extra_params": extra, "created_by": user_id,
             }
         )
         connection = dict(result.mappings().fetchone())
@@ -269,8 +277,18 @@ def update_connection(conn_id: int, req: ConnectionUpdate, current_user: dict = 
 
     if "password" in updates:
         updates["password_encrypted"] = encrypt_password_safe(updates.pop("password"))
+    if "sqlalchemy_uri" in updates:
+        updates["sqlalchemy_uri"] = encrypt_password_safe(updates["sqlalchemy_uri"])
+    if "extra_params" in updates:
+        updates["extra_params"] = json.dumps(updates["extra_params"])
 
-    set_clauses = ", ".join(f"{k} = :{k}" for k in updates)
+    set_parts = []
+    for k in updates:
+        if k == "extra_params":
+            set_parts.append(f"{k} = :{k}::jsonb")
+        else:
+            set_parts.append(f"{k} = :{k}")
+    set_clauses = ", ".join(set_parts)
     updates["id"] = conn_id
 
     with engine.connect() as conn:
