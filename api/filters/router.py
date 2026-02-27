@@ -6,7 +6,7 @@ from sqlalchemy import text
 from api.database import engine
 from api.models import DashboardFilterCreate, DashboardFilterUpdate, DashboardFilterResponse, FilterReorderRequest
 from api.auth.dependencies import get_current_user
-from api.connections.router import _get_connection_with_password, _build_url, _create_ext_engine, is_postgres, is_clickhouse
+from api.connections.router import _get_connection_with_password, _get_connections_with_password, get_engine_for_connection
 
 router = APIRouter(tags=["filters"])
 
@@ -99,12 +99,20 @@ def delete_filter(filter_id: int, current_user: dict = Depends(get_current_user)
 @router.put("/api/dashboards/{dashboard_id}/filters/reorder", summary="Reorder filters")
 def reorder_filters(dashboard_id: int, req: FilterReorderRequest, current_user: dict = Depends(get_current_user)):
     """Update the sort order of all filters for a dashboard."""
+    if not req.items:
+        return {"status": "ok"}
+    cases = " ".join(f"WHEN :id{i} THEN :sort{i}" for i in range(len(req.items)))
+    ids = ", ".join(f":id{i}" for i in range(len(req.items)))
+    params: dict = {"dashboard_id": dashboard_id}
+    for i, item in enumerate(req.items):
+        params[f"id{i}"] = item.id
+        params[f"sort{i}"] = item.sort_order
     with engine.connect() as conn:
-        for item in req.items:
-            conn.execute(
-                text("UPDATE dashboard_filters SET sort_order = :sort_order WHERE id = :id AND dashboard_id = :dashboard_id"),
-                {"sort_order": item.sort_order, "id": item.id, "dashboard_id": dashboard_id}
-            )
+        conn.execute(
+            text(f"UPDATE dashboard_filters SET sort_order = CASE id {cases} END "
+                 f"WHERE dashboard_id = :dashboard_id AND id IN ({ids})"),
+            params
+        )
         conn.commit()
     return {"status": "ok"}
 
@@ -134,26 +142,23 @@ def get_charts_columns(dashboard_id: int, current_user: dict = Depends(get_curre
         key = (cid, sql)
         query_map.setdefault(key, []).append(row["id"])
 
+    # Batch fetch all connections in one query
+    unique_conn_ids = list({k[0] for k in query_map})
+    conn_map = _get_connections_with_password(unique_conn_ids)
+
     result: dict[str, list[str]] = {}
 
     for (connection_id, sql_query), chart_ids in query_map.items():
         try:
-            c = _get_connection_with_password(connection_id)
-            if c["db_type"] == "duckdb":
-                import duckdb
-                duck = duckdb.connect(c["database_name"], read_only=True)
-                try:
-                    res = duck.execute(f"SELECT * FROM ({sql_query}) _t LIMIT 0")
-                    cols = [desc[0] for desc in res.description]
-                finally:
-                    duck.close()
-            else:
-                url = _build_url(c["db_type"], c["host"], c["port"], c["database_name"],
-                                 c["username"], c["password"], c["ssl_enabled"])
-                ext_engine = _create_ext_engine(url, c["db_type"], c["id"])
-                with ext_engine.connect() as ext_conn:
-                    res = ext_conn.execute(text(f"SELECT * FROM ({sql_query}) _t LIMIT 0"))
-                    cols = list(res.keys())
+            c = conn_map.get(connection_id)
+            if not c:
+                for chart_id in chart_ids:
+                    result[str(chart_id)] = []
+                continue
+            ext_engine, spec = get_engine_for_connection(c)
+            with ext_engine.connect() as ext_conn:
+                res = ext_conn.execute(text(f"SELECT * FROM ({sql_query}) _t LIMIT 0"))
+                cols = list(res.keys())
             for chart_id in chart_ids:
                 result[str(chart_id)] = cols
         except Exception:
@@ -193,40 +198,31 @@ def get_dashboard_columns_typed(dashboard_id: int, current_user: dict = Depends(
         key = (cid, sql)
         query_map.setdefault(key, []).append(row["id"])
 
+    # Batch fetch all connections in one query
+    unique_conn_ids = list({k[0] for k in query_map})
+    conn_map = _get_connections_with_password(unique_conn_ids)
+
     seen: dict[str, str] = {}  # column_name -> type
 
     for (connection_id, sql_query), _chart_ids in query_map.items():
         try:
-            c = _get_connection_with_password(connection_id)
-            if c["db_type"] == "duckdb":
-                import duckdb
-                duck = duckdb.connect(c["database_name"], read_only=True)
-                try:
-                    res = duck.execute(f"SELECT * FROM ({sql_query}) _t LIMIT 0")
-                    for desc in res.description:
+            c = conn_map.get(connection_id)
+            if not c:
+                continue
+            ext_engine, spec = get_engine_for_connection(c)
+            with ext_engine.connect() as ext_conn:
+                res = ext_conn.execute(text(f"SELECT * FROM ({sql_query}) _t LIMIT 0"))
+                cursor = res.cursor
+                if cursor and hasattr(cursor, "description") and cursor.description:
+                    for desc in cursor.description:
                         col_name = desc[0]
                         col_type = _normalize_type(str(desc[1]) if desc[1] else "text")
                         if col_name not in seen:
                             seen[col_name] = col_type
-                finally:
-                    duck.close()
-            else:
-                url = _build_url(c["db_type"], c["host"], c["port"], c["database_name"],
-                                 c["username"], c["password"], c["ssl_enabled"])
-                ext_engine = _create_ext_engine(url, c["db_type"], c["id"])
-                with ext_engine.connect() as ext_conn:
-                    res = ext_conn.execute(text(f"SELECT * FROM ({sql_query}) _t LIMIT 0"))
-                    cursor = res.cursor
-                    if cursor and hasattr(cursor, "description") and cursor.description:
-                        for desc in cursor.description:
-                            col_name = desc[0]
-                            col_type = _normalize_type(str(desc[1]) if desc[1] else "text")
-                            if col_name not in seen:
-                                seen[col_name] = col_type
-                    else:
-                        for col_name in res.keys():
-                            if col_name not in seen:
-                                seen[col_name] = "text"
+                else:
+                    for col_name in res.keys():
+                        if col_name not in seen:
+                            seen[col_name] = "text"
         except Exception:
             pass
 
@@ -353,17 +349,12 @@ def get_filter_values(filter_id: int, parent_value: str = None, current_user: di
         finally:
             duck.close()
     else:
-        url = _build_url(c["db_type"], c["host"], c["port"], c["database_name"],
-                         c["username"], c["password"], c["ssl_enabled"])
-        ext_engine = _create_ext_engine(url, c["db_type"], c["id"])
+        ext_engine, spec = get_engine_for_connection(c)
         sql_params = {}
         if parent_column and parent_value is not None:
             sql_params["parent_value"] = parent_value
         with ext_engine.connect() as ext_conn:
-            if is_postgres(c["db_type"]):
-                ext_conn.execute(text("SET statement_timeout = 10000"))
-            elif is_clickhouse(c["db_type"]):
-                ext_conn.execute(text("SET max_execution_time = 10"))
+            spec.set_timeout(ext_conn, 10)
             result = ext_conn.execute(text(distinct_sql), sql_params)
             values = [str(r[0]) for r in result.fetchall()]
 
