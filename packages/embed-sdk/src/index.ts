@@ -1,3 +1,5 @@
+export { createKartaEmbed } from "./core";
+
 export type {
   KartaTheme,
   KartaEmbedType,

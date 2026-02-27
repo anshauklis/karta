@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo, useEffect } from "react";
+import { use, useMemo, useEffect, useState, useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,6 +37,8 @@ export default function EmbedPage({
     setTheme(themeParam);
   }, [themeParam, setTheme]);
 
+  const embedContainerRef = useRef<HTMLDivElement>(null);
+
   // Extract filter params: ?filter_<column>=<value>
   const filters = useMemo(() => {
     const result: Record<string, string> = {};
@@ -48,14 +50,46 @@ export default function EmbedPage({
     return result;
   }, [search]);
 
-  const hasFilters = Object.keys(filters).length > 0;
+  // postMessage: runtime filters from parent
+  const [runtimeFilters, setRuntimeFilters] = useState<Record<string, string> | null>(null);
+
+  const handleMessage = useCallback((event: MessageEvent) => {
+    const msg = event.data;
+    if (!msg || typeof msg.type !== "string" || !msg.type.startsWith("karta:")) return;
+
+    switch (msg.type) {
+      case "karta:setTheme":
+        if (msg.theme === "light" || msg.theme === "dark") {
+          setTheme(msg.theme);
+          window.parent.postMessage({ type: "karta:themeChange", theme: msg.theme }, "*");
+        }
+        break;
+      case "karta:setFilters":
+        if (msg.filters && typeof msg.filters === "object") {
+          setRuntimeFilters(msg.filters);
+          window.parent.postMessage({ type: "karta:filterChange", filters: msg.filters }, "*");
+        }
+        break;
+      case "karta:refresh":
+        window.location.reload();
+        break;
+    }
+  }, [setTheme]);
+
+  useEffect(() => {
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [handleMessage]);
+
+  const activeFilters = runtimeFilters || filters;
+  const hasActiveFilters = Object.keys(activeFilters).length > 0;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["shared", token, filters],
+    queryKey: ["shared", token, activeFilters],
     queryFn: async () => {
       const url = new URL(`${API_URL}/api/shared/${token}`, window.location.origin);
-      if (hasFilters) {
-        url.searchParams.set("filters", JSON.stringify(filters));
+      if (hasActiveFilters) {
+        url.searchParams.set("filters", JSON.stringify(activeFilters));
       }
       const res = await fetch(url.toString());
       if (!res.ok) {
@@ -65,6 +99,55 @@ export default function EmbedPage({
       return res.json();
     },
   });
+
+  // postMessage: send ready event
+  useEffect(() => {
+    if (data?.dashboard) {
+      window.parent.postMessage({
+        type: "karta:ready",
+        embedType: "dashboard",
+        id: data.dashboard.id,
+        title: data.dashboard.title,
+        chartCount: data.charts?.length || 0,
+      }, "*");
+    }
+  }, [data]);
+
+  // postMessage: send error event
+  useEffect(() => {
+    if (error) {
+      window.parent.postMessage({
+        type: "karta:error",
+        code: "LOAD_ERROR",
+        message: (error as Error).message,
+      }, "*");
+    }
+  }, [error]);
+
+  // ResizeObserver: report content height to parent for auto-resize
+  useEffect(() => {
+    if (!embedContainerRef.current) return;
+    let lastHeight = 0;
+    const observer = new ResizeObserver((entries) => {
+      const height = Math.ceil(entries[0].contentRect.height);
+      if (height !== lastHeight) {
+        lastHeight = height;
+        window.parent.postMessage({ type: "karta:resize", height }, "*");
+      }
+    });
+    observer.observe(embedContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const handleChartClick = useCallback((chartId: number, pointData: { x?: unknown; y?: unknown; label?: string; name?: string }) => {
+    const chartInfo = data?.charts?.find((c: any) => c.id === chartId);
+    window.parent.postMessage({
+      type: "karta:chartClick",
+      chartId,
+      chartTitle: chartInfo?.title,
+      point: pointData,
+    }, "*");
+  }, [data?.charts]);
 
   const charts = data?.charts || [];
 
@@ -104,7 +187,7 @@ export default function EmbedPage({
   }
 
   return (
-    <div className="w-full p-2">
+    <div className="w-full p-2" ref={embedContainerRef}>
         {charts.length > 0 ? (
           <div ref={containerRef}>
             <ReactGridLayout
@@ -124,6 +207,7 @@ export default function EmbedPage({
                     chart={chart}
                     result={chart.result}
                     showActions={false}
+                    onDataPointClick={handleChartClick}
                   />
                 </div>
               ))}
