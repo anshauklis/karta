@@ -672,3 +672,71 @@ export interface ChartDraftUpsert {
   sql_query?: string;
   variables?: ChartVariable[] | null;
 }
+
+// --- Semantic Layer ---
+
+export interface SemanticModel {
+  id: number;
+  connection_id: number;
+  name: string;
+  description: string;
+  source_type: "table" | "sql";
+  source_table: string | null;
+  source_sql: string | null;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+  measures?: ModelMeasure[];
+  dimensions?: ModelDimension[];
+  joins?: ModelJoin[];
+}
+
+export interface ModelMeasure {
+  id: number;
+  model_id: number;
+  name: string;
+  label: string;
+  description: string;
+  expression: string;
+  agg_type: "sum" | "count" | "count_distinct" | "avg" | "min" | "max" | "custom";
+  format: string;
+  filters: unknown[];
+  sort_order: number;
+}
+
+export interface ModelDimension {
+  id: number;
+  model_id: number;
+  name: string;
+  label: string;
+  description: string;
+  column_name: string;
+  dimension_type: "categorical" | "temporal" | "numeric";
+  time_grain: string | null;
+  format: string;
+  sort_order: number;
+}
+
+export interface ModelJoin {
+  id: number;
+  from_model_id: number;
+  to_model_id: number;
+  to_model_name?: string;
+  join_type: "inner" | "left" | "right" | "full";
+  from_column: string;
+  to_column: string;
+}
+
+export interface SemanticQueryRequest {
+  model_id: number;
+  measures: string[];
+  dimensions: string[];
+  filters?: Array<{ dimension: string; operator: string; value: string | string[] }>;
+  order_by?: string;
+  limit?: number;
+}
+
+export interface SemanticQueryResult {
+  sql: string;
+  data: { columns: string[]; rows: unknown[][]; row_count: number };
+}
