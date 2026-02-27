@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.engine import Engine
-from sqlalchemy.pool import NullPool
 
 
 @dataclass
