@@ -396,6 +396,58 @@ CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);
 ALTER TABLE charts ADD COLUMN IF NOT EXISTS variables JSONB DEFAULT '[]';
 
 ALTER TABLE scheduled_reports ADD COLUMN IF NOT EXISTS format VARCHAR(10) DEFAULT 'excel';
+
+CREATE TABLE IF NOT EXISTS semantic_models (
+    id              SERIAL PRIMARY KEY,
+    connection_id   INTEGER NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL,
+    description     TEXT DEFAULT '',
+    source_type     TEXT NOT NULL DEFAULT 'table',
+    source_table    TEXT,
+    source_sql      TEXT,
+    created_by      INTEGER REFERENCES users(id),
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(connection_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS model_measures (
+    id              SERIAL PRIMARY KEY,
+    model_id        INTEGER NOT NULL REFERENCES semantic_models(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL,
+    label           TEXT NOT NULL,
+    description     TEXT DEFAULT '',
+    expression      TEXT NOT NULL,
+    agg_type        TEXT NOT NULL,
+    format          TEXT DEFAULT '',
+    filters         JSONB DEFAULT '[]',
+    sort_order      INTEGER DEFAULT 0,
+    UNIQUE(model_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS model_dimensions (
+    id              SERIAL PRIMARY KEY,
+    model_id        INTEGER NOT NULL REFERENCES semantic_models(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL,
+    label           TEXT NOT NULL,
+    description     TEXT DEFAULT '',
+    column_name     TEXT NOT NULL,
+    dimension_type  TEXT NOT NULL DEFAULT 'categorical',
+    time_grain      TEXT,
+    format          TEXT DEFAULT '',
+    sort_order      INTEGER DEFAULT 0,
+    UNIQUE(model_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS model_joins (
+    id              SERIAL PRIMARY KEY,
+    from_model_id   INTEGER NOT NULL REFERENCES semantic_models(id) ON DELETE CASCADE,
+    to_model_id     INTEGER NOT NULL REFERENCES semantic_models(id) ON DELETE CASCADE,
+    join_type       TEXT NOT NULL DEFAULT 'left',
+    from_column     TEXT NOT NULL,
+    to_column       TEXT NOT NULL,
+    UNIQUE(from_model_id, to_model_id)
+);
 """
 
 
