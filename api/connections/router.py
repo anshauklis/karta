@@ -3,8 +3,7 @@ import api.json_util as json
 import re as _re
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
-from sqlalchemy import create_engine, text, inspect
-from sqlalchemy.pool import NullPool
+from sqlalchemy import text, inspect
 
 from api.database import engine
 from api.models import (
@@ -54,51 +53,6 @@ _CONN_COLS = """id, name, db_type, host, port, database_name, username,
     ssl_enabled, is_system, sqlalchemy_uri, extra_params, created_by, created_at, updated_at"""
 
 
-def _build_url(db_type: str, host: str, port: int, database_name: str,
-               username: str, password: str, ssl_enabled: bool) -> str:
-    """Build SQLAlchemy connection URL from connection params."""
-    if db_type in ("postgres", "postgresql"):
-        driver = "postgresql"
-    elif db_type == "mysql":
-        driver = "mysql+pymysql"
-    elif db_type == "clickhouse":
-        driver = "clickhouse+http"
-    elif db_type == "mssql":
-        driver = "mssql+pymssql"
-    elif db_type == "duckdb":
-        # DuckDB uses file path; read_only allows concurrent access
-        return f"duckdb:///{database_name}?access_mode=read_only"
-    else:
-        raise HTTPException(status_code=400, detail=f"Unsupported db_type: {db_type}")
-
-    url = f"{driver}://{username}:{password}@{host}:{port}/{database_name}"
-    if ssl_enabled and db_type in ("postgres", "postgresql"):
-        url += "?sslmode=require"
-    elif ssl_enabled and db_type == "clickhouse":
-        url += "?protocol=https"
-    return url
-
-
-def _create_ext_engine(url: str, db_type: str, connection_id: int | None = None):
-    """Get engine from cache (or create uncached for DuckDB/one-off)."""
-    if db_type == "duckdb":
-        return create_engine(url, poolclass=NullPool)
-    if connection_id is not None:
-        from api.engine_cache import get_engine
-        return get_engine(connection_id, url, db_type)
-    return create_engine(url, pool_pre_ping=True)
-
-
-def is_postgres(db_type: str) -> bool:
-    return db_type in ("postgres", "postgresql")
-
-
-def is_clickhouse(db_type: str) -> bool:
-    return db_type == "clickhouse"
-
-
-def is_mssql(db_type: str) -> bool:
-    return db_type == "mssql"
 
 
 def get_engine_for_connection(c: dict):
@@ -379,6 +333,7 @@ def get_table_sample(
     limit = max(1, min(limit, _SAMPLE_ROWS_MAX))
 
     c = _get_connection_with_password(conn_id)
+    engine, spec = get_engine_for_connection(c)
 
     # DuckDB: use native API for performance
     if c["db_type"] == "duckdb":
@@ -410,23 +365,14 @@ def get_table_sample(
         finally:
             duck.close()
 
-    url = _build_url(c["db_type"], c["host"], c["port"], c["database_name"],
-                     c["username"], c["password"], c["ssl_enabled"])
-    ext_engine = _create_ext_engine(url, c["db_type"], c["id"])
-
     # Validate table name against actual tables
-    inspector = inspect(ext_engine)
+    inspector = inspect(engine)
     valid_tables = inspector.get_table_names()
     if table_name not in valid_tables:
         raise HTTPException(status_code=404, detail=f"Table '{table_name}' not found")
 
-    with ext_engine.connect() as conn:
-        if is_postgres(c["db_type"]):
-            conn.execute(text("SET statement_timeout = 10000"))
-        elif is_clickhouse(c["db_type"]):
-            conn.execute(text("SET max_execution_time = 10"))
-        elif is_mssql(c["db_type"]):
-            conn.execute(text("SET LOCK_TIMEOUT 10000"))
+    with engine.connect() as conn:
+        spec.set_timeout(conn, 10)
         # Use quoted identifier to prevent SQL injection
         result = conn.execute(text(f'SELECT * FROM "{table_name}" LIMIT :limit'), {"limit": limit})
         columns = list(result.keys())
@@ -461,13 +407,10 @@ def get_table_profile(
     """
     _validate_identifier(table_name, "table name")
     c = _get_connection_with_password(conn_id)
-    url = _build_url(c["db_type"], c["host"], c["port"], c["database_name"],
-                     c["username"], c["password"], c["ssl_enabled"])
-    ext_engine = _create_ext_engine(url, c["db_type"], c["id"])
+    engine, spec = get_engine_for_connection(c)
 
-    with ext_engine.connect() as conn:
-        if is_postgres(c["db_type"]):
-            conn.execute(text("SET statement_timeout = 15000"))
+    with engine.connect() as conn:
+        spec.set_timeout(conn, 15)
 
         # Row count
         try:
@@ -486,7 +429,7 @@ def get_table_profile(
             })
 
         # Column types
-        db_columns = inspect(ext_engine).get_columns(table_name)
+        db_columns = inspect(engine).get_columns(table_name)
         col_info = [{"name": c_meta["name"], "type": str(c_meta["type"])} for c_meta in db_columns]
 
         # Distinct values for string/categorical columns (top 10)
