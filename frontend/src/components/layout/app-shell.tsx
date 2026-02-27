@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { AppHeader } from "./app-header";
 import { CommandPalette } from "@/components/command-palette";
 import { AiChatDrawer } from "@/components/ai/ai-chat-drawer";
@@ -21,7 +22,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (status === "loading") {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-blue-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
