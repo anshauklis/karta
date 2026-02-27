@@ -23,6 +23,7 @@ import { DataTable } from "./data-table";
 import { RichTextView } from "@/components/rich-text-view";
 import { downloadCSV, downloadExcel } from "@/lib/export";
 import { useSummarizeChart } from "@/hooks/use-ai";
+import { ChartInsightsBadge } from "./chart-insights-badge";
 import type { Chart, ChartExecuteResult, ColumnFormat } from "@/types";
 import { useInView } from "@/hooks/use-in-view";
 
@@ -148,6 +149,7 @@ export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, e
               <Info className="h-3.5 w-3.5" />
             </button>
           )}
+          {chart.id && <ChartInsightsBadge chartId={chart.id} />}
         </div>
         {showActions && (
           <div className="flex shrink-0 gap-1">

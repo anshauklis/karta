@@ -257,6 +257,10 @@
     "saveAsTemplate": "Save as Template",
     "loadTemplate": "Load Template",
     "deleteChartConfirm": "Delete chart \"{title}\"? This action cannot be undone.",
+    "insights": "Insights",
+    "insightTrend": "Trend",
+    "insightAnomaly": "Anomaly",
+    "insightInfo": "Info",
     "types": {
       "bar": "Bar",
       "bar_h": "Horizontal Bar",

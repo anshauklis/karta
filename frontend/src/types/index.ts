@@ -74,6 +74,15 @@ export interface Chart {
   updated_at: string;
 }
 
+// --- Chart Insights ---
+
+export interface ChartInsight {
+  type: "trend" | "anomaly" | "info";
+  severity: "positive" | "negative" | "neutral";
+  title: string;
+  detail: string;
+}
+
 // --- Chart Variables ---
 
 export interface ChartVariable {

@@ -2173,3 +2173,39 @@ async def chart_thumbnail(
         raise HTTPException(status_code=500, detail=f"Image rendering failed: {str(e)}")
 
     return Response(content=png_bytes, media_type="image/png")
+
+
+@router.get("/api/charts/{chart_id}/insights", summary="Get chart insights")
+async def get_chart_insights(chart_id: int, current_user: dict = Depends(get_current_user)):
+    """Get automated statistical insights for a chart's data."""
+    from api.ai.insights import detect_insights
+
+    chart = await asyncio.to_thread(get_chart, chart_id, current_user)
+
+    # Non-data chart types have no insights
+    if chart.get("chart_type") in ("text", "divider", "header", "spacer", "tabs"):
+        return {"insights": []}
+
+    chart_config = chart.get("chart_config", {}) or {}
+
+    # --- Resolve SQL and connection ---
+    connection_id, sql_query = _resolve_chart_sql(chart)
+    if not sql_query or not connection_id:
+        return {"insights": []}
+
+    # --- Execute chart to get DataFrame ---
+    try:
+        _columns, _rows, df, _pq_path = await asyncio.to_thread(
+            _execute_chart_full, connection_id, sql_query, chart_config,
+            None, int(current_user["sub"]),
+        )
+    except Exception:
+        return {"insights": []}
+
+    # --- Run statistical analysis ---
+    try:
+        insights = detect_insights(df, chart_config)
+    except Exception:
+        insights = []
+
+    return {"insights": insights}

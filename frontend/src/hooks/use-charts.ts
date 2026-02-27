@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import type { Chart, ChartCreate, ChartUpdate, ChartExecuteResult, ChartPreviewRequest, LayoutItem } from "@/types";
+import type { Chart, ChartCreate, ChartUpdate, ChartExecuteResult, ChartPreviewRequest, LayoutItem, ChartInsight } from "@/types";
 
 export interface ChartListItem {
   id: number;
@@ -196,5 +196,17 @@ export function useSaveLayout(dashboardId: number) {
       queryClient.invalidateQueries({ queryKey: ["charts", dashboardId] });
       toast.success("Layout saved");
     },
+  });
+}
+
+export function useChartInsights(chartId: number | undefined) {
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+
+  return useQuery({
+    queryKey: ["chart-insights", chartId],
+    queryFn: () => api.get<{ insights: ChartInsight[] }>(`/api/charts/${chartId}/insights`, token),
+    enabled: !!token && !!chartId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

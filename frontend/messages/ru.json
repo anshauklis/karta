@@ -257,6 +257,10 @@
     "saveAsTemplate": "Сохранить как шаблон",
     "loadTemplate": "Загрузить шаблон",
     "deleteChartConfirm": "Удалить график «{title}»? Это действие нельзя отменить.",
+    "insights": "Аналитика",
+    "insightTrend": "Тренд",
+    "insightAnomaly": "Аномалия",
+    "insightInfo": "Инфо",
     "types": {
       "bar": "Столбчатая",
       "bar_h": "Горизонтальная",
