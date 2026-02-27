@@ -394,6 +394,8 @@ CREATE TABLE IF NOT EXISTS user_roles (
 CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);
 
 ALTER TABLE charts ADD COLUMN IF NOT EXISTS variables JSONB DEFAULT '[]';
+
+ALTER TABLE scheduled_reports ADD COLUMN IF NOT EXISTS format VARCHAR(10) DEFAULT 'excel';
 """
 
 

@@ -1,18 +1,19 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
-    chromium \
     && rm -rf /var/lib/apt/lists/*
-
-ENV CHROME_BIN=/usr/bin/chromium
-ENV CHROMIUM_FLAGS="--disable-setuid-sandbox --disable-gpu"
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+
+# Install Playwright Chromium browser and its system dependencies (~300MB)
+RUN uv run playwright install --with-deps chromium
 
 COPY . ./api/
 
@@ -24,4 +25,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" || exit 1
 
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["uv", "run", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

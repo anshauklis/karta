@@ -17,6 +17,7 @@ class ReportCreate(BaseModel):
     schedule: str  # cron expression
     timezone: str = "Europe/Moscow"
     is_active: bool = True
+    format: str = "excel"  # "excel", "png", or "pdf"
 
 
 class ReportUpdate(BaseModel):
@@ -26,10 +27,12 @@ class ReportUpdate(BaseModel):
     schedule: Optional[str] = None
     timezone: Optional[str] = None
     is_active: Optional[bool] = None
+    format: Optional[str] = None
 
 
 _REPORT_COLS = """r.id, r.name, r.chart_id, r.channel_id, r.schedule, r.timezone,
     r.is_active, r.last_run_at, r.created_by, r.created_at,
+    COALESCE(r.format, 'excel') as format,
     c.title as chart_title, ch.name as channel_name"""
 
 _REPORT_JOIN = """scheduled_reports r
@@ -54,16 +57,16 @@ def create_report(req: ReportCreate, current_user: dict = require_role("editor",
     with engine.connect() as conn:
         row = conn.execute(
             text("""
-                INSERT INTO scheduled_reports (name, chart_id, channel_id, schedule, timezone, is_active, created_by)
-                VALUES (:name, :chart_id, :channel_id, :schedule, :timezone, :is_active, :created_by)
+                INSERT INTO scheduled_reports (name, chart_id, channel_id, schedule, timezone, is_active, format, created_by)
+                VALUES (:name, :chart_id, :channel_id, :schedule, :timezone, :is_active, :format, :created_by)
                 RETURNING id, name, chart_id, channel_id, schedule, timezone, is_active,
-                    last_run_at, created_by, created_at
+                    last_run_at, created_by, created_at, format
             """),
             {
                 "name": req.name, "chart_id": req.chart_id,
                 "channel_id": req.channel_id, "schedule": req.schedule,
                 "timezone": req.timezone, "is_active": req.is_active,
-                "created_by": user_id,
+                "format": req.format, "created_by": user_id,
             },
         ).mappings().fetchone()
         conn.commit()
