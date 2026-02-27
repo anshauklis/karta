@@ -69,15 +69,19 @@
 
 ### Q2 (June–August 2026): Growth + Ecosystem + Advanced AI
 
+**Early deliveries** (completed 2026-02-27, ahead of schedule):
+- ✅ AI copilot mode (multi-agent routing: Data Analyst, Chart Builder, Dashboard Manager; SSE streaming, session history, 20+ tools)
+- ✅ Semantic layer (models, measures, dimensions, joins; query builder; AI tools integration)
+- ✅ Slack/Telegram alerts (both channels with file upload, wired into scheduler)
+- ✅ API documentation (Swagger + ReDoc at /docs, /redoc; Sphinx → GitHub Pages)
+- ✅ Embedding SDK (`@karta-bi/embed` npm package — React `<KartaEmbed />` + vanilla JS `createKartaEmbed()`, postMessage protocol, chart-level embed, auto-resize, filter injection)
+- ✅ Community: CONTRIBUTING.md, CI/CD workflows
+
+**Remaining:**
 - Plugin/extension system (custom chart types, custom connectors)
-- Embedding SDK (React component `<KartaEmbed />`)
-- AI copilot mode (chat with data, follow-up questions)
-- Semantic layer (metrics definitions, reusable calculations)
 - dbt integration (import models as datasets)
-- Slack/Telegram alerts
-- Dashboard versioning + undo
-- API documentation (OpenAPI + SDK generation)
-- Community: Discord, contributing guide, issue templates
+- Dashboard versioning + undo (audit log exists, need snapshot/restore)
+- Community: Discord server, issue templates, CODE_OF_CONDUCT
 - First external contributors
 
 **Q2 outcome**: Ecosystem, AI copilot, integrations. 1,000+ GitHub stars.
