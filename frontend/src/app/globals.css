@@ -235,6 +235,12 @@ th:hover .resizer::after,
   left: 3px;
 }
 
+/* Shimmer animation for background refetch indicators */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
 /* Mobile dashboard — touch-friendly charts */
 @media (max-width: 767px) {
   .react-grid-item {

@@ -24,6 +24,7 @@ import { RichTextView } from "@/components/rich-text-view";
 import { downloadCSV, downloadExcel } from "@/lib/export";
 import { useSummarizeChart } from "@/hooks/use-ai";
 import { ChartInsightsBadge } from "./chart-insights-badge";
+import { ChartSkeleton } from "@/components/charts/chart-skeleton";
 import type { Chart, ChartExecuteResult, ColumnFormat } from "@/types";
 import { useInView } from "@/hooks/use-in-view";
 
@@ -34,6 +35,7 @@ interface ChartCardProps {
   chart: Chart;
   result?: ChartExecuteResult | null;
   isExecuting?: boolean;
+  isFetching?: boolean;
   editHref?: string;
   onEdit?: (chartId: number) => void;
   onRefresh?: (chartId: number) => void;
@@ -47,7 +49,7 @@ interface ChartCardProps {
   onMoveToTab?: (chartId: number, tabId: number) => void;
 }
 
-export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, editHref, onEdit, onRefresh, onDuplicate, showActions = true, onDataPointClick, onToggleComments, tabs, currentTabId, onMoveToTab }: ChartCardProps) {
+export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, isFetching, editHref, onEdit, onRefresh, onDuplicate, showActions = true, onDataPointClick, onToggleComments, tabs, currentTabId, onMoveToTab }: ChartCardProps) {
   const { data: session } = useSession();
   const token = (session as any)?.accessToken;
   const t = useTranslations("chart");
@@ -252,12 +254,17 @@ export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, e
         )}
       </div>
 
+      {/* Background refetch shimmer */}
+      {isFetching && !isExecuting && (
+        <div className="h-0.5 w-full overflow-hidden">
+          <div className="h-full w-1/3 animate-[shimmer_1.5s_ease-in-out_infinite] bg-primary/30 rounded" />
+        </div>
+      )}
+
       {/* Chart body — lazy: heavy content (Plotly/DataTable) only mounts when card is in viewport */}
       <div ref={viewRef} className="flex-1 p-2 min-h-0">
         {!isInView || (isExecuting && !result) ? (
-          <div className="flex h-full items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
+          <ChartSkeleton chartType={chart.chart_type} />
         ) : result?.error ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-4">
             <AlertTriangle className="h-8 w-8 text-red-400" />
