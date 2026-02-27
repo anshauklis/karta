@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { useShareLinks, useCreateShareLink, useRevokeShareLink } from "@/hooks/use-export";
+import { useShareLinks, useCreateShareLink, useRevokeShareLink, useChartShareLinks, useCreateChartShareLink } from "@/hooks/use-export";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,16 +12,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Copy, Loader2, Trash2, Link2, Check, Code2 } from "lucide-react";
 
 interface ShareDialogProps {
-  dashboardId: number;
+  dashboardId?: number;
+  chartId?: number;
   onClose: () => void;
 }
 
-export function ShareDialog({ dashboardId, onClose }: ShareDialogProps) {
+export function ShareDialog({ dashboardId, chartId, onClose }: ShareDialogProps) {
   const t = useTranslations("share");
   const tc = useTranslations("common");
-  const { data: links, isLoading } = useShareLinks(dashboardId);
-  const createLink = useCreateShareLink(dashboardId);
+
+  const { data: dashLinks, isLoading: isDashLoading } = useShareLinks(dashboardId);
+  const { data: chartLinks, isLoading: isChartLoading } = useChartShareLinks(chartId);
+
+  const links = chartId ? chartLinks : dashLinks;
+  const isLoading = chartId ? isChartLoading : isDashLoading;
+
+  const createDashLink = useCreateShareLink(dashboardId);
+  const createChartLink = useCreateChartShareLink(chartId);
   const revokeLink = useRevokeShareLink(dashboardId);
+
+  const createLink = chartId ? createChartLink : createDashLink;
   const [expiresHours, setExpiresHours] = useState<string>("");
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [embedTheme, setEmbedTheme] = useState<string>("light");
@@ -45,8 +55,9 @@ export function ShareDialog({ dashboardId, onClose }: ShareDialogProps) {
     [links]
   );
 
-  const getEmbedCode = (token: string) => {
-    const src = `${window.location.origin}/embed/${token}?theme=${embedTheme}`;
+  const getEmbedCode = (linkToken: string) => {
+    const path = chartId ? `/embed/chart/${linkToken}` : `/embed/${linkToken}`;
+    const src = `${window.location.origin}${path}?theme=${embedTheme}`;
     return `<iframe src="${src}" width="100%" height="600" frameborder="0" allowfullscreen></iframe>`;
   };
 
@@ -62,7 +73,7 @@ export function ShareDialog({ dashboardId, onClose }: ShareDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5" />
-            {t("dashboard")}
+            {chartId ? t("chart") : t("dashboard")}
           </DialogTitle>
         </DialogHeader>
 

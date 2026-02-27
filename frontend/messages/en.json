@@ -572,6 +572,7 @@
   },
   "share": {
     "dashboard": "Share Dashboard",
+    "chart": "Share Chart",
     "createLink": "Create Share Link",
     "linkCreated": "Share link created",
     "copied": "Link copied to clipboard",
