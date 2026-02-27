@@ -233,6 +233,7 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
   const t = useTranslations("dashboard");
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const [deleteChartId, setDeleteChartId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const pointerTabRef = useRef<string | null>(null);
   const pointerCleanupRef = useRef<(() => void) | null>(null);
   const tc = useTranslations("common");
@@ -344,6 +345,7 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
   const handleDragStart = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
     (_layout: any, _oldItem: any) => {
+      setSelectedIds(new Set());
       gridRef.current?.classList.add("grid-interacting");
       if (gridRef.current) {
         const colW = (containerWidth - 11 * 16) / 12;
@@ -591,6 +593,31 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
       }
     );
   }, [moveChartToTab]);
+
+  const handleChartClick = useCallback((chartId: number, e: React.MouseEvent) => {
+    if (e.shiftKey) {
+      e.preventDefault();
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(chartId)) {
+          next.delete(chartId);
+        } else {
+          next.add(chartId);
+        }
+        return next;
+      });
+    } else {
+      setSelectedIds(new Set());
+    }
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedIds(new Set());
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const handleTabDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
@@ -920,7 +947,10 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
         >
           {visibleCharts.map((chart) => (
             <div key={String(chart.id)}>
-              <div className="relative h-full group">
+              <div
+                className={`relative h-full group ${selectedIds.has(chart.id) ? "ring-2 ring-blue-500 rounded-lg" : ""}`}
+                onClick={(e) => handleChartClick(chart.id, e)}
+              >
                 {/* Drag handle — visible grip icon */}
                 <div className="drag-handle absolute inset-x-0 top-0 z-10 h-10 cursor-move flex items-center justify-center">
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 rounded bg-muted/80 px-2 py-0.5">
