@@ -115,6 +115,71 @@ def build_system_prompt(
         parts.append("## Context")
         parts.append(f"The user is currently viewing a {context_type} (id={context_id}).")
 
+    # Dashboard context: list charts with titles, types, and SQL previews
+    if context_type == "dashboard" and context_id:
+        with engine.connect() as conn:
+            charts = conn.execute(text(
+                "SELECT title, chart_type, sql_query FROM charts "
+                "WHERE dashboard_id = :did ORDER BY position_order"
+            ), {"did": context_id}).mappings().all()
+        if charts:
+            parts.append("")
+            parts.append("## Dashboard Charts")
+            parts.append("The current dashboard contains these charts:")
+            for c in charts:
+                line = f"- **{c['title']}** ({c['chart_type'] or 'unknown'})"
+                if c.get("sql_query"):
+                    sql_preview = c["sql_query"][:200].replace("\n", " ")
+                    line += f" — SQL: `{sql_preview}`"
+                parts.append(line)
+
+    # Chart context: full config and SQL for the current chart
+    if context_type == "chart" and context_id:
+        with engine.connect() as conn:
+            chart = conn.execute(text(
+                "SELECT title, chart_type, chart_config, sql_query, mode "
+                "FROM charts WHERE id = :cid"
+            ), {"cid": context_id}).mappings().first()
+        if chart:
+            parts.append("")
+            parts.append("## Current Chart")
+            parts.append(
+                f"Title: {chart['title']}, Type: {chart['chart_type']}, Mode: {chart['mode']}"
+            )
+            if chart.get("sql_query"):
+                parts.append(f"SQL: ```{chart['sql_query']}```")
+            if chart.get("chart_config"):
+                config_str = json.dumps(chart["chart_config"], default=str)[:500]
+                parts.append(f"Config: {config_str}")
+
+    # Semantic context: pre-defined metrics for the active connection
+    if connection_id:
+        with engine.connect() as conn:
+            models = conn.execute(text(
+                "SELECT id, name, description FROM semantic_models "
+                "WHERE connection_id = :cid"
+            ), {"cid": connection_id}).mappings().all()
+            if models:
+                parts.append("")
+                parts.append("## Semantic Models")
+                parts.append(
+                    "Pre-defined metrics available via "
+                    "`list_semantic_models` and `semantic_query` tools:"
+                )
+                for m in models:
+                    measures = conn.execute(text(
+                        "SELECT name, label FROM model_measures WHERE model_id = :mid"
+                    ), {"mid": m["id"]}).mappings().all()
+                    dims = conn.execute(text(
+                        "SELECT name, label FROM model_dimensions WHERE model_id = :mid"
+                    ), {"mid": m["id"]}).mappings().all()
+                    measure_names = ", ".join(r["name"] for r in measures) or "none"
+                    dim_names = ", ".join(r["name"] for r in dims) or "none"
+                    parts.append(
+                        f"- **{m['name']}**: measures=[{measure_names}], "
+                        f"dimensions=[{dim_names}]"
+                    )
+
     return "\n".join(parts)
 
 

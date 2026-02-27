@@ -540,7 +540,12 @@ def _load_messages_for_llm(
     connection_id: int | None,
     context: dict | None,
 ) -> list[dict]:
-    """Load conversation history and prepend system prompt."""
+    """Load conversation history and prepend system prompt.
+
+    When there are more than MAX_MESSAGES messages, older messages are
+    summarised (truncated to 200 chars each) so the context window stays
+    manageable.  The most recent ``keep_count`` messages are kept verbatim.
+    """
     messages = [{
         "role": "system",
         "content": build_system_prompt(
@@ -555,8 +560,35 @@ def _load_messages_for_llm(
             "SELECT role, content FROM ai_messages "
             "WHERE session_id = :sid ORDER BY created_at"
         ), {"sid": session_id})
-        for r in rows.mappings().all():
-            messages.append({"role": r["role"], "content": r["content"]})
+        history = [{"role": r["role"], "content": r["content"]}
+                   for r in rows.mappings().all()]
+
+    # Conversation summary for long dialogues
+    max_messages = 15
+    if len(history) > max_messages:
+        keep_count = 10
+        old_messages = history[:-keep_count]
+        recent_messages = history[-keep_count:]
+
+        summary_parts = []
+        for msg in old_messages:
+            prefix = "User" if msg["role"] == "user" else "Assistant"
+            content_preview = (msg.get("content") or "")[:200]
+            if content_preview:
+                summary_parts.append(f"{prefix}: {content_preview}")
+
+        summary_text = "\n".join(summary_parts)
+        messages.append({
+            "role": "system",
+            "content": (
+                "[Conversation summary of earlier messages]\n"
+                f"{summary_text}\n"
+                "[End of summary — recent messages follow]"
+            ),
+        })
+        messages.extend(recent_messages)
+    else:
+        messages.extend(history)
 
     return messages
 
