@@ -36,6 +36,7 @@ from api.models import (
 from api.ai.llm_client import is_ai_enabled, chat_completion
 from api.ai.prompts import (
     build_system_prompt,
+    build_agent_prompt,
     build_generate_sql_prompt,
     build_fix_sql_prompt,
     build_summarize_prompt,
@@ -45,6 +46,7 @@ from api.ai.prompts import (
     PARSE_FILTERS_TOOL,
 )
 from api.ai.tools import get_schema as tool_get_schema, TOOL_DEFINITIONS, TOOL_MAP
+from api.ai.agents import classify_intent, get_agent_tools
 
 logger = logging.getLogger(__name__)
 
@@ -167,11 +169,25 @@ async def chat(req: AIChatRequest, current_user: dict = Depends(get_current_user
 
             messages = _load_messages_for_llm(session_id, req.connection_id, req.context)
 
+            # Classify intent and select agent
+            agent_key = await classify_intent(req.message, req.context)
+            yield _sse({"type": "agent", "name": agent_key})
+
+            # Get agent-specific tools
+            agent_tool_defs, agent_tool_map = get_agent_tools(
+                agent_key, TOOL_DEFINITIONS, TOOL_MAP,
+            )
+
+            # Append agent-specific instructions
+            agent_prompt = build_agent_prompt(agent_key)
+            if agent_prompt:
+                messages.append({"role": "system", "content": agent_prompt})
+
             # Tool-use loop (max 5 iterations)
             for _iteration in range(5):
                 response = await chat_completion(
                     messages,
-                    tools=TOOL_DEFINITIONS if req.connection_id else None,
+                    tools=agent_tool_defs if req.connection_id else None,
                 )
                 choice = response["choices"][0]
                 msg = choice["message"]
@@ -184,7 +200,7 @@ async def chat(req: AIChatRequest, current_user: dict = Depends(get_current_user
                         fn_args = json.loads(tc["function"]["arguments"])
                         yield _sse({"type": "tool_call", "name": fn_name, "status": "running"})
 
-                        handler = TOOL_MAP.get(fn_name)
+                        handler = agent_tool_map.get(fn_name)
                         if handler:
                             sig = inspect.signature(handler)
                             if "user_id" in sig.parameters:

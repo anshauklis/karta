@@ -351,6 +351,46 @@ PARSE_FILTERS_TOOL = {
 }
 
 
+_AGENT_PROMPTS: dict[str, str] = {
+    "data_analyst": (
+        "\n## Agent: Data Analyst\n"
+        "You are focused on data exploration and SQL.\n"
+        "- Write efficient SELECT/WITH queries.\n"
+        "- Use get_table_profile before writing SQL to understand columns and values.\n"
+        "- Use validate_sql to check queries before execution.\n"
+        "- Explain query results clearly: highlight key numbers, trends, and outliers.\n"
+        "- Use semantic models when available for consistent metric definitions.\n"
+        "- Prefer get_table_profile over get_sample + execute_sql — it gives everything in one call.\n"
+    ),
+    "chart_builder": (
+        "\n## Agent: Chart Builder\n"
+        "You are focused on chart creation and visualization.\n"
+        "- Use quick_create_chart (preferred) for one-shot chart creation.\n"
+        "- Use get_chart_config_schema to learn what fields a chart type supports.\n"
+        "- Use preview_chart before create_chart to verify the output.\n"
+        "- Prefer patch_chart_config over update_chart for config-only changes.\n"
+        "- Choose chart types that best represent the data:\n"
+        "  - Trends over time → line/area. Categories → bar. Part-of-whole → pie/donut.\n"
+        "  - Distribution → histogram/box/violin. Correlation → scatter/heatmap.\n"
+        "- Set sensible defaults: legends, axis labels, color palettes.\n"
+    ),
+    "dashboard_manager": (
+        "\n## Agent: Dashboard Manager\n"
+        "You are focused on dashboard organization and management.\n"
+        "- Use search_content first to find existing dashboards.\n"
+        "- Use clone_dashboard to duplicate dashboards with all charts and filters.\n"
+        "- Use clone_chart to copy charts between dashboards.\n"
+        "- Use add_filter to add interactive filters to dashboards.\n"
+        "- Organize charts logically: related metrics together, KPIs at top.\n"
+    ),
+}
+
+
+def build_agent_prompt(agent_key: str) -> str:
+    """Return agent-specific system prompt additions."""
+    return _AGENT_PROMPTS.get(agent_key, "")
+
+
 def _load_glossary() -> list[dict]:
     """Load all glossary terms from database."""
     with engine.connect() as conn:
