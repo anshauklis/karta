@@ -212,11 +212,46 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [charts]);
 
+  const executeChartById = useCallback(async (chartId: number, filters?: Record<string, unknown>, force?: boolean) => {
+    startTransition(() => {
+      setExecuting((prev) => new Set(prev).add(chartId));
+    });
+    try {
+      // If no explicit resolved filters provided, resolve from current active + drill filters
+      const resolved = filters ?? resolveFiltersForChart(chartId, { ...activeFiltersRef.current, ...drillFiltersRef.current });
+      const result = await executeChart.mutateAsync({ chartId, filters: Object.keys(resolved).length > 0 ? resolved : undefined, force });
+      // Persist to TanStack Query cache for cross-navigation
+      queryClient.setQueryData(chartResultKey(chartId, Object.keys(resolved).length > 0 ? resolved : undefined), result);
+      startTransition(() => {
+        setResults((prev) => ({ ...prev, [chartId]: result }));
+      });
+    } catch (e: any) {
+      startTransition(() => {
+        setResults((prev) => ({
+          ...prev,
+          [chartId]: { figure: null, columns: [], rows: [], row_count: 0, error: e.message },
+        }));
+      });
+    } finally {
+      startTransition(() => {
+        setExecuting((prev) => {
+          const next = new Set(prev);
+          next.delete(chartId);
+          return next;
+        });
+      });
+    }
+  }, [resolveFiltersForChart, executeChart, queryClient]);
+
   // Viewport-gated: execute a single chart when it becomes visible
   const executeChartOnVisible = useCallback((chartId: number) => {
     if (executedRef.current.has(chartId)) return;
     executedRef.current.add(chartId);
     executeChartById(chartId);
+  }, [executeChartById]);
+
+  const handleRefreshChart = useCallback((chartId: number) => {
+    executeChartById(chartId, undefined, true);
   }, [executeChartById]);
 
   // Re-execute already-loaded charts when filters change
@@ -260,41 +295,6 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [charts, activeFilters, drillFilters]);
-
-  const executeChartById = useCallback(async (chartId: number, filters?: Record<string, unknown>, force?: boolean) => {
-    startTransition(() => {
-      setExecuting((prev) => new Set(prev).add(chartId));
-    });
-    try {
-      // If no explicit resolved filters provided, resolve from current active + drill filters
-      const resolved = filters ?? resolveFiltersForChart(chartId, { ...activeFiltersRef.current, ...drillFiltersRef.current });
-      const result = await executeChart.mutateAsync({ chartId, filters: Object.keys(resolved).length > 0 ? resolved : undefined, force });
-      // Persist to TanStack Query cache for cross-navigation
-      queryClient.setQueryData(chartResultKey(chartId, Object.keys(resolved).length > 0 ? resolved : undefined), result);
-      startTransition(() => {
-        setResults((prev) => ({ ...prev, [chartId]: result }));
-      });
-    } catch (e: any) {
-      startTransition(() => {
-        setResults((prev) => ({
-          ...prev,
-          [chartId]: { figure: null, columns: [], rows: [], row_count: 0, error: e.message },
-        }));
-      });
-    } finally {
-      startTransition(() => {
-        setExecuting((prev) => {
-          const next = new Set(prev);
-          next.delete(chartId);
-          return next;
-        });
-      });
-    }
-  }, [resolveFiltersForChart, executeChart, queryClient]);
-
-  const handleRefreshChart = useCallback((chartId: number) => {
-    executeChartById(chartId, undefined, true);
-  }, [executeChartById]);
 
   const handleEditTextBlock = useCallback((chartId: number) => {
     setEditingTextChartId(chartId);
