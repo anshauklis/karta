@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, useEffect, memo } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
@@ -43,13 +43,14 @@ interface ChartCardProps {
   showActions?: boolean;
   onDataPointClick?: (chartId: number, data: DataPointClickData) => void;
   onToggleComments?: (chartId: number) => void;
+  onVisible?: () => void;
   // Tab movement
   tabs?: Array<{ id: number; title: string }>;
   currentTabId?: number | null;
   onMoveToTab?: (chartId: number, tabId: number) => void;
 }
 
-export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, isFetching, editHref, onEdit, onRefresh, onDuplicate, showActions = true, onDataPointClick, onToggleComments, tabs, currentTabId, onMoveToTab }: ChartCardProps) {
+export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, isFetching, editHref, onEdit, onRefresh, onDuplicate, showActions = true, onDataPointClick, onToggleComments, onVisible, tabs, currentTabId, onMoveToTab }: ChartCardProps) {
   const { data: session } = useSession();
   const token = (session as any)?.accessToken;
   const t = useTranslations("chart");
@@ -63,6 +64,10 @@ export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, i
   const colFormats = (chart.chart_config?.column_formats as Record<string, ColumnFormat>) || undefined;
   const chartId = chart.id;
   const [viewRef, isInView] = useInView();
+
+  useEffect(() => {
+    if (isInView && onVisible) onVisible();
+  }, [isInView, onVisible]);
 
   const handleEdit = useCallback(() => onEdit?.(chartId), [onEdit, chartId]);
   const handleRefresh = useCallback(() => onRefresh?.(chartId), [onRefresh, chartId]);

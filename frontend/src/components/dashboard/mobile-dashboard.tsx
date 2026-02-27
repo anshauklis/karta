@@ -20,6 +20,7 @@ interface MobileDashboardProps {
   onRefresh?: (chartId: number) => void;
   onDataPointClick?: (chartId: number, data: { x?: unknown; y?: unknown; label?: string; name?: string }) => void;
   onToggleComments?: (chartId: number) => void;
+  onVisible?: (chartId: number) => void;
   // Tab container support
   onUpdateTabConfig?: (chartId: number, config: Record<string, unknown>) => void;
 }
@@ -35,6 +36,7 @@ export function MobileDashboard({
   onRefresh,
   onDataPointClick,
   onToggleComments,
+  onVisible,
   onUpdateTabConfig,
 }: MobileDashboardProps) {
   // Sort charts by grid position: top-to-bottom, then left-to-right
@@ -92,6 +94,7 @@ export function MobileDashboard({
                 onRefresh={onRefresh}
                 onDataPointClick={onDataPointClick}
                 onToggleComments={onToggleComments}
+                onVisible={onVisible ? () => onVisible(chart.id) : undefined}
               />
             </ChartErrorBoundary>
           </div>

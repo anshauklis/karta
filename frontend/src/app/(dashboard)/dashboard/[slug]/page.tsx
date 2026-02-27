@@ -46,7 +46,7 @@ import { MobileDashboard } from "@/components/dashboard/mobile-dashboard";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const VISUAL_TYPES = new Set(["text", "divider", "header", "spacer", "tabs"]);
-const CHART_CONCURRENCY = 3;
+const FILTER_CONCURRENCY = 4;
 
 // Dynamic import for react-grid-layout (needs window)
 import dynamic from "next/dynamic";
@@ -208,35 +208,43 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [charts]);
 
-  // Execute charts: initial load (with default filters) + re-execute on filter change
+  // Viewport-gated: execute a single chart when it becomes visible
+  const executeChartOnVisible = useCallback((chartId: number) => {
+    if (executedRef.current.has(chartId)) return;
+    executedRef.current.add(chartId);
+    executeChartById(chartId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-execute already-loaded charts when filters change
   const filtersSnap = useRef<string>("");
   useEffect(() => {
     if (!charts || charts.length === 0) return;
-    if (!defaultsApplied.current) return; // wait for filter defaults
 
     const merged = { ...activeFilters, ...drillFilters };
     const snap = JSON.stringify(merged);
-    const isFilterChange = filtersSnap.current !== "" && filtersSnap.current !== snap;
+
+    // First run: record initial filter state, don't execute (viewport handles it)
+    if (filtersSnap.current === "") {
+      filtersSnap.current = snap;
+      return;
+    }
+    if (filtersSnap.current === snap) return;
     filtersSnap.current = snap;
 
+    // Only re-execute charts that have already been loaded (visible ones)
     const chartsToExecute = charts.filter((chart) => {
       if (VISUAL_TYPES.has(chart.chart_type || "")) return false;
-      const canRun = chart.sql_query || chart.connection_id || chart.dataset_id;
-      if (!canRun) return false;
-      if (!isFilterChange && executedRef.current.has(chart.id)) return false;
-      return true;
+      return executedRef.current.has(chart.id);
     });
 
     if (chartsToExecute.length === 0) return;
 
-    chartsToExecute.forEach((c) => executedRef.current.add(c.id));
-
-    // Execute in concurrency-limited batches to keep UI responsive
     let cancelled = false;
     (async () => {
-      for (let i = 0; i < chartsToExecute.length; i += CHART_CONCURRENCY) {
+      for (let i = 0; i < chartsToExecute.length; i += FILTER_CONCURRENCY) {
         if (cancelled) break;
-        const batch = chartsToExecute.slice(i, i + CHART_CONCURRENCY);
+        const batch = chartsToExecute.slice(i, i + FILTER_CONCURRENCY);
         await Promise.allSettled(
           batch.map((chart) => {
             const resolved = resolveFiltersForChart(chart.id, merged);
@@ -322,7 +330,7 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
     setCommentsChartId((prev) => (prev === chartId ? null : chartId));
   }, []);
 
-  if (dashLoading || chartsLoading) {
+  if (dashLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-10 w-64" />
@@ -547,6 +555,7 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
             onRefresh={handleRefreshChart}
             onDataPointClick={handleDataPointClick}
             onToggleComments={handleToggleComments}
+            onVisible={executeChartOnVisible}
             onUpdateTabConfig={(chartId, config) =>
               updateChart.mutate({ chartId, data: { chart_config: config } })
             }
@@ -589,11 +598,13 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
                     chart={chart}
                     result={results[chart.id]}
                     isExecuting={executing.has(chart.id)}
+                    isFetching={executing.has(chart.id) && !!results[chart.id]}
                     editHref={chart.chart_type !== "text" ? `/dashboard/${slug}/chart/${chart.id}` : undefined}
                     onRefresh={handleRefreshChart}
                     onEdit={handleEditChart}
                     onDataPointClick={handleDataPointClick}
                     onToggleComments={handleToggleComments}
+                    onVisible={() => executeChartOnVisible(chart.id)}
                   />
                 )}
               </ChartErrorBoundary>
