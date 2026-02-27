@@ -231,7 +231,7 @@ The API automatically runs database migrations on startup.
 
 ```bash
 cd api
-pip install -r requirements.txt
+uv sync
 DATABASE_URL="postgresql://karta:karta@localhost:5432/karta" \
 JWT_SECRET="dev-secret" \
 CONNECTION_SECRET="dev-conn-secret" \
@@ -299,8 +299,10 @@ All chart types support: color palettes (6 built-in), conditional formatting, Ex
 
 ## Documentation
 
-- **[User Guide](docs/user-guide.md)** — how to use Karta: connections, SQL Lab, dashboards, charts, formatting, collaboration, administration
-- **[Deployment Guide](docs/deployment-guide.md)** — production deployment, SSL, cloud providers, backups, monitoring, security hardening, scaling
+- **[Quickstart](docs/quickstart.md)** — get running in 5 minutes
+- **[User Guide](docs/user-guide.md)** — connections, SQL Lab, dashboards, charts, formatting, collaboration, administration
+- **[Deployment Guide](docs/deployment-guide.md)** — production deployment, SSL, backups, monitoring, security hardening
+- **[Contributing](CONTRIBUTING.md)** — development setup, code style, PR process
 
 ## License
 
