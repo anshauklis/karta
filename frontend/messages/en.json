@@ -559,7 +559,9 @@
     "column3": "3-column layout",
     "column4": "4-column layout",
     "compact": "Compact",
-    "freePlace": "Free"
+    "freePlace": "Free",
+    "undo": "Undo",
+    "redo": "Redo"
   },
   "share": {
     "dashboard": "Share Dashboard",

@@ -78,6 +78,8 @@ import {
   SquareSplitVertical,
   X,
   Settings2,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { RichTextEditor } from "@/components/rich-text-editor";
@@ -85,6 +87,7 @@ import { HistoryPanel } from "@/components/history-panel";
 import { DashboardPropertiesDialog } from "@/components/dashboard/dashboard-properties-dialog";
 import { useContainerWidth } from "@/hooks/use-container-width";
 import { useHotkey } from "@/hooks/use-hotkey";
+import { useLayoutHistory } from "@/hooks/use-layout-history";
 import type { Chart, ChartExecuteResult, LayoutItem } from "@/types";
 
 import dynamic from "next/dynamic";
@@ -277,6 +280,8 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
     [visibleCharts]
   );
 
+  const layoutHistory = useLayoutHistory();
+
   // Init description from dashboard
   useEffect(() => {
     if (dashboard) setDescValue(dashboard.description || "");
@@ -284,6 +289,22 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
 
   // Track which charts have been auto-executed
   const executedRef = useRef<Set<number>>(new Set());
+
+  const historyInitRef = useRef(false);
+  useEffect(() => {
+    if (visibleCharts.length > 0 && !historyInitRef.current) {
+      historyInitRef.current = true;
+      layoutHistory.init(
+        visibleCharts.map((c) => ({
+          id: c.id,
+          grid_x: c.grid_x,
+          grid_y: c.grid_y,
+          grid_w: c.grid_w,
+          grid_h: c.grid_h,
+        }))
+      );
+    }
+  }, [visibleCharts]);
 
   // Execute all charts on load
   useEffect(() => {
@@ -400,9 +421,10 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
         grid_w: l.w,
         grid_h: l.h,
       }));
+      layoutHistory.push(items);
       saveLayout.mutate(items);
     },
-    [dashboard, saveLayout, charts, moveChartToTab, unfreezeWidth]
+    [dashboard, saveLayout, charts, moveChartToTab, unfreezeWidth, layoutHistory]
   );
 
   const handleResizeStop = useCallback(
@@ -417,14 +439,16 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
         grid_w: l.w,
         grid_h: l.h,
       }));
+      layoutHistory.push(items);
       saveLayout.mutate(items);
     },
-    [dashboard, saveLayout, unfreezeWidth]
+    [dashboard, saveLayout, unfreezeWidth, layoutHistory]
   );
 
   const handleApplyPreset = async (columns: number) => {
     if (!charts || !dashboard) return;
     const items = applyLayoutPreset(charts, columns);
+    layoutHistory.push(items);
     await saveLayout.mutateAsync(items);
   };
 
@@ -521,6 +545,28 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
     executeChartById(chartId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleUndo = useCallback(() => {
+    const restored = layoutHistory.undo();
+    if (restored && dashboard) {
+      saveLayout.mutate(restored);
+    }
+  }, [layoutHistory, dashboard, saveLayout]);
+
+  const handleRedo = useCallback(() => {
+    const restored = layoutHistory.redo();
+    if (restored && dashboard) {
+      saveLayout.mutate(restored);
+    }
+  }, [layoutHistory, dashboard, saveLayout]);
+
+  useHotkey("z", useCallback((e: KeyboardEvent) => {
+    if (e.shiftKey) {
+      handleRedo();
+    } else {
+      handleUndo();
+    }
+  }, [handleUndo, handleRedo]));
 
   const handleEditChart = useCallback((chartId: number) => {
     const c = charts?.find((ch) => ch.id === chartId);
@@ -642,6 +688,26 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
           >
             {compactType === "vertical" ? tl("compact") : tl("freePlace")}
           </button>
+
+          <div className="mx-1 h-4 w-px bg-border" />
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={handleUndo}
+              disabled={!layoutHistory.canUndo}
+              className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none"
+              title={tl("undo")}
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={!layoutHistory.canRedo}
+              className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none"
+              title={tl("redo")}
+            >
+              <Redo2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
 
           <div className="mx-1 h-4 w-px bg-border" />
 
