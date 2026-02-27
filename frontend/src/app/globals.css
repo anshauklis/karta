@@ -156,6 +156,40 @@
   display: none;
 }
 
+/* Column grid guides — visible during drag/resize */
+.grid-interacting {
+  position: relative;
+}
+.grid-interacting::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0px,
+    transparent var(--col-w),
+    oklch(0.7 0.05 250 / 0.12) var(--col-w),
+    oklch(0.7 0.05 250 / 0.12) calc(var(--col-w) + 1px),
+    transparent calc(var(--col-w) + 1px),
+    transparent calc(var(--col-w) + var(--grid-gap))
+  );
+  background-size: calc(var(--col-w) + var(--grid-gap)) 100%;
+}
+.dark .grid-interacting::before {
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0px,
+    transparent var(--col-w),
+    oklch(0.5 0.05 250 / 0.15) var(--col-w),
+    oklch(0.5 0.05 250 / 0.15) calc(var(--col-w) + 1px),
+    transparent calc(var(--col-w) + 1px),
+    transparent calc(var(--col-w) + var(--grid-gap))
+  );
+  background-size: calc(var(--col-w) + var(--grid-gap)) 100%;
+}
+
 /* During active drag/resize: smooth transitions on non-active items so they slide into place */
 .grid-interacting .react-grid-item:not(.react-draggable-dragging):not(.resizing) {
   transition: transform 200ms ease-out;

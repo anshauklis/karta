@@ -324,6 +324,11 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
     (_layout: any, _oldItem: any) => {
       gridRef.current?.classList.add("grid-interacting");
+      if (gridRef.current) {
+        const colW = (containerWidth - 11 * 16) / 12;
+        gridRef.current.style.setProperty("--col-w", `${colW}px`);
+        gridRef.current.style.setProperty("--grid-gap", "16px");
+      }
       freezeWidth();
 
       // Monitor pointer to highlight tab on hover
@@ -341,13 +346,18 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
         document.removeEventListener("pointermove", onMove);
       };
     },
-    [freezeWidth]
+    [freezeWidth, containerWidth]
   );
 
   const handleResizeStart = useCallback(() => {
     gridRef.current?.classList.add("grid-interacting");
+    if (gridRef.current) {
+      const colW = (containerWidth - 11 * 16) / 12;
+      gridRef.current.style.setProperty("--col-w", `${colW}px`);
+      gridRef.current.style.setProperty("--grid-gap", "16px");
+    }
     freezeWidth();
-  }, [freezeWidth]);
+  }, [freezeWidth, containerWidth]);
 
   // Save layout on drag stop — also handles cross-tab chart moves
   const handleDragStop = useCallback(
