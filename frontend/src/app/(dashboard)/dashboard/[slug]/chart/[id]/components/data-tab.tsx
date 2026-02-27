@@ -16,11 +16,12 @@ import {
   ChevronDown,
   ArrowLeftRight,
   Play,
+  Variable,
 } from "lucide-react";
 import { DropZone } from "./drop-zone";
 import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
-import type { ChartExecuteResult } from "@/types";
+import type { ChartExecuteResult, ChartVariable } from "@/types";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -88,6 +89,8 @@ export interface DataTabProps {
   showColor: boolean;
   handleYColumnsChange: (col: string) => void;
   handleMultiSelectToggle: (key: string, col: string) => void;
+  variables: ChartVariable[];
+  onVariablesChange: (vars: ChartVariable[]) => void;
 }
 
 export function DataTab({
@@ -115,6 +118,8 @@ export function DataTab({
   showColor,
   handleYColumnsChange,
   handleMultiSelectToggle,
+  variables,
+  onVariablesChange,
 }: DataTabProps) {
   const t = useTranslations("chart");
 
@@ -178,6 +183,93 @@ export function DataTab({
                       </div>
                     </div>
                   )}
+
+                  {/* === SQL Variables === */}
+                  {dataSource === "sql" && (() => {
+                    // Auto-detect {{ var_name }} placeholders from SQL
+                    const detectedNames: string[] = [];
+                    const varPattern = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+                    for (const m of sqlQuery.matchAll(varPattern)) {
+                      if (!detectedNames.includes(m[1])) detectedNames.push(m[1]);
+                    }
+                    if (detectedNames.length === 0) return null;
+
+                    // Sync: ensure every detected var has a definition
+                    const currentVars = variables || [];
+                    const byName = new Map(currentVars.map(v => [v.name, v]));
+                    const synced = detectedNames.map(name =>
+                      byName.get(name) || { name, type: "text" as const, default: "", label: "" }
+                    );
+                    // If synced differs from current, update once
+                    const needsSync = synced.length !== currentVars.length ||
+                      synced.some((v, i) => v.name !== currentVars[i]?.name);
+
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1.5">
+                          <Variable className="h-3.5 w-3.5 text-muted-foreground" />
+                          <Label className="text-xs">Variables</Label>
+                          <span className="text-[10px] text-muted-foreground">({detectedNames.length})</span>
+                          {needsSync && (
+                            <button
+                              onClick={() => onVariablesChange(synced)}
+                              className="ml-auto text-[10px] text-primary hover:underline"
+                            >
+                              Sync
+                            </button>
+                          )}
+                        </div>
+                        {synced.map((v, idx) => (
+                          <div key={v.name} className="rounded-md border border-border p-2 space-y-1.5">
+                            <div className="flex items-center gap-1">
+                              <code className="text-[11px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded">
+                                {"{{ "}{v.name}{" }}"}
+                              </code>
+                              <Select
+                                value={v.type || "text"}
+                                onValueChange={(val) => {
+                                  const updated = [...synced];
+                                  updated[idx] = { ...updated[idx], type: val as "text" | "number" | "date" };
+                                  onVariablesChange(updated);
+                                }}
+                              >
+                                <SelectTrigger size="xs" className="h-6 w-20 bg-card">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="text">Text</SelectItem>
+                                  <SelectItem value="number">Number</SelectItem>
+                                  <SelectItem value="date">Date</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                className="h-6 flex-1 text-[10px] bg-card"
+                                placeholder="Default value"
+                                value={v.default || ""}
+                                onChange={(e) => {
+                                  const updated = [...synced];
+                                  updated[idx] = { ...updated[idx], default: e.target.value };
+                                  onVariablesChange(updated);
+                                }}
+                              />
+                              <Input
+                                className="h-6 flex-1 text-[10px] bg-card"
+                                placeholder="Label (optional)"
+                                value={v.label || ""}
+                                onChange={(e) => {
+                                  const updated = [...synced];
+                                  updated[idx] = { ...updated[idx], label: e.target.value };
+                                  onVariablesChange(updated);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
 
                   {/* --- Time group --- */}
                   {availableColumns.length > 0 && (chartConfig.time_column as string) ? (

@@ -164,7 +164,7 @@ export default function ChartEditorPage({
     title, setTitle, description, setDescription, showDesc, setShowDesc,
     connectionId, setConnectionId, dataSource, setDataSource, datasetId, setDatasetId,
     sqlQuery, setSqlQuery, mode, chartType, setChartType, chartCode, setChartCode,
-    chartConfig, setChartConfig,
+    chartConfig, setChartConfig, chartVariables, setChartVariables,
     // Undo
     configUndo,
     // Tab state
@@ -666,6 +666,8 @@ export default function ChartEditorPage({
               showColor={showColor}
               handleYColumnsChange={handleYColumnsChange}
               handleMultiSelectToggle={handleMultiSelectToggle}
+              variables={chartVariables}
+              onVariablesChange={setChartVariables}
             />
           </TabsContent>
 

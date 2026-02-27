@@ -107,6 +107,7 @@ class ChartCreate(BaseModel):
     chart_code: str = ""
     sql_query: str = ""
     tab_id: Optional[int] = None
+    variables: list[dict] = []
 
 class QuickChartCreate(BaseModel):
     """One-shot chart creation: SQL + title + chart_type → dataset + chart in one call."""
@@ -147,6 +148,7 @@ class ChartUpdate(BaseModel):
     grid_y: Optional[int] = None
     grid_w: Optional[int] = None
     grid_h: Optional[int] = None
+    variables: Optional[list[dict]] = None
 
 class ChartResponse(BaseModel):
     id: int
@@ -166,6 +168,7 @@ class ChartResponse(BaseModel):
     grid_w: int
     grid_h: int
     tab_id: Optional[int] = None
+    variables: list[dict] = []
     created_by: Optional[int]
     created_at: datetime
     updated_at: datetime
@@ -219,10 +222,13 @@ class ChartPreviewRequest(BaseModel):
     chart_config: dict = {}
     chart_code: str = ""
     filters: dict | None = None
+    variable_values: dict | None = None
+    variables: list[dict] | None = None
 
 class ChartExecuteRequest(BaseModel):
     filters: dict | None = None
     force: bool = False
+    variable_values: dict | None = None
 
 class ChartExecuteResponse(BaseModel):
     figure: dict | None = None

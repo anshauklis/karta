@@ -16,7 +16,7 @@ DATABASE_URL = os.environ.get(
     "postgresql://karta:karta@localhost:5432/karta",
 )
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=15, max_overflow=5)
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS users (
@@ -389,6 +389,8 @@ CREATE TABLE IF NOT EXISTS user_roles (
     UNIQUE(user_id, role)
 );
 CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);
+
+ALTER TABLE charts ADD COLUMN IF NOT EXISTS variables JSONB DEFAULT '[]';
 """
 
 

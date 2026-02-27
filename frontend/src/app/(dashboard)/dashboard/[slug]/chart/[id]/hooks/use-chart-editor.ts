@@ -124,6 +124,9 @@ export function useChartEditor(slug: string, id: string) {
     `# Available: df (DataFrame), pd, px, go, np\n# Must produce a 'fig' variable\n\nfig = px.bar(df, x=df.columns[0], y=df.columns[1])\n`
   );
 
+  // SQL variables ({{ var_name }} syntax)
+  const [chartVariables, setChartVariables] = useState<import("@/types").ChartVariable[]>([]);
+
   // Guard against auto-preview firing on initial load
   const isInitialLoadRef = useRef(true);
 
@@ -218,6 +221,7 @@ export function useChartEditor(slug: string, id: string) {
         setDataSource("dataset");
         setDatasetId(existingChart.dataset_id);
       }
+      setChartVariables(existingChart.variables || []);
       if (existingChart.chart_config && Object.keys(existingChart.chart_config).length > 0) {
         const cfg = { ...existingChart.chart_config };
         // Backward compat: old stacked boolean -> stack_mode
@@ -342,6 +346,7 @@ export function useChartEditor(slug: string, id: string) {
         chart_type: chartType,
         chart_config: chartConfig,
         ...(isCodeMode ? { chart_code: chartCode } : {}),
+        ...(chartVariables.length > 0 ? { variables: chartVariables } : {}),
       });
       setResult((prev) => {
         // Preserve previous columns when response has error and returns no columns
@@ -417,6 +422,7 @@ export function useChartEditor(slug: string, id: string) {
       chart_config: chartConfig,
       chart_code: chartCode,
       tab_id: selectedTabId,
+      variables: chartVariables,
     };
 
     if (params.mode === "overwrite" && chartId) {
@@ -740,6 +746,7 @@ export function useChartEditor(slug: string, id: string) {
     chartType, setChartType,
     chartCode, setChartCode,
     chartConfig, setChartConfig,
+    chartVariables, setChartVariables,
 
     // Undo
     configUndo,

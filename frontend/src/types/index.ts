@@ -68,9 +68,19 @@ export interface Chart {
   grid_w: number;
   grid_h: number;
   tab_id: number | null;
+  variables: ChartVariable[];
   created_by: number | null;
   created_at: string;
   updated_at: string;
+}
+
+// --- Chart Variables ---
+
+export interface ChartVariable {
+  name: string;
+  type: "text" | "number" | "date";
+  default?: string;
+  label?: string;
 }
 
 // --- Dashboard Tabs ---
@@ -198,6 +208,7 @@ export interface ChartCreate {
   chart_code?: string;
   sql_query?: string;
   tab_id?: number | null;
+  variables?: ChartVariable[];
 }
 
 export interface ChartUpdate extends Partial<ChartCreate> {
@@ -205,6 +216,7 @@ export interface ChartUpdate extends Partial<ChartCreate> {
   grid_y?: number;
   grid_w?: number;
   grid_h?: number;
+  variables?: ChartVariable[];
 }
 
 export interface ChartMetric {
@@ -253,6 +265,8 @@ export interface ChartPreviewRequest {
   chart_type?: string;
   chart_config?: Record<string, unknown>;
   chart_code?: string;
+  variable_values?: Record<string, string>;
+  variables?: ChartVariable[];
 }
 
 export interface LayoutItem {

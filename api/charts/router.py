@@ -1,4 +1,5 @@
-import json
+import asyncio
+import api.json_util as json
 import hashlib
 import re
 import pandas as pd
@@ -147,7 +148,7 @@ _CHART_COLS = """id, dashboard_id, connection_id, dataset_id, title, description
     chart_type, chart_config, chart_code, sql_query, position_order,
     COALESCE(grid_x, 0) as grid_x, COALESCE(grid_y, 0) as grid_y,
     COALESCE(grid_w, 6) as grid_w, COALESCE(grid_h, 224) as grid_h,
-    tab_id, created_by, created_at, updated_at"""
+    tab_id, variables, created_by, created_at, updated_at"""
 
 
 @router.get("/api/charts", summary="List all charts")
@@ -284,10 +285,10 @@ def create_chart(dashboard_id: int, req: ChartCreate, current_user: dict = requi
             text(f"""
                 INSERT INTO charts (dashboard_id, connection_id, dataset_id, title, description, mode,
                     chart_type, chart_config, chart_code, sql_query, position_order,
-                    grid_x, grid_y, tab_id, created_by)
+                    grid_x, grid_y, tab_id, variables, created_by)
                 VALUES (:dashboard_id, :connection_id, :dataset_id, :title, :description, :mode,
                     :chart_type, CAST(:chart_config AS jsonb), :chart_code, :sql_query, :position_order,
-                    :grid_x, :grid_y, :tab_id, :created_by)
+                    :grid_x, :grid_y, :tab_id, CAST(:variables AS jsonb), :created_by)
                 RETURNING {_CHART_COLS}
             """),
             {
@@ -305,6 +306,7 @@ def create_chart(dashboard_id: int, req: ChartCreate, current_user: dict = requi
                 "grid_x": grid_x,
                 "grid_y": grid_y,
                 "tab_id": tab_id,
+                "variables": json.dumps(req.variables),
                 "created_by": user_id,
             }
         )
@@ -344,9 +346,9 @@ def create_standalone_chart(req: ChartCreate, current_user: dict = require_role(
         result = conn.execute(
             text(f"""
                 INSERT INTO charts (dashboard_id, connection_id, dataset_id, title, description, mode,
-                    chart_type, chart_config, chart_code, sql_query, position_order, tab_id, created_by)
+                    chart_type, chart_config, chart_code, sql_query, position_order, tab_id, variables, created_by)
                 VALUES (:dashboard_id, :connection_id, :dataset_id, :title, :description, :mode,
-                    :chart_type, CAST(:chart_config AS jsonb), :chart_code, :sql_query, :position_order, :tab_id, :created_by)
+                    :chart_type, CAST(:chart_config AS jsonb), :chart_code, :sql_query, :position_order, :tab_id, CAST(:variables AS jsonb), :created_by)
                 RETURNING {_CHART_COLS}
             """),
             {
@@ -362,6 +364,7 @@ def create_standalone_chart(req: ChartCreate, current_user: dict = require_role(
                 "sql_query": sql_query,
                 "position_order": position_order,
                 "tab_id": tab_id,
+                "variables": json.dumps(req.variables),
                 "created_by": user_id,
             },
         )
@@ -649,11 +652,14 @@ def update_chart(chart_id: int, req: ChartUpdate, current_user: dict = require_r
     if diff:
         record_change("chart", chart_id, int(current_user["sub"]), "updated", diff)
 
-    # Handle chart_config JSONB cast
-    if "chart_config" in updates:
-        updates["chart_config"] = json.dumps(updates["chart_config"])
+    # Handle JSONB casts for chart_config and variables
+    _jsonb_fields = {"chart_config", "variables"}
+    for jf in _jsonb_fields:
+        if jf in updates:
+            updates[jf] = json.dumps(updates[jf])
+    if _jsonb_fields & updates.keys():
         set_clauses = ", ".join(
-            f"{k} = CAST(:{k} AS jsonb)" if k == "chart_config" else f"{k} = :{k}"
+            f"{k} = CAST(:{k} AS jsonb)" if k in _jsonb_fields else f"{k} = :{k}"
             for k in updates
         )
     else:
@@ -745,10 +751,10 @@ def duplicate_chart(chart_id: int, req: ChartCloneRequest | None = Body(None), c
         result = conn.execute(text(f"""
             INSERT INTO charts (dashboard_id, connection_id, dataset_id, title, description, mode,
                 chart_type, chart_config, chart_code, sql_query, position_order,
-                grid_x, grid_y, grid_w, grid_h, tab_id, created_by)
+                grid_x, grid_y, grid_w, grid_h, tab_id, variables, created_by)
             VALUES (:did, :cid, :dsid, :title, :desc, :mode,
                 :chart_type, :chart_config, :chart_code, :sql_query, :pos,
-                :grid_x, :grid_y, :grid_w, :grid_h, :tab_id, :uid)
+                :grid_x, :grid_y, :grid_w, :grid_h, :tab_id, CAST(:variables AS jsonb), :uid)
             RETURNING {_CHART_COLS}
         """), {
             "did": target_did,
@@ -767,6 +773,7 @@ def duplicate_chart(chart_id: int, req: ChartCloneRequest | None = Body(None), c
             "grid_w": original["grid_w"],
             "grid_h": original["grid_h"],
             "tab_id": target_tab,
+            "variables": json.dumps(original["variables"]) if original.get("variables") else "[]",
             "uid": int(current_user["sub"]),
         })
         conn.commit()
@@ -798,10 +805,10 @@ def import_chart_to_dashboard(dashboard_id: int, chart_id: int, current_user: di
         result = conn.execute(text(f"""
             INSERT INTO charts (dashboard_id, connection_id, dataset_id, title, description, mode,
                 chart_type, chart_config, chart_code, sql_query, position_order,
-                grid_x, grid_y, grid_w, grid_h, created_by)
+                grid_x, grid_y, grid_w, grid_h, variables, created_by)
             VALUES (:did, :cid, :dsid, :title, :desc, :mode,
                 :chart_type, :chart_config, :chart_code, :sql_query, :pos,
-                :grid_x, :grid_y, :grid_w, :grid_h, :uid)
+                :grid_x, :grid_y, :grid_w, :grid_h, CAST(:variables AS jsonb), :uid)
             RETURNING {_CHART_COLS}
         """), {
             "did": dashboard_id,
@@ -819,6 +826,7 @@ def import_chart_to_dashboard(dashboard_id: int, chart_id: int, current_user: di
             "grid_y": grid_y,
             "grid_w": original["grid_w"],
             "grid_h": original["grid_h"],
+            "variables": json.dumps(original["variables"]) if original.get("variables") else "[]",
             "uid": int(current_user["sub"]),
         })
         conn.commit()
@@ -866,7 +874,9 @@ def get_chart_dashboards(chart_id: int, current_user: dict = Depends(get_current
 
 # --- Chart Execution ---
 
-def _execute_chart_sql(connection_id: int, sql_query: str, filters: dict | None = None, user_id: int | None = None):
+def _execute_chart_sql(connection_id: int, sql_query: str, filters: dict | None = None, user_id: int | None = None,
+                       chart_filter_where: str = "", chart_filter_params: dict | None = None,
+                       time_range_config: dict | None = None):
     """Execute SQL on external DB, return (columns, rows, dataframe)."""
     from api.sql_validator import validate_sql, SQLValidationError
     from api.connections.router import _get_connection_with_password, _build_url, _create_ext_engine, is_postgres, is_clickhouse, is_mssql
@@ -879,18 +889,26 @@ def _execute_chart_sql(connection_id: int, sql_query: str, filters: dict | None 
     except SQLValidationError as e:
         raise ValueError(f"SQL validation error: {e}")
 
-    # Merge RLS filters into user filters
+    # Build RLS WHERE clauses — always enforced, never overridden by user filters
+    filter_params = {}
+    rls_conditions = []
     if user_id:
         rls = get_rls_filters(connection_id, user_id)
         if rls:
-            if filters is None:
-                filters = {}
-            for col, vals in rls.items():
-                if col not in filters:
-                    filters[col] = vals if len(vals) > 1 else vals[0]
+            for ri, (col, vals) in enumerate(rls.items()):
+                if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', col):
+                    continue
+                if len(vals) == 1:
+                    p = f"_rls_{ri}"
+                    filter_params[p] = vals[0]
+                    rls_conditions.append(f'"{col}" = :{p}')
+                else:
+                    placeholders = ", ".join(f":_rls_{ri}_{j}" for j in range(len(vals)))
+                    rls_conditions.append(f'"{col}" IN ({placeholders})')
+                    for j, v in enumerate(vals):
+                        filter_params[f"_rls_{ri}_{j}"] = v
 
-    # Build filter WHERE clauses with parameterized queries
-    filter_params = {}
+    # Build user filter WHERE clauses with parameterized queries
     if filters:
         conditions = []
         for i, (col, val) in enumerate(filters.items()):
@@ -937,6 +955,16 @@ def _execute_chart_sql(connection_id: int, sql_query: str, filters: dict | None 
             where_clause = " AND ".join(conditions)
             clean_sql = f"SELECT * FROM ({clean_sql}) _filtered WHERE {where_clause}"
 
+    # Inject RLS constraints — always enforced, independent of user filters
+    if rls_conditions:
+        rls_where = " AND ".join(rls_conditions)
+        clean_sql = f"SELECT * FROM ({clean_sql}) _rls WHERE {rls_where}"
+
+    # Inject chart-level filter push-down
+    if chart_filter_where:
+        clean_sql = f"SELECT * FROM ({clean_sql}) _cf WHERE {chart_filter_where}"
+        filter_params.update(chart_filter_params or {})
+
     # Check cache
     key = cache_key(connection_id, clean_sql, filter_params or None)
     cached = get_cached(key)
@@ -949,6 +977,13 @@ def _execute_chart_sql(connection_id: int, sql_query: str, filters: dict | None 
 
     c = _get_connection_with_password(connection_id)
 
+    # Push time range into SQL if possible
+    if time_range_config:
+        tr_sql = _build_time_range_sql(clean_sql, time_range_config, c["db_type"])
+        if tr_sql:
+            clean_sql = tr_sql
+            time_range_config["_applied"] = True
+
     # DuckDB fast path: native fetchdf() bypasses row-by-row Python conversion
     if c["db_type"] == "duckdb":
         import duckdb
@@ -956,7 +991,7 @@ def _execute_chart_sql(connection_id: int, sql_query: str, filters: dict | None 
         duck_params = None
         if filter_params:
             # Convert :param to $param for DuckDB native API
-            duck_sql = re.sub(r':(_filter_\w+)', r'$\1', clean_sql)
+            duck_sql = re.sub(r':(_(?:filter|cf|rls)_\w+)', r'$\1', clean_sql)
             duck_params = filter_params
         duck = duckdb.connect(c["database_name"], read_only=True)
         try:
@@ -986,7 +1021,7 @@ def _execute_chart_sql(connection_id: int, sql_query: str, filters: dict | None 
             conn.execute(text("SET LOCK_TIMEOUT 30000"))
         result = conn.execute(text(clean_sql), filter_params)
         columns = list(result.keys())
-        rows_raw = [list(row) for row in result.fetchall()]
+        rows_raw = result.fetchall()
 
     # Build DataFrame and coerce types (vectorized — handles Decimal, numpy types)
     df = pd.DataFrame(rows_raw, columns=columns)
@@ -1018,12 +1053,6 @@ def _resolve_chart_sql(chart: dict) -> tuple[int | None, str]:
     return connection_id, sql_query
 
 
-def _apply_time_grain(sql: str, config: dict) -> str:
-    """No-op: time grain is now applied in pandas after query execution.
-    Kept for backward compatibility — returns sql unchanged."""
-    return sql
-
-
 def _apply_time_grain_df(df, config: dict):
     """Apply time grain truncation + aggregation to a DataFrame.
 
@@ -1041,8 +1070,6 @@ def _apply_time_grain_df(df, config: dict):
     valid_grains = {"day", "week", "month", "quarter", "year"}
     if time_grain not in valid_grains:
         return df
-
-    df = df.copy()
 
     # Try to convert to datetime
     try:
@@ -1108,7 +1135,6 @@ def _apply_time_range_df(df, config: dict):
     if not time_col or time_range == "all" or time_col not in df.columns:
         return df
 
-    df = df.copy()
     try:
         df[time_col] = pd.to_datetime(df[time_col], errors="coerce")
     except Exception:
@@ -1135,6 +1161,48 @@ def _apply_time_range_df(df, config: dict):
     return df.reset_index(drop=True)
 
 
+_TIME_RANGE_DAYS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
+
+
+def _build_time_range_sql(base_sql: str, config: dict, db_type: str) -> str | None:
+    """Build SQL wrapper that pushes time_range filtering into the query.
+
+    Returns wrapped SQL string, or None if push-down is not applicable.
+    Uses MAX(col) as reference point (same semantics as _apply_time_range_df).
+    """
+    time_col = config.get("time_column")
+    time_range = config.get("time_range", "all")
+    if not time_col or time_range == "all":
+        return None
+
+    days = _TIME_RANGE_DAYS.get(time_range)
+    if days is None:
+        return None
+
+    # Validate column name
+    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_ ]*$', time_col):
+        return None
+
+    col = f'"{time_col}"'
+    db = (db_type or "").lower()
+
+    if db in ("postgresql", "postgres", "duckdb"):
+        date_expr = f"MAX({col}) - INTERVAL '{days} days'"
+    elif db == "clickhouse":
+        date_expr = f"subtractDays(MAX({col}), {days})"
+    elif db == "mysql":
+        date_expr = f"DATE_SUB(MAX({col}), INTERVAL {days} DAY)"
+    elif db == "mssql":
+        date_expr = f"DATEADD(day, -{days}, MAX({col}))"
+    else:
+        return None
+
+    return (
+        f"SELECT * FROM ({base_sql}) _tr "
+        f"WHERE {col} >= (SELECT {date_expr} FROM ({base_sql}) _tr_max)"
+    )
+
+
 def _apply_chart_filters_df(df, config: dict):
     """Apply chart-level filters to DataFrame."""
     filters = config.get("chart_filters", [])
@@ -1143,15 +1211,35 @@ def _apply_chart_filters_df(df, config: dict):
 
     mask = pd.Series(True, index=df.index)
     for f in filters:
+        # Custom SQL expression mode: evaluate via pandas df.eval()
+        # This is safe: df.eval() only operates on DataFrame columns with
+        # arithmetic/comparison ops — no access to builtins, os, imports, etc.
+        # The expression comes from authenticated users editing their own charts.
+        if f.get("expressionType") == "custom_sql":
+            expr = f.get("sqlExpression", "")
+            if expr:
+                try:
+                    mask &= df.eval(expr)  # noqa: S307 — pandas eval, not Python eval
+                except Exception:
+                    continue
+            continue
+
         col = f.get("column", "")
         op = f.get("operator", "=")
         val = f.get("value")
 
-        if col not in df.columns or val is None:
+        if col not in df.columns:
+            continue
+        # IS NULL / IS NOT NULL don't need a value; all others do
+        if val is None and op not in ("IS NULL", "IS NOT NULL"):
             continue
 
         try:
-            if op == "=":
+            if op == "IS NULL":
+                mask &= df[col].isna()
+            elif op == "IS NOT NULL":
+                mask &= df[col].notna()
+            elif op == "=":
                 mask &= df[col] == val
             elif op == "!=":
                 mask &= df[col] != val
@@ -1177,6 +1265,77 @@ def _apply_chart_filters_df(df, config: dict):
     return df.loc[mask].reset_index(drop=True)
 
 
+def _build_chart_filter_sql(config: dict) -> tuple:
+    """Extract chart_filters that can be pushed down to SQL.
+
+    Returns (where_clause, params, remaining_filters).
+    - where_clause: SQL WHERE fragment (empty string if nothing to push)
+    - params: dict of bind parameters
+    - remaining_filters: filters that couldn't be pushed (fallback to pandas)
+    """
+    filters = config.get("chart_filters", [])
+    if not filters:
+        return "", {}, []
+
+    SAFE_OPS = {"=", "!=", ">", ">=", "<", "<=", "IN", "NOT IN", "LIKE", "IS NULL", "IS NOT NULL"}
+    NUMERIC_OPS = {">", ">=", "<", "<="}
+    COL_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_ ]*$')
+
+    conditions = []
+    params = {}
+    remaining = []
+
+    for i, f in enumerate(filters):
+        col = f.get("column", "")
+        op = f.get("operator", "=")
+        val = f.get("value")
+
+        # custom_sql filters can't be pushed to SQL safely
+        if f.get("expressionType") == "custom_sql":
+            remaining.append(f)
+            continue
+
+        if op not in SAFE_OPS or not COL_RE.match(col):
+            remaining.append(f)
+            continue
+
+        # IS NULL / IS NOT NULL don't need a value; all others do
+        if op in ("IS NULL", "IS NOT NULL"):
+            conditions.append(f'"{col}" {op}')
+            continue
+
+        if val is None:
+            remaining.append(f)
+            continue
+
+        pname = f"_cf_{i}"
+
+        if op in ("IN", "NOT IN"):
+            vals = [v.strip() for v in str(val).split(",")]
+            placeholders = []
+            for j, v in enumerate(vals):
+                p = f"_cf_{i}_{j}"
+                params[p] = v
+                placeholders.append(f":{p}")
+            conditions.append(f'CAST("{col}" AS TEXT) {op} ({", ".join(placeholders)})')
+        elif op == "LIKE":
+            params[pname] = f"%{val}%"
+            conditions.append(f'CAST("{col}" AS TEXT) LIKE :{pname}')
+        elif op in NUMERIC_OPS:
+            # Cast to float for numeric comparisons to avoid string vs number mismatch
+            try:
+                params[pname] = float(val)
+            except (ValueError, TypeError):
+                params[pname] = val
+            conditions.append(f'"{col}" {op} :{pname}')
+        else:
+            params[pname] = val
+            conditions.append(f'"{col}" {op} :{pname}')
+
+    where = " AND ".join(conditions)
+    return where, params, remaining
+
+
 def _apply_calculated_columns_df(df, config: dict):
     """Add calculated columns via pandas eval()."""
     calc_cols = config.get("calculated_columns", [])
@@ -1187,7 +1346,6 @@ def _apply_calculated_columns_df(df, config: dict):
     _SAFE_EXPR = re.compile(r'^[\w\s\+\-\*/\(\)\.\,\>\<\=\!\&\|\~\%]+$')
     _BLOCKED_TOKENS = {"import", "__", "lambda", "def ", "class ", "exec", "eval", "open", "compile"}
 
-    df = df.copy()
     for cc in calc_cols:
         name = cc.get("name", "")
         expr = cc.get("expression", "")
@@ -1476,6 +1634,7 @@ def _rename_pivot_custom_cols(df, config: dict):
 
 def _apply_pipeline(df, chart_config: dict, skip_metrics: bool = False):
     """Apply the full processing pipeline to a DataFrame."""
+    df = df.copy()
     df = _apply_time_range_df(df, chart_config)
     df = _apply_time_grain_df(df, chart_config)
     if not skip_metrics:
@@ -1484,20 +1643,173 @@ def _apply_pipeline(df, chart_config: dict, skip_metrics: bool = False):
         df = _apply_metrics_df(df, chart_config)
     df = _apply_row_limit(df, chart_config)
     # Update y_columns to match metric labels when metrics are present
-    if chart_config.get("metrics"):
+    # Skip when custom SQL already applied aggregation (skip_metrics=True)
+    if not skip_metrics and chart_config.get("metrics"):
         metric_labels = [m.get("label", f"{m.get('aggregate', 'SUM')}({m.get('column', '')})")
                          for m in chart_config["metrics"]]
         chart_config["y_columns"] = metric_labels
     return df
 
 
+def _execute_chart_full(
+    connection_id: int,
+    base_sql: str,
+    chart_config: dict,
+    filters: dict | None = None,
+    user_id: int | None = None,
+    skip_metrics: bool = False,
+    cache_ttl: int | None = None,
+    extra_params: dict | None = None,
+) -> tuple[list, list, pd.DataFrame, str | None]:
+    """Execute chart via DuckDB pipeline: Parquet cache → CTE chain → small DataFrame.
+
+    Returns (columns, rows, df, parquet_path).
+    """
+    import duckdb
+    from api.sql_validator import validate_sql, SQLValidationError
+    from api.connections.router import _get_connection_with_password, _build_url, _create_ext_engine, is_postgres
+    from api.rls.router import get_rls_filters
+    import api.parquet_cache as parquet_cache
+    import api.pipeline_sql as pipeline_sql
+
+    try:
+        clean_sql = validate_sql(base_sql, max_limit=0)
+    except SQLValidationError as e:
+        raise ValueError(f"SQL validation error: {e}")
+
+    c = _get_connection_with_password(connection_id)
+    db_type = c["db_type"]
+
+    # --- Get or populate Parquet cache ---
+    pq_path = None
+    if db_type != "duckdb":
+        url = _build_url(db_type, c["host"], c["port"], c["database_name"],
+                         c["username"], c["password"], c["ssl_enabled"])
+        ext_engine = _create_ext_engine(url, db_type, connection_id)
+        pq_path = parquet_cache.get_or_populate(
+            connection_id, clean_sql, db_type, ext_engine, ttl=cache_ttl,
+        )
+
+    # --- Column metadata for time_grain ---
+    col_meta = pipeline_sql.get_column_meta(parquet_path=pq_path) if pq_path else {}
+
+    # --- Build RLS conditions with $param placeholders (DuckDB syntax) ---
+    rls_conditions = []
+    rls_params = {}
+    if user_id:
+        rls = get_rls_filters(connection_id, user_id)
+        if rls:
+            for ri, (col, vals) in enumerate(rls.items()):
+                if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', col):
+                    continue
+                if len(vals) == 1:
+                    p = f"_rls_{ri}"
+                    rls_params[p] = vals[0]
+                    rls_conditions.append(f'"{col}" = ${p}')
+                else:
+                    placeholders = ", ".join(f"$_rls_{ri}_{j}" for j in range(len(vals)))
+                    rls_conditions.append(f'"{col}" IN ({placeholders})')
+                    for j, v in enumerate(vals):
+                        rls_params[f"_rls_{ri}_{j}"] = v
+
+    # --- Build dashboard filter conditions ---
+    dash_where = ""
+    dash_params = {}
+    if filters:
+        conditions = []
+        for i, (col, val) in enumerate(filters.items()):
+            if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', col):
+                continue
+            pname = f"_df_{i}"
+            if isinstance(val, dict) and "__contains" in val:
+                contains_val = val["__contains"]
+                if isinstance(contains_val, list):
+                    or_parts = []
+                    for j, v in enumerate(contains_val):
+                        p = f"_df_{i}_c{j}"
+                        dash_params[p] = f"%{v}%"
+                        or_parts.append(f'CAST("{col}" AS TEXT) LIKE ${p}')
+                    if or_parts:
+                        conditions.append(f'({" OR ".join(or_parts)})')
+                else:
+                    dash_params[pname] = f"%{contains_val}%"
+                    conditions.append(f'CAST("{col}" AS TEXT) LIKE ${pname}')
+            elif isinstance(val, list):
+                placeholders = ", ".join(f"$_df_{i}_{j}" for j in range(len(val)))
+                conditions.append(f'"{col}" IN ({placeholders})')
+                for j, v in enumerate(val):
+                    dash_params[f"_df_{i}_{j}"] = v
+            elif isinstance(val, dict):
+                range_from = val.get("from") or val.get("min")
+                range_to = val.get("to") or val.get("max")
+                if range_from is not None and str(range_from).strip():
+                    p = f"_df_{i}_from"
+                    dash_params[p] = range_from
+                    conditions.append(f'"{col}" >= ${p}')
+                if range_to is not None and str(range_to).strip():
+                    p = f"_df_{i}_to"
+                    dash_params[p] = range_to
+                    conditions.append(f'"{col}" <= ${p}')
+            else:
+                dash_params[pname] = val
+                conditions.append(f'"{col}" = ${pname}')
+        dash_where = " AND ".join(conditions)
+
+    # --- Build pipeline SQL ---
+    if db_type == "duckdb":
+        source = f"({clean_sql})"
+    else:
+        source = f"read_parquet('{pq_path}')"
+
+    sql, params = pipeline_sql.build_pipeline_sql(
+        source=source,
+        config=chart_config,
+        rls_conditions=rls_conditions if rls_conditions else None,
+        rls_params=rls_params,
+        dash_where=dash_where,
+        dash_params=dash_params,
+        column_meta=col_meta,
+        skip_metrics=skip_metrics,
+    )
+
+    # Merge extra params (e.g. SQL variable substitutions) into pipeline params
+    if extra_params:
+        params = {**(params or {}), **extra_params}
+
+    # --- Execute via DuckDB ---
+    if db_type == "duckdb":
+        con = duckdb.connect(c["database_name"], read_only=True)
+    else:
+        con = duckdb.connect()  # in-memory
+
+    try:
+        if params:
+            df = con.execute(sql, params).fetchdf()
+        else:
+            df = con.execute(sql).fetchdf()
+    finally:
+        con.close()
+
+    # Update y_columns to match metric labels (same as _apply_pipeline)
+    if not skip_metrics and chart_config.get("metrics"):
+        metric_labels = [m.get("label", f"{m.get('aggregate', 'SUM')}({m.get('column', '')})")
+                         for m in chart_config["metrics"]]
+        chart_config["y_columns"] = metric_labels
+
+    _coerce_numeric_columns(df)
+    columns = list(df.columns)
+    rows = df.values.tolist()
+
+    return columns, rows, df, pq_path
+
+
 @router.post("/api/charts/{chart_id}/execute", summary="Execute chart", response_model=ChartExecuteResponse)
-def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, current_user: dict = Depends(get_current_user)):
+async def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, current_user: dict = Depends(get_current_user)):
     """Execute a saved chart with optional runtime filters. Returns Plotly figure or table data."""
     from api.analytics.router import track_view
     track_view(int(current_user["sub"]), "chart", chart_id)
 
-    chart = get_chart(chart_id, current_user)
+    chart = await asyncio.to_thread(get_chart, chart_id, current_user)
 
     # Text blocks don't need execution
     if chart.get("chart_type") == "text":
@@ -1520,7 +1832,8 @@ def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, current
 
     force = req.force if req else False
     filters = req.filters if req else None
-    _exec_key = chart_exec_key(chart_id, filters, _config_hash)
+    uid = int(current_user["sub"])
+    _exec_key = chart_exec_key(chart_id, filters, _config_hash, user_id=uid)
 
     if not force:
         _cached = get_cached(_exec_key)
@@ -1557,8 +1870,17 @@ def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, current
     if not sql_query or not connection_id:
         return ChartExecuteResponse(error={"code": "MISSING_CONFIG", "message": "Chart has no SQL query or connection"})
 
-    # Apply time grain
-    sql_query = _apply_time_grain(sql_query, chart_config)
+    # Substitute {{ variable }} placeholders with DuckDB $param placeholders
+    from api.sql_params import extract_variables, substitute as var_substitute
+    _var_params: dict = {}
+    chart_vars = chart.get("variables") or []
+    var_defaults = {v["name"]: v.get("default") for v in chart_vars if v.get("name")}
+    runtime_values = (req.variable_values if req else None) or {}
+    if extract_variables(sql_query):
+        try:
+            sql_query, _var_params = var_substitute(sql_query, runtime_values, var_defaults)
+        except ValueError as e:
+            return ChartExecuteResponse(error=_classify_error(e))
 
     # Build custom SQL wrapper if config uses custom SQL expressions
     _skip_metrics = False
@@ -1575,18 +1897,27 @@ def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, current
         except Exception as e:
             return ChartExecuteResponse(error=_classify_error(e))
 
-    # Execute SQL
-    uid = int(current_user["sub"])
+    # Resolve Parquet cache TTL from dataset
+    _pq_ttl = None
+    if chart.get("dataset_id"):
+        with engine.connect() as conn:
+            _ds_ttl = conn.execute(
+                text("SELECT cache_ttl FROM datasets WHERE id = :id"),
+                {"id": chart["dataset_id"]}
+            ).mappings().fetchone()
+            if _ds_ttl:
+                _pq_ttl = _ds_ttl["cache_ttl"]
+
+    # Execute full pipeline via DuckDB (IO-bound — run in thread pool)
     try:
-        columns, rows, df = _execute_chart_sql(connection_id, sql_query, filters, user_id=uid)
+        columns, rows, df, pq_path = await asyncio.to_thread(
+            _execute_chart_full, connection_id, sql_query, chart_config,
+            filters, uid, _skip_metrics, _pq_ttl, _var_params or None)
     except Exception as e:
         return ChartExecuteResponse(error=_classify_error(e))
 
     # Rename pivot custom SQL columns (_pcs_ prefix → original names)
     df = _rename_pivot_custom_cols(df, chart_config)
-
-    # Apply processing pipeline
-    df = _apply_pipeline(df, chart_config, skip_metrics=_skip_metrics)
     columns = list(df.columns)
     row_count = len(df)
 
@@ -1610,7 +1941,7 @@ def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, current
         elif chart["mode"] == "visual":
             figure = build_visual_chart(chart["chart_type"], chart_config, df)
         elif chart["mode"] == "code":
-            code_result = execute_chart_code(chart["chart_code"], df)
+            code_result = execute_chart_code(chart["chart_code"], df, parquet_path=pq_path)
             if isinstance(code_result, dict) and code_result.get("_table"):
                 return _cache_and_return(
                     figure=None,
@@ -1650,24 +1981,38 @@ def execute_chart(chart_id: int, req: ChartExecuteRequest | None = None, current
 
 
 @router.post("/api/charts/preview", summary="Preview chart", response_model=ChartExecuteResponse)
-def preview_chart(req: ChartPreviewRequest, current_user: dict = Depends(get_current_user)):
+async def preview_chart(req: ChartPreviewRequest, current_user: dict = Depends(get_current_user)):
     """Execute an ad-hoc chart configuration without saving. Use for testing before creation."""
     connection_id = req.connection_id
     sql_query = req.sql_query
 
     # Resolve dataset if provided
+    _pq_ttl = None
     if req.dataset_id:
         with engine.connect() as conn:
             ds = conn.execute(
-                text("SELECT connection_id, sql_query FROM datasets WHERE id = :id"),
+                text("SELECT connection_id, sql_query, cache_ttl FROM datasets WHERE id = :id"),
                 {"id": req.dataset_id}
             ).mappings().fetchone()
             if ds:
                 connection_id = ds["connection_id"]
                 sql_query = ds["sql_query"]
+                _pq_ttl = ds["cache_ttl"]
 
     if not sql_query or not connection_id:
         return ChartExecuteResponse(error={"code": "MISSING_CONFIG", "message": "SQL query and connection are required"})
+
+    # Substitute {{ variable }} placeholders with DuckDB $param placeholders
+    from api.sql_params import extract_variables, substitute as var_substitute
+    _var_params: dict = {}
+    preview_vars = req.variables or []
+    var_defaults = {v["name"]: v.get("default") for v in preview_vars if v.get("name")}
+    runtime_values = req.variable_values or {}
+    if extract_variables(sql_query):
+        try:
+            sql_query, _var_params = var_substitute(sql_query, runtime_values, var_defaults)
+        except ValueError as e:
+            return ChartExecuteResponse(error=_classify_error(e))
 
     # Build custom SQL wrapper if config uses custom SQL expressions
     chart_config = req.chart_config or {}
@@ -1685,17 +2030,17 @@ def preview_chart(req: ChartPreviewRequest, current_user: dict = Depends(get_cur
         except Exception as e:
             return ChartExecuteResponse(error=_classify_error(e))
 
+    # Execute full pipeline via DuckDB (IO-bound — run in thread pool)
     uid = int(current_user["sub"])
     try:
-        columns, rows, df = _execute_chart_sql(connection_id, sql_query, req.filters, user_id=uid)
+        columns, rows, df, pq_path = await asyncio.to_thread(
+            _execute_chart_full, connection_id, sql_query, chart_config,
+            req.filters, uid, _skip_metrics, _pq_ttl, _var_params or None)
     except Exception as e:
         return ChartExecuteResponse(error=_classify_error(e))
 
     # Rename pivot custom SQL columns (_pcs_ prefix → original names)
     df = _rename_pivot_custom_cols(df, chart_config)
-
-    # Apply processing pipeline
-    df = _apply_pipeline(df, chart_config, skip_metrics=_skip_metrics)
     columns = list(df.columns)
     row_count = len(df)
 
@@ -1718,7 +2063,7 @@ def preview_chart(req: ChartPreviewRequest, current_user: dict = Depends(get_cur
         elif req.mode == "visual":
             figure = build_visual_chart(req.chart_type, chart_config, df)
         elif req.mode == "code":
-            code_result = execute_chart_code(req.chart_code, df)
+            code_result = execute_chart_code(req.chart_code, df, parquet_path=pq_path)
             # Table/pivot mode: code returned data instead of figure
             if isinstance(code_result, dict) and code_result.get("_table"):
                 return ChartExecuteResponse(
@@ -1748,7 +2093,7 @@ def preview_chart(req: ChartPreviewRequest, current_user: dict = Depends(get_cur
 
 
 @router.get("/api/charts/{chart_id}/thumbnail", summary="Chart PNG thumbnail")
-def chart_thumbnail(
+async def chart_thumbnail(
     chart_id: int,
     width: int = 600,
     height: int = 400,
@@ -1758,7 +2103,7 @@ def chart_thumbnail(
     from fastapi.responses import Response
     import plotly.graph_objects as go
 
-    chart = get_chart(chart_id, current_user)
+    chart = await asyncio.to_thread(get_chart, chart_id, current_user)
 
     # Table/pivot/text don't produce figures
     if chart.get("chart_type") in ("table", "pivot", "text"):
@@ -1769,7 +2114,6 @@ def chart_thumbnail(
         raise HTTPException(status_code=400, detail="Chart has no SQL query or connection")
 
     chart_config = chart.get("chart_config", {}) or {}
-    sql_query = _apply_time_grain(sql_query, chart_config)
 
     # Build custom SQL wrapper if config uses custom SQL expressions
     _skip_metrics = False
@@ -1779,20 +2123,21 @@ def chart_thumbnail(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Custom SQL expression error: {str(e)}")
 
+    # Execute full pipeline via DuckDB (IO-bound — run in thread pool)
     uid = int(current_user["sub"])
     try:
-        columns, rows, df = _execute_chart_sql(connection_id, sql_query, user_id=uid)
+        columns, rows, df, pq_path = await asyncio.to_thread(
+            _execute_chart_full, connection_id, sql_query, chart_config,
+            None, uid, _skip_metrics)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"SQL execution failed: {str(e)}")
-
-    df = _apply_pipeline(df, chart_config, skip_metrics=_skip_metrics)
 
     figure = None
     try:
         if chart["mode"] == "visual":
             figure = build_visual_chart(chart["chart_type"], chart_config, df)
         elif chart["mode"] == "code":
-            code_result = execute_chart_code(chart["chart_code"], df)
+            code_result = execute_chart_code(chart["chart_code"], df, parquet_path=pq_path)
             if isinstance(code_result, dict) and code_result.get("_table"):
                 raise HTTPException(status_code=400, detail="Code mode returned table data, not a figure")
             figure = code_result
@@ -1811,7 +2156,12 @@ def chart_thumbnail(
         fig = figure
 
     try:
-        png_bytes = fig.to_image(format="png", width=width, height=height, engine="kaleido")
+        import kaleido  # noqa: F401
+    except ImportError:
+        raise HTTPException(status_code=501, detail="kaleido is not installed — thumbnail rendering unavailable")
+
+    try:
+        png_bytes = await asyncio.to_thread(fig.to_image, format="png", width=width, height=height, engine="kaleido")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Image rendering failed: {str(e)}")
 
