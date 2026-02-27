@@ -898,6 +898,12 @@
     "messages": "Messages",
     "lastActivity": "Last Activity"
   },
+  "copilot": {
+    "title": "AI Copilot",
+    "newChat": "New Chat",
+    "placeholder": "Ask anything about your data...",
+    "suggestedTitle": "Try asking..."
+  },
   "metrics": {
     "title": "Metrics",
     "description": "Define reusable measures, dimensions, and relationships",

@@ -6,12 +6,12 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { AppHeader } from "./app-header";
 import { CommandPalette } from "@/components/command-palette";
-import { AiChatDrawer } from "@/components/ai/ai-chat-drawer";
+import { CopilotSidebar } from "@/components/ai/copilot-sidebar";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { status } = useSession();
   const router = useRouter();
-  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -31,12 +31,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen flex-col bg-background">
-      <AppHeader onAiToggle={() => setAiDrawerOpen(!aiDrawerOpen)} />
+      <AppHeader onAiToggle={() => setCopilotOpen((prev) => !prev)} />
       <main className="flex-1 overflow-auto p-4">
         {children}
       </main>
       <CommandPalette />
-      {aiDrawerOpen && <AiChatDrawer onClose={() => setAiDrawerOpen(false)} />}
+      <CopilotSidebar open={copilotOpen} onOpenChange={setCopilotOpen} />
     </div>
   );
 }

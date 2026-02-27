@@ -37,7 +37,7 @@ export interface AIGlossaryTerm {
 }
 
 export interface AIStreamEvent {
-  type: "session" | "text" | "sql" | "data" | "tool_call" | "tool_result" | "done" | "error";
+  type: "session" | "text" | "sql" | "data" | "tool_call" | "tool_result" | "done" | "error" | "agent";
   content?: string;
   session_id?: number;
   name?: string;
@@ -92,6 +92,7 @@ export function useAIChat() {
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [streamingContent, setStreamingContent] = useState("");
   const [activeToolCall, setActiveToolCall] = useState<string | null>(null);
+  const [currentAgent, setCurrentAgent] = useState<string | null>(null);
 
   const sendMessage = useCallback(
     async (text: string, connectionId?: number, context?: { type: string; id: number }) => {
@@ -139,6 +140,9 @@ export function useAIChat() {
             case "tool_result":
               setActiveToolCall(null);
               break;
+            case "agent":
+              setCurrentAgent(event.name || null);
+              break;
             case "error":
               assistantContent += `\n\nError: ${event.content}`;
               setStreamingContent(assistantContent);
@@ -172,6 +176,7 @@ export function useAIChat() {
       } finally {
         setIsStreaming(false);
         setActiveToolCall(null);
+        setCurrentAgent(null);
       }
     },
     [token, isStreaming, currentSessionId, queryClient],
@@ -198,6 +203,7 @@ export function useAIChat() {
     isStreaming,
     streamingContent,
     activeToolCall,
+    currentAgent,
     currentSessionId,
     sendMessage,
     loadSession,
