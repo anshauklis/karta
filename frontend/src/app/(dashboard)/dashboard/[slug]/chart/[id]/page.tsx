@@ -203,7 +203,7 @@ export default function ChartEditorPage({
 
   // Semantic models — show metrics tab only when models exist for current connection
   const { data: semanticModels } = useSemanticModels(connectionId);
-  const hasMetrics = (semanticModels?.length ?? 0) > 0;
+  const hasMetrics = !!connectionId && (semanticModels?.length ?? 0) > 0;
 
   // If user is on metrics tab but no models exist anymore, reset to data tab
   useEffect(() => {
@@ -302,30 +302,20 @@ export default function ChartEditorPage({
     const activeId = String(active.id);
     const overId = String(over.id);
 
-    // Dragged from metrics browser — validate target drop zone
-    if (activeId.startsWith("metric-measure-")) {
-      // Measures can only be dropped on zone-y or items already in y_columns
+    // Dragged from metrics browser — use drag data instead of parsing IDs
+    const dragData = active.data.current;
+    if (dragData?.type === "measure") {
       const yItems = (chartConfig.y_columns as string[]) || [];
       if (overId === "zone-y" || yItems.includes(overId)) {
-        // Extract measure name: "metric-measure-{modelId}-{name}"
-        const parts = activeId.replace("metric-measure-", "").split("-");
-        const measureName = parts.slice(1).join("-");
-        if (measureName) {
-          updateConfig("y_columns", [...yItems, measureName]);
-        }
+        updateConfig("y_columns", [...yItems, dragData.name]);
       }
       return;
     }
-    if (activeId.startsWith("metric-dimension-")) {
-      // Dimensions can be dropped on zone-x (sets x_column) or zone-color (sets color_column)
-      const parts = activeId.replace("metric-dimension-", "").split("-");
-      const columnName = parts.slice(1).join("-");
-      if (columnName) {
-        if (overId === "zone-x" || overId === chartConfig.x_column) {
-          updateConfig("x_column", columnName);
-        } else if (overId === "zone-color" || overId === chartConfig.color_column) {
-          updateConfig("color_column", columnName);
-        }
+    if (dragData?.type === "dimension") {
+      if (overId === "zone-x" || overId === chartConfig.x_column) {
+        updateConfig("x_column", dragData.columnName);
+      } else if (overId === "zone-color" || overId === chartConfig.color_column) {
+        updateConfig("color_column", dragData.columnName);
       }
       return;
     }
