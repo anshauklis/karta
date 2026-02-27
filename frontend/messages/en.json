@@ -567,7 +567,15 @@
     "linkExpiredOrRevoked": "This share link may have expired or been revoked.",
     "linkExpiredNotFound": "Link expired or not found",
     "failedToLoad": "Failed to load",
-    "noCharts": "No charts in this dashboard"
+    "noCharts": "No charts in this dashboard",
+    "tabLink": "Link",
+    "tabEmbed": "Embed",
+    "embedNoLinks": "Create a share link first, then you can generate embed code.",
+    "embedTheme": "Theme",
+    "embedThemeLight": "Light",
+    "embedThemeDark": "Dark",
+    "embedCode": "Iframe Code",
+    "embedHint": "Paste this code into your website HTML. You can add filter params like ?filter_column=value to the URL."
   },
   "settings": {
     "language": "Language",

@@ -567,7 +567,15 @@
     "linkExpiredOrRevoked": "Эта ссылка могла истечь или быть отозвана.",
     "linkExpiredNotFound": "Ссылка истекла или не найдена",
     "failedToLoad": "Не удалось загрузить",
-    "noCharts": "В этом дашборде нет графиков"
+    "noCharts": "В этом дашборде нет графиков",
+    "tabLink": "Ссылка",
+    "tabEmbed": "Встроить",
+    "embedNoLinks": "Сначала создайте ссылку, затем можно сгенерировать код для встраивания.",
+    "embedTheme": "Тема",
+    "embedThemeLight": "Светлая",
+    "embedThemeDark": "Тёмная",
+    "embedCode": "Код iframe",
+    "embedHint": "Вставьте этот код в HTML вашего сайта. Можно добавить параметры фильтров вида ?filter_column=value в URL."
   },
   "settings": {
     "language": "Язык",
