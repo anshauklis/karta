@@ -95,6 +95,8 @@ app = FastAPI(
         {"name": "teams", "description": "Teams and membership management"},
         {"name": "tenants", "description": "Multi-tenant management (enterprise)"},
         {"name": "Meta", "description": "Chart configuration schemas and metadata"},
+        {"name": "billing", "description": "Stripe billing, checkout, and subscription management"},
+        {"name": "cloud", "description": "Karta Cloud: tenant provisioning and onboarding"},
     ],
 )
 
@@ -159,6 +161,10 @@ from api.dbt.router import router as dbt_router
 from api.audit.router import router as audit_router
 from api.teams.router import router as teams_router
 from api.tenants.router import router as tenants_router
+from api.whitelabel.router import router as whitelabel_router
+from api.sso.router import router as sso_router
+from api.billing.router import router as billing_router
+from api.cloud.router import router as cloud_router
 
 app.include_router(auth_router)
 app.include_router(dashboards_router)
@@ -191,6 +197,10 @@ app.include_router(dbt_router)
 app.include_router(audit_router)
 app.include_router(teams_router)
 app.include_router(tenants_router)
+app.include_router(whitelabel_router)
+app.include_router(sso_router)
+app.include_router(billing_router)
+app.include_router(cloud_router)
 
 
 @app.get("/api/health", summary="Health check", tags=["system"])

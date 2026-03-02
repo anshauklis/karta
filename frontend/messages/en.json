@@ -60,7 +60,10 @@
     "metrics": "Metrics",
     "plugins": "Plugins",
     "auditLog": "Audit Log",
-    "teams": "Teams"
+    "teams": "Teams",
+    "sso": "SSO",
+    "billing": "Billing",
+    "whiteLabel": "White Label"
   },
   "dashboard": {
     "new": "New Dashboard",
@@ -1199,5 +1202,108 @@
       "contactSales": "Contact Sales",
       "getStarted": "Get Started Free"
     }
+  },
+  "sso": {
+    "title": "Single Sign-On",
+    "description": "Configure SSO providers for your organization",
+    "addProvider": "Add Provider",
+    "editProvider": "Edit Provider",
+    "deleteProvider": "Delete Provider",
+    "providerType": "Provider Type",
+    "providerName": "Provider Name",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "testConnection": "Test Connection",
+    "testSuccess": "Connection successful",
+    "testFailed": "Connection failed",
+    "noProviders": "No SSO providers configured",
+    "oidc": {
+      "title": "OpenID Connect",
+      "issuer": "Issuer URL",
+      "clientId": "Client ID",
+      "clientSecret": "Client Secret",
+      "scopes": "Scopes"
+    },
+    "saml": {
+      "title": "SAML",
+      "metadataUrl": "Metadata URL",
+      "entityId": "Entity ID"
+    },
+    "ldap": {
+      "title": "LDAP",
+      "host": "Host",
+      "port": "Port",
+      "bindDn": "Bind DN",
+      "bindPassword": "Bind Password",
+      "searchBase": "Search Base",
+      "userFilter": "User Filter",
+      "emailAttr": "Email Attribute",
+      "nameAttr": "Name Attribute",
+      "useTls": "Use TLS"
+    },
+    "deleteConfirm": "Are you sure you want to delete this provider?"
+  },
+  "billing": {
+    "title": "Billing",
+    "description": "Manage your subscription and billing",
+    "currentPlan": "Current Plan",
+    "status": "Status",
+    "nextBilling": "Next Billing Date",
+    "manageSub": "Manage Subscription",
+    "upgrade": "Upgrade",
+    "contactSales": "Contact Sales",
+    "getStarted": "Get Started",
+    "community": {
+      "name": "Community",
+      "price": "Free",
+      "description": "For individuals and small teams"
+    },
+    "team": {
+      "name": "Team",
+      "price": "$29/user/mo",
+      "description": "For growing teams that need more"
+    },
+    "enterpriseTier": {
+      "name": "Enterprise",
+      "price": "Custom",
+      "description": "For large organizations"
+    },
+    "statuses": {
+      "active": "Active",
+      "past_due": "Past Due",
+      "canceled": "Canceled",
+      "trialing": "Trial"
+    }
+  },
+  "whitelabel": {
+    "title": "White Label",
+    "description": "Customize the look and feel of your Karta instance",
+    "appName": "Application Name",
+    "primaryColor": "Primary Color",
+    "accentColor": "Accent Color",
+    "customCss": "Custom CSS",
+    "logo": "Logo",
+    "favicon": "Favicon",
+    "uploadLogo": "Upload Logo",
+    "uploadFavicon": "Upload Favicon",
+    "save": "Save Settings",
+    "saved": "Settings saved",
+    "preview": "Preview",
+    "resetDefaults": "Reset to Defaults"
+  },
+  "cloud": {
+    "title": "Create Your Karta Workspace",
+    "orgName": "Organization Name",
+    "slug": "Workspace URL",
+    "adminEmail": "Admin Email",
+    "adminName": "Admin Name",
+    "adminPassword": "Password",
+    "createAccount": "Create Workspace",
+    "creating": "Creating workspace...",
+    "slugTaken": "This URL is already taken",
+    "success": "Workspace created! Redirecting...",
+    "alreadyHaveAccount": "Already have an account?",
+    "signIn": "Sign In"
   }
 }

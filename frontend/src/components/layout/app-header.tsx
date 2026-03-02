@@ -30,6 +30,9 @@ import {
   Puzzle,
   ScrollText,
   UsersRound,
+  Palette,
+  KeyRound,
+  CreditCard,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useLocale } from "next-intl";
@@ -54,6 +57,7 @@ import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/config";
 import { useRouter } from "next/navigation";
 import { useRoles } from "@/hooks/use-roles";
+import { useWhitelabelSettings } from "@/hooks/use-whitelabel";
 
 const PRIMARY_NAV_ITEMS = [
   { href: "/", icon: LayoutDashboard, labelKey: "dashboards" },
@@ -78,6 +82,9 @@ const ADMIN_ITEMS = [
   { href: "/admin/plugins", icon: Puzzle, labelKey: "plugins" },
   { href: "/admin/ai", icon: Bot, labelKey: "ai" },
   { href: "/admin/audit", icon: ScrollText, labelKey: "auditLog" },
+  { href: "/admin/sso", icon: KeyRound, labelKey: "sso" },
+  { href: "/admin/whitelabel", icon: Palette, labelKey: "whiteLabel" },
+  { href: "/admin/billing", icon: CreditCard, labelKey: "billing" },
   { href: "/analytics", icon: Eye, labelKey: "analytics" },
   { href: "/lineage", icon: GitBranch, labelKey: "lineage" },
 ] as const;
@@ -96,6 +103,8 @@ export function AppHeader({ onAiToggle }: AppHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: session } = useSession();
   const { isAdmin, canSqlLab } = useRoles();
+  const { data: wlSettings } = useWhitelabelSettings();
+  const appName = wlSettings?.app_name || "Karta";
   const userName = session?.user?.name || "";
   const userEmail = session?.user?.email || "";
   const userInitial = (userName || userEmail || "U").charAt(0).toUpperCase();
@@ -129,8 +138,12 @@ export function AppHeader({ onAiToggle }: AppHeaderProps) {
         <SheetContent side="left" className="w-64 p-0 gap-0">
           <SheetHeader className="border-b border-border px-4 py-3">
             <SheetTitle className="flex items-center gap-2 text-sm">
-              <BarChart3 className="h-5 w-5 text-blue-600" />
-              Karta
+              {wlSettings?.logo_url ? (
+                <img src={wlSettings.logo_url} alt={appName} className="h-5 w-5 object-contain" />
+              ) : (
+                <BarChart3 className="h-5 w-5 text-blue-600" />
+              )}
+              {appName}
             </SheetTitle>
           </SheetHeader>
 
@@ -205,8 +218,12 @@ export function AppHeader({ onAiToggle }: AppHeaderProps) {
 
       {/* Logo */}
       <Link href="/" className="mr-6 flex items-center gap-2 shrink-0">
-        <BarChart3 className="h-5 w-5 text-blue-600" />
-        <span className="text-sm font-semibold hidden lg:inline">Karta</span>
+        {wlSettings?.logo_url ? (
+          <img src={wlSettings.logo_url} alt={appName} className="h-5 w-5 object-contain" />
+        ) : (
+          <BarChart3 className="h-5 w-5 text-blue-600" />
+        )}
+        <span className="text-sm font-semibold hidden lg:inline">{appName}</span>
       </Link>
 
       {/* Nav links */}

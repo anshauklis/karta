@@ -528,6 +528,27 @@ CREATE TABLE IF NOT EXISTS tenants (
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id INTEGER DEFAULT 1;
+
+CREATE TABLE IF NOT EXISTS sso_providers (
+    id              SERIAL PRIMARY KEY,
+    tenant_id       INTEGER DEFAULT 1,
+    provider_type   TEXT NOT NULL,
+    name            TEXT NOT NULL,
+    config          JSONB NOT NULL DEFAULT '{}',
+    is_active       BOOLEAN DEFAULT TRUE,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id                      SERIAL PRIMARY KEY,
+    tenant_id               INTEGER DEFAULT 1,
+    stripe_customer_id      TEXT,
+    stripe_subscription_id  TEXT,
+    tier                    TEXT NOT NULL DEFAULT 'community',
+    status                  TEXT NOT NULL DEFAULT 'active',
+    current_period_end      TIMESTAMPTZ,
+    created_at              TIMESTAMPTZ DEFAULT NOW()
+);
 """
 
 

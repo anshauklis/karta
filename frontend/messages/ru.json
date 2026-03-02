@@ -60,7 +60,10 @@
     "metrics": "Метрики",
     "plugins": "Плагины",
     "auditLog": "Журнал аудита",
-    "teams": "Команды"
+    "teams": "Команды",
+    "sso": "SSO",
+    "billing": "Биллинг",
+    "whiteLabel": "Белая метка"
   },
   "dashboard": {
     "new": "Новый дашборд",
@@ -1199,5 +1202,108 @@
       "contactSales": "Связаться с отделом продаж",
       "getStarted": "Начать бесплатно"
     }
+  },
+  "sso": {
+    "title": "Единый вход (SSO)",
+    "description": "Настройка провайдеров SSO для вашей организации",
+    "addProvider": "Добавить провайдер",
+    "editProvider": "Редактировать провайдер",
+    "deleteProvider": "Удалить провайдер",
+    "providerType": "Тип провайдера",
+    "providerName": "Название провайдера",
+    "status": "Статус",
+    "active": "Активен",
+    "inactive": "Неактивен",
+    "testConnection": "Проверить соединение",
+    "testSuccess": "Соединение успешно",
+    "testFailed": "Ошибка соединения",
+    "noProviders": "Провайдеры SSO не настроены",
+    "oidc": {
+      "title": "OpenID Connect",
+      "issuer": "URL издателя",
+      "clientId": "ID клиента",
+      "clientSecret": "Секрет клиента",
+      "scopes": "Области доступа"
+    },
+    "saml": {
+      "title": "SAML",
+      "metadataUrl": "URL метаданных",
+      "entityId": "ID сущности"
+    },
+    "ldap": {
+      "title": "LDAP",
+      "host": "Хост",
+      "port": "Порт",
+      "bindDn": "Bind DN",
+      "bindPassword": "Пароль привязки",
+      "searchBase": "Базовый путь поиска",
+      "userFilter": "Фильтр пользователей",
+      "emailAttr": "Атрибут email",
+      "nameAttr": "Атрибут имени",
+      "useTls": "Использовать TLS"
+    },
+    "deleteConfirm": "Вы уверены, что хотите удалить этого провайдера?"
+  },
+  "billing": {
+    "title": "Биллинг",
+    "description": "Управление подпиской и оплатой",
+    "currentPlan": "Текущий план",
+    "status": "Статус",
+    "nextBilling": "Следующая дата оплаты",
+    "manageSub": "Управление подпиской",
+    "upgrade": "Улучшить план",
+    "contactSales": "Связаться с отделом продаж",
+    "getStarted": "Начать",
+    "community": {
+      "name": "Community",
+      "price": "Бесплатно",
+      "description": "Для индивидуальных пользователей и небольших команд"
+    },
+    "team": {
+      "name": "Team",
+      "price": "$29/пользователь/мес",
+      "description": "Для растущих команд, которым нужно больше"
+    },
+    "enterpriseTier": {
+      "name": "Enterprise",
+      "price": "По запросу",
+      "description": "Для крупных организаций"
+    },
+    "statuses": {
+      "active": "Активна",
+      "past_due": "Просрочена",
+      "canceled": "Отменена",
+      "trialing": "Пробный период"
+    }
+  },
+  "whitelabel": {
+    "title": "Белая метка",
+    "description": "Настройте внешний вид вашего экземпляра Karta",
+    "appName": "Название приложения",
+    "primaryColor": "Основной цвет",
+    "accentColor": "Акцентный цвет",
+    "customCss": "Пользовательский CSS",
+    "logo": "Логотип",
+    "favicon": "Фавикон",
+    "uploadLogo": "Загрузить логотип",
+    "uploadFavicon": "Загрузить фавикон",
+    "save": "Сохранить настройки",
+    "saved": "Настройки сохранены",
+    "preview": "Предпросмотр",
+    "resetDefaults": "Сбросить по умолчанию"
+  },
+  "cloud": {
+    "title": "Создайте рабочее пространство Karta",
+    "orgName": "Название организации",
+    "slug": "URL рабочего пространства",
+    "adminEmail": "Email администратора",
+    "adminName": "Имя администратора",
+    "adminPassword": "Пароль",
+    "createAccount": "Создать пространство",
+    "creating": "Создание пространства...",
+    "slugTaken": "Этот URL уже занят",
+    "success": "Пространство создано! Перенаправление...",
+    "alreadyHaveAccount": "Уже есть аккаунт?",
+    "signIn": "Войти"
   }
 }
