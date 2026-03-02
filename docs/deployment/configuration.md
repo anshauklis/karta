@@ -40,8 +40,8 @@ Default memory limits in `docker-compose.yml`:
 | Service | Memory Limit | Adjust If... |
 |---------|-------------|--------------|
 | **postgres** | 1 GB | Large number of concurrent queries |
-| **api** | 512 MB | Complex Python code charts or large datasets |
-| **frontend** | 512 MB | Usually sufficient |
+| **api** | 4 GB | Complex Python code charts or large datasets |
+| **frontend** | 768 MB | Usually sufficient |
 | **nginx** | 256 MB | Usually sufficient |
 | **redis** | 256 MB | Large query cache needs |
 
@@ -51,6 +51,41 @@ To adjust, edit `mem_limit` in `docker-compose.yml`:
 api:
   mem_limit: 1g
 ```
+
+### AI Assistant
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AI_ENABLED` | `false` | Enable AI features |
+| `AI_API_URL` | `https://api.openai.com/v1` | AI provider API URL |
+| `AI_API_KEY` | --- | API key for AI provider |
+| `AI_MODEL` | `gpt-4o` | Model name |
+
+### SMTP (Email)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SMTP_HOST` | --- | SMTP server hostname |
+| `SMTP_PORT` | `587` | SMTP port |
+| `SMTP_USER` | --- | SMTP username |
+| `SMTP_PASSWORD` | --- | SMTP password |
+| `SMTP_FROM` | --- | Sender email address |
+| `SMTP_USE_TLS` | `true` | Enable TLS |
+
+### Stripe Billing (Enterprise)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `STRIPE_SECRET_KEY` | --- | Stripe API secret key |
+| `STRIPE_WEBHOOK_SECRET` | --- | Stripe webhook signing secret |
+| `STRIPE_PRICE_TEAM` | --- | Stripe Price ID for Team plan |
+| `STRIPE_PRICE_ENTERPRISE` | --- | Stripe Price ID for Enterprise plan |
+
+### License
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `KARTA_LICENSE` | --- | JWT license key for enterprise features |
 
 ## Redis Cache
 

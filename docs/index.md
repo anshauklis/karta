@@ -23,6 +23,8 @@ user-guide/export
 user-guide/collaboration
 user-guide/filters
 user-guide/datasets
+user-guide/ai-assistant
+semantic-layer
 ```
 
 ```{toctree}
@@ -32,6 +34,11 @@ user-guide/datasets
 admin/users
 admin/rls
 admin/alerts-reports
+admin/teams
+admin/audit
+admin/sso
+admin/whitelabel
+admin/billing
 ```
 
 ```{toctree}
@@ -46,6 +53,7 @@ deployment/operations
 deployment/security
 deployment/scaling
 deployment/cloud
+deployment/multi-tenant
 ```
 
 ```{toctree}
@@ -55,6 +63,14 @@ deployment/cloud
 reference/keyboard-shortcuts
 reference/chart-types
 reference/troubleshooting
+reference/api-overview
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Developer
+
+developer/contributing
 ```
 
 ## Quick Start
@@ -94,6 +110,14 @@ Public share links, dashboard and chart comments, stories, and change history.
 
 :::{grid-item-card} Security
 JWT auth, row-level security, AES-256-GCM credential encryption, SQL validation, Python sandbox.
+:::
+
+:::{grid-item-card} AI Assistant
+Chat-based data exploration with SQL generation, chart suggestions, and natural language filters.
+:::
+
+:::{grid-item-card} Enterprise
+SSO, audit log, RBAC with teams, white-label, multi-tenant, and Stripe billing.
 :::
 
 ::::
