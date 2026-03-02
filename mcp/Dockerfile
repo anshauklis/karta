@@ -1,9 +1,11 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+COPY pyproject.toml .
+RUN uv sync --no-dev --no-install-project
 
 COPY . .
 
@@ -12,4 +14,4 @@ USER app
 
 EXPOSE 8811
 
-CMD ["python", "server.py"]
+CMD ["uv", "run", "python", "server.py"]
