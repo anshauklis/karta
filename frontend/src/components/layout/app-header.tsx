@@ -139,6 +139,7 @@ export function AppHeader({ onAiToggle }: AppHeaderProps) {
           <SheetHeader className="border-b border-border px-4 py-3">
             <SheetTitle className="flex items-center gap-2 text-sm">
               {wlSettings?.logo_url ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={wlSettings.logo_url} alt={appName} className="h-5 w-5 object-contain" />
               ) : (
                 <BarChart3 className="h-5 w-5 text-blue-600" />
@@ -219,6 +220,7 @@ export function AppHeader({ onAiToggle }: AppHeaderProps) {
       {/* Logo */}
       <Link href="/" className="mr-6 flex items-center gap-2 shrink-0">
         {wlSettings?.logo_url ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img src={wlSettings.logo_url} alt={appName} className="h-5 w-5 object-contain" />
         ) : (
           <BarChart3 className="h-5 w-5 text-blue-600" />
