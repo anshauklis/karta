@@ -23,9 +23,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RotateCcw, Save, Trash2, Pencil, Check, X } from "lucide-react";
+import { Loader2, RotateCcw, Save, Trash2, Pencil, Check, X, LayoutGrid, Filter, Layers } from "lucide-react";
 import {
   useDashboardVersions,
+  useVersionDetail,
   useCreateVersion,
   useRestoreVersion,
   useUpdateVersionLabel,
@@ -58,6 +59,12 @@ export function VersionHistoryPanel({
   const [restoreTarget, setRestoreTarget] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editLabel, setEditLabel] = useState("");
+  const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
+
+  const { data: versionDetail, isLoading: isDetailLoading } = useVersionDetail(
+    open ? dashboardId : undefined,
+    selectedVersionId
+  );
 
   const handleSaveVersion = useCallback(() => {
     createVersion.mutate(
@@ -166,7 +173,14 @@ export function VersionHistoryPanel({
                 {versions.map((v) => (
                   <div
                     key={v.id}
-                    className="px-4 py-3 hover:bg-muted/50 group"
+                    className={`px-4 py-3 hover:bg-muted/50 group cursor-pointer ${
+                      selectedVersionId === v.id ? "bg-muted/50" : ""
+                    }`}
+                    onClick={() =>
+                      setSelectedVersionId(
+                        selectedVersionId === v.id ? null : v.id
+                      )
+                    }
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -187,7 +201,10 @@ export function VersionHistoryPanel({
                         </div>
 
                         {editingId === v.id ? (
-                          <div className="flex items-center gap-1">
+                          <div
+                            className="flex items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <Input
                               value={editLabel}
                               onChange={(e) => setEditLabel(e.target.value)}
@@ -221,7 +238,8 @@ export function VersionHistoryPanel({
                               )}
                             </span>
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setEditingId(v.id);
                                 setEditLabel(v.label);
                               }}
@@ -232,15 +250,25 @@ export function VersionHistoryPanel({
                           </div>
                         )}
 
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {formatDistanceToNow(new Date(v.created_at), {
-                            addSuffix: true,
-                          })}
-                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatDistanceToNow(new Date(v.created_at), {
+                              addSuffix: true,
+                            })}
+                          </span>
+                          {v.created_by_name && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {t("createdBy", { name: v.created_by_name })}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <div
+                        className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
                           onClick={() => setRestoreTarget(v.id)}
                           className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -257,6 +285,30 @@ export function VersionHistoryPanel({
                         </button>
                       </div>
                     </div>
+
+                    {/* Snapshot preview */}
+                    {selectedVersionId === v.id && (
+                      <div className="mt-2 pt-2 border-t border-border/50">
+                        {isDetailLoading ? (
+                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                        ) : versionDetail?.snapshot ? (
+                          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <LayoutGrid className="h-3 w-3" />
+                              {t("charts")}: {(versionDetail.snapshot.charts as unknown[])?.length ?? 0}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Filter className="h-3 w-3" />
+                              {t("filters")}: {(versionDetail.snapshot.filters as unknown[])?.length ?? 0}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Layers className="h-3 w-3" />
+                              {t("tabs")}: {(versionDetail.snapshot.tabs as unknown[])?.length ?? 0}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -101,6 +101,16 @@ def _get_connection_with_password(conn_id: int):
     row["password"] = decrypt_password_safe(row["password_encrypted"])
     if row.get("sqlalchemy_uri"):
         row["sqlalchemy_uri"] = decrypt_password_safe(row["sqlalchemy_uri"])
+    if row.get("extra_params"):
+        from api.engine_specs import get_spec
+        spec = get_spec(row["db_type"])
+        if spec:
+            for field in spec.encrypted_fields:
+                if field in row["extra_params"] and field != "password":
+                    try:
+                        row["extra_params"][field] = decrypt_password_safe(row["extra_params"][field])
+                    except Exception:
+                        pass  # field may not be encrypted (legacy data)
     return row
 
 
@@ -118,12 +128,22 @@ def _get_connections_with_password(conn_ids: list[int]) -> dict[int, dict]:
             f"FROM connections WHERE id IN ({placeholders})"
         ), params)
         rows = result.mappings().all()
+    from api.engine_specs import get_spec
     out = {}
     for row in rows:
         r = dict(row)
         r["password"] = decrypt_password_safe(r["password_encrypted"])
         if r.get("sqlalchemy_uri"):
             r["sqlalchemy_uri"] = decrypt_password_safe(r["sqlalchemy_uri"])
+        if r.get("extra_params"):
+            spec = get_spec(r["db_type"])
+            if spec:
+                for field in spec.encrypted_fields:
+                    if field in r["extra_params"] and field != "password":
+                        try:
+                            r["extra_params"][field] = decrypt_password_safe(r["extra_params"][field])
+                        except Exception:
+                            pass  # field may not be encrypted (legacy data)
         out[r["id"]] = r
     return out
 
@@ -234,7 +254,15 @@ def create_connection(req: ConnectionCreate, current_user: dict = Depends(requir
     user_id = int(current_user["sub"])
     password_encrypted = encrypt_password_safe(req.password) if req.password else ""
     uri_encrypted = encrypt_password_safe(req.sqlalchemy_uri) if req.sqlalchemy_uri else None
-    extra = json.dumps(req.extra_params) if req.extra_params else "{}"
+    extra_params = dict(req.extra_params) if req.extra_params else {}
+    if extra_params:
+        from api.engine_specs import get_spec
+        spec = get_spec(req.db_type)
+        if spec:
+            for field in spec.encrypted_fields:
+                if field in extra_params and field != "password":
+                    extra_params[field] = encrypt_password_safe(extra_params[field])
+    extra = json.dumps(extra_params)
 
     with engine.connect() as conn:
         result = conn.execute(
@@ -279,6 +307,18 @@ def update_connection(conn_id: int, req: ConnectionUpdate, current_user: dict = 
         updates["password_encrypted"] = encrypt_password_safe(updates.pop("password"))
     if "sqlalchemy_uri" in updates:
         updates["sqlalchemy_uri"] = encrypt_password_safe(updates["sqlalchemy_uri"])
+    if "extra_params" in updates and updates["extra_params"]:
+        from api.engine_specs import get_spec
+        with engine.connect() as conn2:
+            db_type_row = conn2.execute(
+                text("SELECT db_type FROM connections WHERE id = :id"), {"id": conn_id}
+            ).fetchone()
+        if db_type_row:
+            spec = get_spec(db_type_row[0])
+            if spec:
+                for field in spec.encrypted_fields:
+                    if field in updates["extra_params"] and field != "password":
+                        updates["extra_params"][field] = encrypt_password_safe(updates["extra_params"][field])
     if "extra_params" in updates:
         updates["extra_params"] = json.dumps(updates["extra_params"])
 

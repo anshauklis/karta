@@ -149,6 +149,7 @@ from api.tabs.router import router as tabs_router
 from api.meta.router import router as meta_router
 from api.semantic.router import router as semantic_router
 from api.versions.router import router as versions_router
+from api.dbt.router import router as dbt_router
 
 app.include_router(auth_router)
 app.include_router(dashboards_router)
@@ -177,6 +178,7 @@ app.include_router(tabs_router)
 app.include_router(meta_router)
 app.include_router(semantic_router)
 app.include_router(versions_router)
+app.include_router(dbt_router)
 
 
 @app.get("/api/health", summary="Health check", tags=["system"])

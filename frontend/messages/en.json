@@ -57,7 +57,8 @@
     "preferences": "Preferences",
     "aiAssistant": "AI Assistant",
     "ai": "AI",
-    "metrics": "Metrics"
+    "metrics": "Metrics",
+    "plugins": "Plugins"
   },
   "dashboard": {
     "new": "New Dashboard",
@@ -352,7 +353,29 @@
     "physicalHint": "Select a table from a database connection",
     "virtualHint": "Write a SQL query to define the dataset",
     "deleteConfirm": "Delete dataset \"{name}\"? This action cannot be undone.",
-    "createDashboardFirst": "Create a dashboard first before creating a chart."
+    "createDashboardFirst": "Create a dashboard first before creating a chart.",
+    "importDbt": "Import from dbt"
+  },
+  "dbt": {
+    "importFromDbt": "Import from dbt",
+    "selectConnection": "Select connection",
+    "uploadManifest": "Upload manifest.json",
+    "previewModels": "Preview models",
+    "import": "Import",
+    "importing": "Importing...",
+    "importComplete": "Import complete",
+    "imported": "Imported",
+    "updated": "Updated",
+    "skipped": "Skipped",
+    "noModels": "No models found in manifest",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "columns": "Columns",
+    "tags": "Tags",
+    "schema": "Schema",
+    "materialized": "Materialized",
+    "modelsFound": "models found",
+    "existing": "exists"
   },
   "alert": {
     "title": "Alerts",
@@ -1009,6 +1032,21 @@
     "versionSaved": "Version saved",
     "versionDeleted": "Version deleted",
     "labelUpdated": "Label updated",
-    "delete": "Delete"
+    "delete": "Delete",
+    "createdBy": "by {name}",
+    "charts": "Charts",
+    "filters": "Filters",
+    "tabs": "Tabs"
+  },
+  "plugins": {
+    "title": "Plugins",
+    "description": "Installed connector plugins for database engines.",
+    "name": "Name",
+    "type": "Type",
+    "source": "Source",
+    "status": "Status",
+    "builtIn": "Built-in",
+    "active": "Active",
+    "noPlugins": "No plugins installed"
   }
 }

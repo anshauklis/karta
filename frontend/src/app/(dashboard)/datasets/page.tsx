@@ -67,6 +67,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { CSVUploadDialog } from "@/components/datasets/csv-upload-dialog";
+import { ImportDbtDialog } from "@/components/datasets/import-dbt-dialog";
 import { useRoles } from "@/hooks/use-roles";
 import dynamic from "next/dynamic";
 
@@ -595,6 +596,7 @@ export default function DatasetsPage() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingDataset, setEditingDataset] = useState<Dataset | null>(null);
   const [showCSVUpload, setShowCSVUpload] = useState(false);
+  const [showDbtImport, setShowDbtImport] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Dataset | null>(null);
 
@@ -699,6 +701,9 @@ export default function DatasetsPage() {
         <h1 className="text-xl font-semibold text-slate-900">{tn("datasets")}</h1>
         {canEdit && (
           <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setShowDbtImport(true)}>
+              {t("importDbt")}
+            </Button>
             <Button size="sm" variant="outline" onClick={() => setShowCSVUpload(true)}>
               <Upload className="mr-1 h-4 w-4" />
               {t("uploadFile")}
@@ -832,6 +837,11 @@ export default function DatasetsPage() {
         open={showCSVUpload}
         onOpenChange={setShowCSVUpload}
         onCreateChart={handleCSVCreateChart}
+      />
+
+      <ImportDbtDialog
+        open={showDbtImport}
+        onOpenChange={setShowDbtImport}
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>

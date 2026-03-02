@@ -137,3 +137,63 @@ export function useCSVImport() {
     },
   });
 }
+
+export interface DbtPreviewModel {
+  unique_id: string;
+  name: string;
+  schema: string;
+  description: string;
+  columns_count: number;
+  columns: { name: string; description: string; data_type: string }[];
+  tags: string[];
+  materialized: string;
+  exists_in_karta: boolean;
+}
+
+export interface DbtImportResult {
+  imported: number;
+  updated: number;
+  skipped: number;
+  datasets: { id: number; name: string; action: string }[];
+}
+
+export function usePreviewDbt() {
+  const { data: session } = useSession();
+  const token = (session as SessionWithToken)?.accessToken;
+
+  return useMutation({
+    mutationFn: ({ file, connectionId }: { file: File; connectionId: number }) => {
+      const formData = new FormData();
+      formData.append("manifest", file);
+      formData.append("connection_id", String(connectionId));
+      return api.upload<{ models: DbtPreviewModel[] }>("/api/datasets/preview-dbt", formData, token);
+    },
+  });
+}
+
+export function useImportDbt() {
+  const { data: session } = useSession();
+  const token = (session as SessionWithToken)?.accessToken;
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      file,
+      connectionId,
+      selectedModels,
+    }: {
+      file: File;
+      connectionId: number;
+      selectedModels: string[];
+    }) => {
+      const formData = new FormData();
+      formData.append("manifest", file);
+      formData.append("connection_id", String(connectionId));
+      formData.append("selected_models", JSON.stringify(selectedModels));
+      return api.upload<DbtImportResult>("/api/datasets/import-dbt", formData, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+    },
+  });
+}

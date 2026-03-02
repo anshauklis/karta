@@ -27,6 +27,7 @@ import {
   ChevronDown,
   Bot,
   Layers,
+  Puzzle,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useLocale } from "next-intl";
@@ -71,6 +72,7 @@ const MORE_NAV_ITEMS = [
 const ADMIN_ITEMS = [
   { href: "/admin/users", icon: Users, labelKey: "users" },
   { href: "/admin/rls", icon: Shield, labelKey: "rlsRules" },
+  { href: "/admin/plugins", icon: Puzzle, labelKey: "plugins" },
   { href: "/admin/ai", icon: Bot, labelKey: "ai" },
   { href: "/analytics", icon: Eye, labelKey: "analytics" },
   { href: "/lineage", icon: GitBranch, labelKey: "lineage" },

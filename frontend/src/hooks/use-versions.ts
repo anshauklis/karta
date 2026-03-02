@@ -11,6 +11,7 @@ interface VersionListItem {
   label: string;
   is_auto: boolean;
   created_by: number | null;
+  created_by_name: string | null;
   created_at: string;
 }
 

@@ -57,7 +57,8 @@
     "preferences": "Настройки",
     "aiAssistant": "AI Ассистент",
     "ai": "AI",
-    "metrics": "Метрики"
+    "metrics": "Метрики",
+    "plugins": "Плагины"
   },
   "dashboard": {
     "new": "Новый дашборд",
@@ -352,7 +353,29 @@
     "physicalHint": "Выберите таблицу из подключения к базе данных",
     "virtualHint": "Напишите SQL-запрос для определения датасета",
     "deleteConfirm": "Удалить датасет «{name}»? Это действие нельзя отменить.",
-    "createDashboardFirst": "Сначала создайте дашборд."
+    "createDashboardFirst": "Сначала создайте дашборд.",
+    "importDbt": "Импорт из dbt"
+  },
+  "dbt": {
+    "importFromDbt": "Импорт из dbt",
+    "selectConnection": "Выберите подключение",
+    "uploadManifest": "Загрузите manifest.json",
+    "previewModels": "Предпросмотр моделей",
+    "import": "Импортировать",
+    "importing": "Импорт...",
+    "importComplete": "Импорт завершён",
+    "imported": "Импортировано",
+    "updated": "Обновлено",
+    "skipped": "Пропущено",
+    "noModels": "Модели не найдены в манифесте",
+    "selectAll": "Выбрать все",
+    "deselectAll": "Снять выбор",
+    "columns": "Колонки",
+    "tags": "Теги",
+    "schema": "Схема",
+    "materialized": "Материализация",
+    "modelsFound": "моделей найдено",
+    "existing": "есть"
   },
   "alert": {
     "title": "Алерты",
@@ -1009,6 +1032,21 @@
     "versionSaved": "Версия сохранена",
     "versionDeleted": "Версия удалена",
     "labelUpdated": "Название обновлено",
-    "delete": "Удалить"
+    "delete": "Удалить",
+    "createdBy": "от {name}",
+    "charts": "Графики",
+    "filters": "Фильтры",
+    "tabs": "Вкладки"
+  },
+  "plugins": {
+    "title": "Плагины",
+    "description": "Установленные плагины коннекторов для баз данных.",
+    "name": "Название",
+    "type": "Тип",
+    "source": "Источник",
+    "status": "Статус",
+    "builtIn": "Встроенный",
+    "active": "Активен",
+    "noPlugins": "Нет установленных плагинов"
   }
 }

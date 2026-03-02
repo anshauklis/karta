@@ -127,10 +127,12 @@ def create_auto_version(dashboard_id: int, user_id: int) -> bool:
 def list_versions(dashboard_id: int, current_user: dict = Depends(get_current_user)):
     with engine.connect() as conn:
         rows = conn.execute(text("""
-            SELECT id, dashboard_id, version_number, label, is_auto, created_by, created_at
-            FROM dashboard_versions
-            WHERE dashboard_id = :did
-            ORDER BY version_number DESC
+            SELECT v.id, v.dashboard_id, v.version_number, v.label, v.is_auto,
+                   v.created_by, u.name AS created_by_name, v.created_at
+            FROM dashboard_versions v
+            LEFT JOIN users u ON v.created_by = u.id
+            WHERE v.dashboard_id = :did
+            ORDER BY v.version_number DESC
         """), {"did": dashboard_id}).mappings().all()
     return [dict(r) for r in rows]
 

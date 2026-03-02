@@ -160,6 +160,14 @@ export interface FieldDef {
   placeholder: string;
 }
 
+export interface Plugin {
+  db_type: string;
+  display_name: string;
+  type: string;
+  source: string;
+  status: string;
+}
+
 export interface EngineSpec {
   db_type: string;
   display_name: string;

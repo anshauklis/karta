@@ -11,7 +11,7 @@ import { convertLayout } from "@/lib/keyboard-layouts";
 import {
   LayoutDashboard, Database, Terminal, FileSpreadsheet,
   Bell, FileText, BookOpen, Users, Shield, Eye, GitBranch,
-  Search, BarChart3, Layers,
+  Search, BarChart3, Layers, Puzzle,
 } from "lucide-react";
 import { useRoles } from "@/hooks/use-roles";
 
@@ -37,6 +37,7 @@ export function CommandPalette() {
     { label: tn("stories"), href: "/stories", icon: BookOpen, group: "navigate" as const },
     { label: tn("users"), href: "/admin/users", icon: Users, group: "admin" as const },
     { label: tn("rlsRules"), href: "/admin/rls", icon: Shield, group: "admin" as const },
+    { label: tn("plugins"), href: "/admin/plugins", icon: Puzzle, group: "admin" as const },
     { label: tn("analytics"), href: "/analytics", icon: Eye, group: "admin" as const },
     { label: tn("lineage"), href: "/lineage", icon: GitBranch, group: "admin" as const },
   ];

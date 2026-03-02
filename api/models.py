@@ -776,6 +776,7 @@ class VersionListItem(BaseModel):
     label: str
     is_auto: bool
     created_by: Optional[int]
+    created_by_name: Optional[str] = None
     created_at: datetime
 
 class VersionDetail(VersionListItem):
