@@ -16,6 +16,7 @@ data/csv/*
 /*.png
 /*.jpg
 /*.jpeg
+scripts/license_private.pem
 .fastembed_cache/
 .playwright-mcp/
 .serena/

@@ -768,3 +768,13 @@ export interface SemanticQueryResult {
   sql: string;
   data: { columns: string[]; rows: unknown[][]; row_count: number };
 }
+
+// --- License ---
+
+export interface LicenseInfo {
+  tier: "community" | "team" | "enterprise";
+  features: string[];
+  org: string | null;
+  max_users: number;
+  grace: boolean;
+}

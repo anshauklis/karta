@@ -187,6 +187,22 @@ def health():
     return {"status": "ok"}
 
 
+from api.license import get_license, get_tier, get_features
+
+
+@app.get("/api/license", summary="License info", tags=["system"])
+async def license_info():
+    """Return current license tier, features, and org. No authentication required."""
+    lic = get_license()
+    return {
+        "tier": get_tier(),
+        "features": get_features(),
+        "org": lic.get("org") if lic else None,
+        "max_users": lic.get("max_users", 0) if lic else 0,
+        "grace": lic.get("_grace", False) if lic else False,
+    }
+
+
 # --- Generic change history endpoint ---
 from fastapi import Depends
 from sqlalchemy import text as sa_text
