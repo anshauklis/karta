@@ -1048,5 +1048,93 @@
     "builtIn": "Built-in",
     "active": "Active",
     "noPlugins": "No plugins installed"
+  },
+  "enterprise": {
+    "title": "Karta for Enterprise",
+    "subtitle": "Enterprise-grade business intelligence for your organization",
+    "description": "Powerful analytics with enterprise security, compliance, and customization built in.",
+    "features": {
+      "title": "Enterprise Features",
+      "sso": {
+        "name": "Single Sign-On",
+        "description": "SAML 2.0, OpenID Connect, and LDAP integration for centralized authentication."
+      },
+      "auditLog": {
+        "name": "Audit Log",
+        "description": "Track every user action with immutable audit trails for compliance and governance."
+      },
+      "rbac": {
+        "name": "Advanced RBAC",
+        "description": "Fine-grained access control with teams, custom roles, and resource-level scoping."
+      },
+      "whiteLabel": {
+        "name": "White-Label",
+        "description": "Customize the logo, colors, and application name to match your brand."
+      },
+      "multiTenant": {
+        "name": "Multi-Tenant",
+        "description": "Schema-level isolation per organization with tenant-aware data routing."
+      },
+      "prioritySupport": {
+        "name": "Priority Support",
+        "description": "Dedicated support channel with guaranteed response times and onboarding assistance."
+      }
+    },
+    "pricing": {
+      "title": "Plans & Pricing",
+      "recommended": "Recommended",
+      "perUserMonth": "/user/mo",
+      "community": {
+        "name": "Community",
+        "price": "Free",
+        "description": "Everything you need to get started with self-hosted BI.",
+        "features": {
+          "0": "Unlimited users",
+          "1": "Unlimited dashboards & charts",
+          "2": "Unlimited connections",
+          "3": "SQL Lab",
+          "4": "Community support"
+        }
+      },
+      "team": {
+        "name": "Team",
+        "price": "$29",
+        "description": "For growing teams that need collaboration and governance.",
+        "features": {
+          "0": "Everything in Community",
+          "1": "Audit log",
+          "2": "Basic RBAC (roles & permissions)",
+          "3": "Scheduled reports",
+          "4": "Alerts & notifications",
+          "5": "CSV & Parquet export",
+          "6": "Dashboard versioning",
+          "7": "Email support"
+        }
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "price": "Custom",
+        "description": "For organizations that require security, compliance, and full customization.",
+        "features": {
+          "0": "Everything in Team",
+          "1": "SSO (SAML, OIDC, LDAP)",
+          "2": "Advanced RBAC with teams",
+          "3": "Multi-tenant isolation",
+          "4": "White-label branding",
+          "5": "Priority support & SLA",
+          "6": "Custom integrations",
+          "7": "Dedicated onboarding",
+          "8": "Volume discounts",
+          "9": "On-premise deployment support",
+          "10": "Security review & compliance"
+        }
+      }
+    },
+    "cta": {
+      "title": "Ready to scale your analytics?",
+      "description": "Get in touch with our team to discuss your needs, or start with the free Community edition today.",
+      "contactSales": "Contact Sales",
+      "getStarted": "Get Started Free"
+    }
   }
 }
