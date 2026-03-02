@@ -29,6 +29,7 @@ import {
   Layers,
   Puzzle,
   ScrollText,
+  UsersRound,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useLocale } from "next-intl";
@@ -72,6 +73,7 @@ const MORE_NAV_ITEMS = [
 
 const ADMIN_ITEMS = [
   { href: "/admin/users", icon: Users, labelKey: "users" },
+  { href: "/admin/teams", icon: UsersRound, labelKey: "teams" },
   { href: "/admin/rls", icon: Shield, labelKey: "rlsRules" },
   { href: "/admin/plugins", icon: Puzzle, labelKey: "plugins" },
   { href: "/admin/ai", icon: Bot, labelKey: "ai" },

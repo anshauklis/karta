@@ -22,8 +22,9 @@ def get_current_user(
 
 
 def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
-    """Require the current user to be an admin (via roles)."""
-    if "admin" not in current_user.get("roles", []):
+    """Require the current user to be an admin or owner (via roles)."""
+    user_roles = current_user.get("roles", [])
+    if "admin" not in user_roles and "owner" not in user_roles:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 

@@ -403,6 +403,30 @@ ALTER TABLE charts ADD COLUMN IF NOT EXISTS variables JSONB DEFAULT '[]';
 
 ALTER TABLE scheduled_reports ADD COLUMN IF NOT EXISTS format VARCHAR(10) DEFAULT 'excel';
 
+-- Advanced RBAC: user role column and teams
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'editor';
+
+CREATE TABLE IF NOT EXISTS teams (
+    id          SERIAL PRIMARY KEY,
+    tenant_id   INTEGER,
+    name        TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS team_members (
+    id       SERIAL PRIMARY KEY,
+    team_id  INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role     TEXT NOT NULL DEFAULT 'viewer',
+    UNIQUE(team_id, user_id)
+);
+
+ALTER TABLE dashboards ADD COLUMN IF NOT EXISTS team_id INTEGER;
+ALTER TABLE dashboards ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT TRUE;
+ALTER TABLE connections ADD COLUMN IF NOT EXISTS team_id INTEGER;
+ALTER TABLE datasets ADD COLUMN IF NOT EXISTS team_id INTEGER;
+
 CREATE TABLE IF NOT EXISTS semantic_models (
     id              SERIAL PRIMARY KEY,
     connection_id   INTEGER NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
@@ -568,6 +592,17 @@ def ensure_migrations():
                 ON CONFLICT DO NOTHING
             """))
             logger.info("Migration rbac_v1: populated user_roles from is_admin flag")
+
+        # RBAC v2: sync is_admin → users.role column
+        result = conn.execute(text(
+            "INSERT INTO schema_migrations (name) VALUES ('rbac_v2_role_column') ON CONFLICT DO NOTHING"
+        ))
+        if result.rowcount > 0:
+            conn.execute(text("""
+                UPDATE users SET role = 'admin'
+                WHERE is_admin = true AND (role IS NULL OR role = 'editor')
+            """))
+            logger.info("Migration rbac_v2_role_column: synced is_admin → users.role")
 
         conn.commit()
 

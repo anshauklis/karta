@@ -59,7 +59,8 @@
     "ai": "AI",
     "metrics": "Metrics",
     "plugins": "Plugins",
-    "auditLog": "Audit Log"
+    "auditLog": "Audit Log",
+    "teams": "Teams"
   },
   "dashboard": {
     "new": "New Dashboard",
@@ -1038,6 +1039,31 @@
     "charts": "Charts",
     "filters": "Filters",
     "tabs": "Tabs"
+  },
+  "teams": {
+    "title": "Teams",
+    "description": "Manage teams and access control",
+    "name": "Name",
+    "teamDescription": "Description",
+    "members": "Members",
+    "memberCount": "Member Count",
+    "created": "Created",
+    "createTeam": "Create Team",
+    "editTeam": "Edit Team",
+    "deleteTeam": "Delete Team",
+    "addMember": "Add Member",
+    "removeMember": "Remove Member",
+    "role": "Role",
+    "roles": {
+      "viewer": "Viewer",
+      "editor": "Editor",
+      "admin": "Admin",
+      "owner": "Owner"
+    },
+    "noTeams": "No teams yet",
+    "deleteConfirm": "Are you sure you want to delete this team?",
+    "selectUser": "Select user",
+    "selectRole": "Select role"
   },
   "plugins": {
     "title": "Plugins",
