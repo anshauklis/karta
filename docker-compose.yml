@@ -145,5 +145,18 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  jackson:
+    image: boxyhq/jackson:latest
+    ports:
+      - "5225:5225"
+    environment:
+      JACKSON_URL: http://jackson:5225
+      DB_ENGINE: sql
+      DB_TYPE: postgres
+      DB_URL: postgresql://karta:${POSTGRES_PASSWORD}@postgres:5432/karta
+    profiles:
+      - enterprise
+    restart: unless-stopped
+
 volumes:
   pgdata:
