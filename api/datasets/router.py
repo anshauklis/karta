@@ -3,7 +3,7 @@ import os
 import re
 
 import duckdb
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
@@ -11,6 +11,7 @@ from api.database import engine
 from api.models import DatasetCreate, DatasetUpdate, DatasetResponse, SQLExecuteRequest, SQLExecuteResponse
 from api.auth.dependencies import get_current_user, check_ownership, require_role
 from api.sql_lab.router import execute_sql
+from api.audit import log_action
 
 router = APIRouter(prefix="/api/datasets", tags=["datasets"])
 
@@ -71,7 +72,7 @@ def list_datasets(
 
 
 @router.post("", summary="Create dataset", response_model=DatasetResponse, status_code=201)
-def create_dataset(req: DatasetCreate, current_user: dict = require_role("editor", "admin")):
+async def create_dataset(req: DatasetCreate, request: Request, current_user: dict = require_role("editor", "admin")):
     """Create a dataset. Virtual datasets use a SQL query, physical datasets wrap a database table."""
     user_id = int(current_user["sub"])
 
@@ -107,6 +108,10 @@ def create_dataset(req: DatasetCreate, current_user: dict = require_role("editor
         )
         dataset = dict(result.mappings().fetchone())
         conn.commit()
+
+    await log_action(user_id, "create", "dataset", dataset["id"],
+                     details={"name": req.name}, ip_address=request.client.host if request.client else None)
+
     return dataset
 
 
@@ -162,7 +167,7 @@ def update_dataset(dataset_id: int, req: DatasetUpdate, current_user: dict = req
 
 
 @router.delete("/{dataset_id}", summary="Delete dataset", status_code=204)
-def delete_dataset(dataset_id: int, current_user: dict = require_role("editor", "admin")):
+async def delete_dataset(dataset_id: int, request: Request, current_user: dict = require_role("editor", "admin")):
     """Delete a dataset. Physical DuckDB datasets also drop the underlying table."""
     with engine.connect() as conn:
         check_ownership(conn, "datasets", dataset_id, current_user)
@@ -196,10 +201,13 @@ def delete_dataset(dataset_id: int, current_user: dict = require_role("editor", 
                         duck.execute(f'DROP TABLE IF EXISTS "{table_name}"')
                         duck.close()
                     except Exception:
-                        pass  # Non-critical — table might already be gone
+                        pass  # Non-critical -- table might already be gone
 
         conn.execute(text("DELETE FROM datasets WHERE id = :id"), {"id": dataset_id})
         conn.commit()
+
+    await log_action(int(current_user["sub"]), "delete", "dataset", dataset_id,
+                     ip_address=request.client.host if request.client else None)
 
 
 @router.post("/{dataset_id}/preview", summary="Preview dataset", response_model=SQLExecuteResponse)

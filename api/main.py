@@ -91,6 +91,7 @@ app = FastAPI(
         {"name": "favorites", "description": "User favorites"},
         {"name": "export", "description": "Dashboard share links"},
         {"name": "dashboard_versions", "description": "Dashboard version history and restore"},
+        {"name": "audit", "description": "Audit log (admin, enterprise)"},
         {"name": "Meta", "description": "Chart configuration schemas and metadata"},
     ],
 )
@@ -150,6 +151,7 @@ from api.meta.router import router as meta_router
 from api.semantic.router import router as semantic_router
 from api.versions.router import router as versions_router
 from api.dbt.router import router as dbt_router
+from api.audit.router import router as audit_router
 
 app.include_router(auth_router)
 app.include_router(dashboards_router)
@@ -179,6 +181,7 @@ app.include_router(meta_router)
 app.include_router(semantic_router)
 app.include_router(versions_router)
 app.include_router(dbt_router)
+app.include_router(audit_router)
 
 
 @app.get("/api/health", summary="Health check", tags=["system"])

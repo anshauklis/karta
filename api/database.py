@@ -479,6 +479,20 @@ CREATE INDEX IF NOT EXISTS idx_charts_dataset ON charts(dataset_id);
 CREATE INDEX IF NOT EXISTS idx_charts_dashboard_order ON charts(dashboard_id, position_order);
 CREATE INDEX IF NOT EXISTS idx_scheduled_reports_active ON scheduled_reports(is_active, id);
 CREATE INDEX IF NOT EXISTS idx_alert_rules_active ON alert_rules(is_active, id);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id          BIGSERIAL PRIMARY KEY,
+    tenant_id   INTEGER,
+    user_id     INTEGER,
+    action      TEXT NOT NULL,
+    resource_type TEXT NOT NULL,
+    resource_id INTEGER,
+    details     JSONB DEFAULT '{}',
+    ip_address  TEXT,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_log_tenant_time ON audit_log(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id, created_at DESC);
 """
 
 

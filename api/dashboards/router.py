@@ -1,6 +1,6 @@
 import api.json_util as json
 import re
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
@@ -8,6 +8,7 @@ from api.database import engine
 from api.models import DashboardCreate, DashboardUpdate, DashboardResponse
 from api.auth.dependencies import get_current_user, require_role
 from api.cache import get_cached, set_cached
+from api.audit import log_action
 
 router = APIRouter(prefix="/api/dashboards", tags=["dashboards"])
 
@@ -240,7 +241,7 @@ def get_dashboard_by_slug(slug: str, current_user: dict = Depends(get_current_us
 
 
 @router.post("", response_model=DashboardResponse, status_code=201, summary="Create dashboard")
-def create_dashboard(req: DashboardCreate, current_user: dict = require_role("editor", "admin")):
+async def create_dashboard(req: DashboardCreate, request: Request, current_user: dict = require_role("editor", "admin")):
     """Create a new dashboard. Auto-generates a URL slug from the title."""
     user_id = int(current_user["sub"])
     slug = _slugify(req.title)
@@ -288,6 +289,9 @@ def create_dashboard(req: DashboardCreate, current_user: dict = require_role("ed
 
         dashboard = _enrich_dashboard(conn, dashboard)
 
+    await log_action(user_id, "create", "dashboard", dashboard["id"],
+                     details={"title": req.title}, ip_address=request.client.host if request.client else None)
+
     return dashboard
 
 
@@ -318,7 +322,7 @@ def get_dashboard(dashboard_id: int, current_user: dict = Depends(get_current_us
 
 
 @router.put("/{dashboard_id}", response_model=DashboardResponse, summary="Update dashboard")
-def update_dashboard(dashboard_id: int, req: DashboardUpdate, current_user: dict = require_role("editor", "admin")):
+async def update_dashboard(dashboard_id: int, req: DashboardUpdate, request: Request, current_user: dict = require_role("editor", "admin")):
     """Update dashboard title, description, icon, slug, color scheme, owners, or roles."""
     from api.history import record_change, compute_diff
 
@@ -382,11 +386,14 @@ def update_dashboard(dashboard_id: int, req: DashboardUpdate, current_user: dict
     except Exception:
         pass
 
+    await log_action(int(current_user["sub"]), "update", "dashboard", dashboard_id,
+                     ip_address=request.client.host if request.client else None)
+
     return get_dashboard(dashboard_id, current_user)
 
 
 @router.delete("/{dashboard_id}", status_code=204, summary="Delete dashboard")
-def delete_dashboard(dashboard_id: int, current_user: dict = require_role("editor", "admin")):
+async def delete_dashboard(dashboard_id: int, request: Request, current_user: dict = require_role("editor", "admin")):
     """Soft-delete a dashboard by setting is_archived=true."""
     with engine.connect() as conn:
         conn.execute(
@@ -394,6 +401,8 @@ def delete_dashboard(dashboard_id: int, current_user: dict = require_role("edito
             {"id": dashboard_id}
         )
         conn.commit()
+    await log_action(int(current_user["sub"]), "delete", "dashboard", dashboard_id,
+                     ip_address=request.client.host if request.client else None)
 
 
 @router.post("/{dashboard_id}/clone", response_model=DashboardResponse, status_code=201, summary="Clone dashboard")

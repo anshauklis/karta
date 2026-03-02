@@ -58,7 +58,8 @@
     "aiAssistant": "AI Ассистент",
     "ai": "AI",
     "metrics": "Метрики",
-    "plugins": "Плагины"
+    "plugins": "Плагины",
+    "auditLog": "Журнал аудита"
   },
   "dashboard": {
     "new": "Новый дашборд",
@@ -1048,6 +1049,42 @@
     "builtIn": "Встроенный",
     "active": "Активен",
     "noPlugins": "Нет установленных плагинов"
+  },
+  "audit": {
+    "title": "Журнал аудита",
+    "description": "Отслеживание всех действий пользователей",
+    "action": "Действие",
+    "resourceType": "Тип ресурса",
+    "resourceId": "ID ресурса",
+    "ipAddress": "IP-адрес",
+    "time": "Время",
+    "user": "Пользователь",
+    "details": "Детали",
+    "noEvents": "События аудита не найдены",
+    "filters": "Фильтры",
+    "allActions": "Все действия",
+    "allResources": "Все ресурсы",
+    "fromDate": "С даты",
+    "toDate": "По дату",
+    "actions": {
+      "login": "Вход",
+      "logout": "Выход",
+      "create": "Создание",
+      "update": "Обновление",
+      "delete": "Удаление",
+      "execute": "Выполнение",
+      "export": "Экспорт",
+      "share": "Поделиться"
+    },
+    "resources": {
+      "dashboard": "Дашборд",
+      "chart": "График",
+      "connection": "Подключение",
+      "dataset": "Датасет",
+      "user": "Пользователь",
+      "report": "Отчёт",
+      "alert": "Оповещение"
+    }
   },
   "enterprise": {
     "title": "Karta для предприятий",

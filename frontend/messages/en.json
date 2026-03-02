@@ -58,7 +58,8 @@
     "aiAssistant": "AI Assistant",
     "ai": "AI",
     "metrics": "Metrics",
-    "plugins": "Plugins"
+    "plugins": "Plugins",
+    "auditLog": "Audit Log"
   },
   "dashboard": {
     "new": "New Dashboard",
@@ -1048,6 +1049,42 @@
     "builtIn": "Built-in",
     "active": "Active",
     "noPlugins": "No plugins installed"
+  },
+  "audit": {
+    "title": "Audit Log",
+    "description": "Track all user actions across the platform",
+    "action": "Action",
+    "resourceType": "Resource Type",
+    "resourceId": "Resource ID",
+    "ipAddress": "IP Address",
+    "time": "Time",
+    "user": "User",
+    "details": "Details",
+    "noEvents": "No audit events found",
+    "filters": "Filters",
+    "allActions": "All Actions",
+    "allResources": "All Resources",
+    "fromDate": "From Date",
+    "toDate": "To Date",
+    "actions": {
+      "login": "Login",
+      "logout": "Logout",
+      "create": "Create",
+      "update": "Update",
+      "delete": "Delete",
+      "execute": "Execute",
+      "export": "Export",
+      "share": "Share"
+    },
+    "resources": {
+      "dashboard": "Dashboard",
+      "chart": "Chart",
+      "connection": "Connection",
+      "dataset": "Dataset",
+      "user": "User",
+      "report": "Report",
+      "alert": "Alert"
+    }
   },
   "enterprise": {
     "title": "Karta for Enterprise",

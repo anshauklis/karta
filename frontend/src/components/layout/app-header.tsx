@@ -28,6 +28,7 @@ import {
   Bot,
   Layers,
   Puzzle,
+  ScrollText,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useLocale } from "next-intl";
@@ -74,6 +75,7 @@ const ADMIN_ITEMS = [
   { href: "/admin/rls", icon: Shield, labelKey: "rlsRules" },
   { href: "/admin/plugins", icon: Puzzle, labelKey: "plugins" },
   { href: "/admin/ai", icon: Bot, labelKey: "ai" },
+  { href: "/admin/audit", icon: ScrollText, labelKey: "auditLog" },
   { href: "/analytics", icon: Eye, labelKey: "analytics" },
   { href: "/lineage", icon: GitBranch, labelKey: "lineage" },
 ] as const;

@@ -1,7 +1,7 @@
 import ipaddress
 import api.json_util as json
 import re as _re
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text, inspect
 
@@ -12,6 +12,7 @@ from api.models import (
 )
 from api.auth.dependencies import get_current_user, require_admin
 from api.crypto import encrypt_password_safe, decrypt_password_safe
+from api.audit import log_action
 
 router = APIRouter(prefix="/api/connections", tags=["connections"])
 
@@ -247,7 +248,7 @@ def list_connections(
 
 
 @router.post("", summary="Create connection", response_model=ConnectionResponse, status_code=201)
-def create_connection(req: ConnectionCreate, current_user: dict = Depends(require_admin)):
+async def create_connection(req: ConnectionCreate, request: Request, current_user: dict = Depends(require_admin)):
     """Create a new database connection. Admin only. Password is encrypted with AES-256-GCM."""
     if req.host:
         _validate_connection_host(req.host)
@@ -283,11 +284,16 @@ def create_connection(req: ConnectionCreate, current_user: dict = Depends(requir
         )
         connection = dict(result.mappings().fetchone())
         conn.commit()
+
+    await log_action(user_id, "create", "connection", connection["id"],
+                     details={"name": req.name, "db_type": req.db_type},
+                     ip_address=request.client.host if request.client else None)
+
     return connection
 
 
 @router.put("/{conn_id}", summary="Update connection", response_model=ConnectionResponse)
-def update_connection(conn_id: int, req: ConnectionUpdate, current_user: dict = Depends(require_admin)):
+async def update_connection(conn_id: int, req: ConnectionUpdate, request: Request, current_user: dict = Depends(require_admin)):
     """Update connection details. Admin only. Password is re-encrypted if changed."""
     if req.host:
         _validate_connection_host(req.host)
@@ -343,6 +349,9 @@ def update_connection(conn_id: int, req: ConnectionUpdate, current_user: dict = 
     from api.parquet_cache import invalidate_connection
     invalidate_connection(conn_id)
 
+    await log_action(int(current_user["sub"]), "update", "connection", conn_id,
+                     ip_address=request.client.host if request.client else None)
+
     with engine.connect() as conn:
         result = conn.execute(text(f"SELECT {_CONN_COLS} FROM connections WHERE id = :id"), {"id": conn_id})
         row = result.mappings().fetchone()
@@ -352,7 +361,7 @@ def update_connection(conn_id: int, req: ConnectionUpdate, current_user: dict = 
 
 
 @router.delete("/{conn_id}", summary="Delete connection", status_code=204)
-def delete_connection(conn_id: int, current_user: dict = Depends(require_admin)):
+async def delete_connection(conn_id: int, request: Request, current_user: dict = Depends(require_admin)):
     """Delete a database connection. Admin only. System connections cannot be deleted."""
     with engine.connect() as conn:
         # Prevent deleting system connections
@@ -367,6 +376,8 @@ def delete_connection(conn_id: int, current_user: dict = Depends(require_admin))
     invalidate(conn_id)
     from api.parquet_cache import invalidate_connection
     invalidate_connection(conn_id)
+    await log_action(int(current_user["sub"]), "delete", "connection", conn_id,
+                     ip_address=request.client.host if request.client else None)
 
 
 @router.get("/{conn_id}/datasets", summary="List datasets using this connection")

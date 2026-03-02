@@ -3,7 +3,7 @@ import api.json_util as json
 import hashlib
 import re
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Depends, Body
+from fastapi import APIRouter, HTTPException, Depends, Body, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
@@ -16,6 +16,7 @@ from api.models import (
 )
 from api.auth.dependencies import get_current_user, check_ownership, require_role
 from api.executor import build_visual_chart, build_pivot_table, execute_chart_code
+from api.audit import log_action
 
 router = APIRouter(tags=["charts"])
 
@@ -343,7 +344,7 @@ def _resolve_dataset_fields(conn, req: ChartCreate):
 
 
 @router.post("/api/dashboards/{dashboard_id}/charts", summary="Create chart on dashboard", response_model=ChartResponse, status_code=201)
-def create_chart(dashboard_id: int, req: ChartCreate, current_user: dict = require_role("editor", "admin")):
+async def create_chart(dashboard_id: int, req: ChartCreate, request: Request, current_user: dict = require_role("editor", "admin")):
     """Create a new chart and add it to a dashboard.
 
     If dataset_id is provided, connection_id and sql_query are auto-resolved from the dataset.
@@ -398,6 +399,9 @@ def create_chart(dashboard_id: int, req: ChartCreate, current_user: dict = requi
         )
         chart = dict(result.mappings().fetchone())
         conn.commit()
+
+    await log_action(user_id, "create", "chart", chart["id"],
+                     details={"title": req.title}, ip_address=request.client.host if request.client else None)
 
     return chart
 
@@ -719,7 +723,7 @@ def get_chart(chart_id: int, current_user: dict = Depends(get_current_user)):
 
 
 @router.put("/api/charts/{chart_id}", summary="Update chart", response_model=ChartResponse)
-def update_chart(chart_id: int, req: ChartUpdate, current_user: dict = require_role("editor", "admin")):
+async def update_chart(chart_id: int, req: ChartUpdate, request: Request, current_user: dict = require_role("editor", "admin")):
     """Update chart title, type, config, SQL, or grid position."""
     from api.history import record_change, compute_diff
 
@@ -762,6 +766,9 @@ def update_chart(chart_id: int, req: ChartUpdate, current_user: dict = require_r
     from api.cache import delete_pattern
     delete_pattern(f"chart_exec:{chart_id}:*")
 
+    await log_action(int(current_user["sub"]), "update", "chart", chart_id,
+                     ip_address=request.client.host if request.client else None)
+
     return get_chart(chart_id, current_user)
 
 
@@ -797,12 +804,14 @@ def patch_chart_config(chart_id: int, config_updates: dict, current_user: dict =
 
 
 @router.delete("/api/charts/{chart_id}", summary="Delete chart", status_code=204)
-def delete_chart(chart_id: int, current_user: dict = require_role("editor", "admin")):
+async def delete_chart(chart_id: int, request: Request, current_user: dict = require_role("editor", "admin")):
     """Delete a chart permanently."""
     with engine.connect() as conn:
         check_ownership(conn, "charts", chart_id, current_user)
         conn.execute(text("DELETE FROM charts WHERE id = :id"), {"id": chart_id})
         conn.commit()
+    await log_action(int(current_user["sub"]), "delete", "chart", chart_id,
+                     ip_address=request.client.host if request.client else None)
 
 
 @router.post("/api/charts/{chart_id}/duplicate", summary="Duplicate chart", response_model=ChartResponse, status_code=201)
