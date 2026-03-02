@@ -22,7 +22,14 @@ npm run lint                        # ESLint
 # API linting
 cd api && uv run ruff check .       # Ruff linter
 
-# API has no tests. Frontend has no tests.
+# API tests (from api/)
+cd api && uv run pytest tests/ -v                              # All unit tests
+cd api && uv run pytest tests/ -v --ignore=tests/integration   # Unit only (no DB needed)
+cd api && uv run pytest tests/test_sql_validator.py -v         # Single module
+
+# Frontend tests (from frontend/)
+cd frontend && npm test                                        # All tests (single run)
+cd frontend && npm run test:watch                              # Watch mode
 ```
 
 **After any code change: commit, then `docker compose up --build -d`.** Partial restarts (`restart api`) do NOT apply changes.
