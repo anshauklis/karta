@@ -59,22 +59,24 @@ export function SaveChartModal({
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
-      setMode(isNew ? "save_as" : "overwrite");
-      setTitle(currentTitle);
-      setDashboardId(currentDashboardId);
-      setDashSearch("");
-      setDashPickerOpen(false);
+      queueMicrotask(() => {
+        setMode(isNew ? "save_as" : "overwrite");
+        setTitle(currentTitle);
+        setDashboardId(currentDashboardId);
+        setDashSearch("");
+        setDashPickerOpen(false);
+      });
     }
   }, [open, isNew, currentTitle, currentDashboardId]);
 
   // When switching to "save_as", append " (copy)" if title matches current
   useEffect(() => {
     if (mode === "save_as" && title === currentTitle && !isNew) {
-      setTitle(`${currentTitle} (copy)`);
+      queueMicrotask(() => setTitle(`${currentTitle} (copy)`));
     } else if (mode === "overwrite" && title === `${currentTitle} (copy)`) {
-      setTitle(currentTitle);
+      queueMicrotask(() => setTitle(currentTitle));
     }
-  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, title, currentTitle, isNew]);
 
   // Fetch charts in selected dashboard for duplicate detection
   const { data: dashCharts } = useDashboardCharts(dashboardId ?? undefined);

@@ -5,9 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { PopularContentItem, UserActivityItem, DashboardStats } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function usePopularContent() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["analytics", "popular"],
@@ -18,7 +20,7 @@ export function usePopularContent() {
 
 export function useUserActivity() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["analytics", "user-activity"],
@@ -29,7 +31,7 @@ export function useUserActivity() {
 
 export function useDashboardStats(dashboardId: number | null) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["analytics", "dashboard-stats", dashboardId],

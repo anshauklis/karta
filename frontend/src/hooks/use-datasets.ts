@@ -6,6 +6,8 @@ import { api } from "@/lib/api";
 import type { Dataset, DatasetCreate, DatasetUpdate, SQLResult } from "@/types";
 import { toast } from "sonner";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export interface CSVPreviewResponse {
   temp_id: string;
   filename: string;
@@ -31,7 +33,7 @@ export interface CSVImportResponse {
 
 export function useDatasets() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["datasets"],
@@ -43,7 +45,7 @@ export function useDatasets() {
 
 export function useCreateDataset() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -57,7 +59,7 @@ export function useCreateDataset() {
 
 export function useUpdateDataset() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -72,7 +74,7 @@ export function useUpdateDataset() {
 
 export function useDeleteDataset() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -85,7 +87,7 @@ export function useDeleteDataset() {
 
 export function useDatasetColumns(datasetId: number | null) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["dataset-columns", datasetId],
@@ -101,7 +103,7 @@ export function useDatasetColumns(datasetId: number | null) {
 
 export function usePreviewDataset() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useMutation({
     mutationFn: (id: number) =>
@@ -111,7 +113,7 @@ export function usePreviewDataset() {
 
 export function useCSVPreview() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useMutation({
     mutationFn: (file: File) => {
@@ -124,7 +126,7 @@ export function useCSVPreview() {
 
 export function useCSVImport() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({

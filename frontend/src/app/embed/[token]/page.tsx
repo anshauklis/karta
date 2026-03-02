@@ -6,15 +6,16 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart3 } from "lucide-react";
 import { ChartCard } from "@/components/charts/chart-card";
+import type { Chart, ChartExecuteResult } from "@/types";
 import { useContainerWidth } from "@/hooks/use-container-width";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
 import "react-grid-layout/css/styles.css";
 
 const ReactGridLayout = dynamic(
-  () => import("react-grid-layout/legacy").then((mod) => mod.default || mod) as any,
+  () => import("react-grid-layout/legacy").then((mod) => mod.default || mod) as unknown as Promise<React.ComponentType<Record<string, unknown>>>,
   { ssr: false }
-) as any;
+) as React.ComponentType<Record<string, unknown>>;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -139,8 +140,10 @@ export default function EmbedPage({
     return () => observer.disconnect();
   }, []);
 
+  type SharedChart = Chart & { result?: ChartExecuteResult };
+
   const handleChartClick = useCallback((chartId: number, pointData: { x?: unknown; y?: unknown; label?: string; name?: string }) => {
-    const chartInfo = data?.charts?.find((c: any) => c.id === chartId);
+    const chartInfo = (data?.charts as SharedChart[] | undefined)?.find((c) => c.id === chartId);
     window.parent.postMessage({
       type: "karta:chartClick",
       chartId,
@@ -149,11 +152,11 @@ export default function EmbedPage({
     }, "*");
   }, [data?.charts]);
 
-  const charts = data?.charts || [];
+  const charts: SharedChart[] = useMemo(() => data?.charts || [], [data?.charts]);
 
   const layout = useMemo(
     () =>
-      charts.map((chart: any) => ({
+      charts.map((chart) => ({
         i: String(chart.id),
         x: chart.grid_x ?? 0,
         y: chart.grid_y ?? 0,
@@ -201,7 +204,7 @@ export default function EmbedPage({
               compactType="vertical"
               margin={[16, 0]}
             >
-              {charts.map((chart: any) => (
+              {charts.map((chart) => (
                 <div key={String(chart.id)}>
                   <ChartCard
                     chart={chart}

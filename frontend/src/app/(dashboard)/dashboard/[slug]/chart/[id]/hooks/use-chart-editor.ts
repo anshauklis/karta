@@ -25,7 +25,7 @@ export function useChartEditor(slug: string, id: string) {
   const chartId = isNew ? undefined : parseInt(id);
   const router = useRouter();
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as { accessToken?: string } | null)?.accessToken;
 
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -356,13 +356,13 @@ export function useChartEditor(slug: string, id: string) {
         }
         return res;
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       setResult((prev) => ({
         figure: null,
         columns: prev?.columns || [],
         rows: [],
         row_count: 0,
-        error: e.message,
+        error: e instanceof Error ? e.message : String(e),
       }));
     } finally {
       setPreviewing(false);
@@ -510,13 +510,13 @@ export function useChartEditor(slug: string, id: string) {
       });
       if (res.columns) setQueryColumns(res.columns);
       setResult(res);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setResult((prev) => ({
         figure: null,
         columns: prev?.columns || [],
         rows: [],
         row_count: 0,
-        error: e.message,
+        error: e instanceof Error ? e.message : String(e),
       }));
     } finally {
       setPreviewing(false);

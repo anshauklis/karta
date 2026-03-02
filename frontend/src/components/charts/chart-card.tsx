@@ -52,7 +52,7 @@ interface ChartCardProps {
 
 export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, isFetching, editHref, onEdit, onRefresh, onDuplicate, showActions = true, onDataPointClick, onToggleComments, onVisible, tabs, currentTabId, onMoveToTab }: ChartCardProps) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as { accessToken?: string } | null)?.accessToken;
   const t = useTranslations("chart");
   const tc = useTranslations("common");
   const td = useTranslations("dashboard");

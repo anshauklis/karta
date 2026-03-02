@@ -8,7 +8,7 @@ import pandas as pd
 from sqlalchemy import text
 
 from api.database import engine
-from api.charts.router import _execute_chart_sql
+from api.charts.router import _execute_chart_full
 from api.notifications.dispatcher import send_file
 
 logger = logging.getLogger("karta.reports")
@@ -78,7 +78,7 @@ def _run_excel_report(report: dict) -> tuple[dict, bytes, str, int]:
     if not report["sql_query"] or not report["connection_id"]:
         raise ValueError(f"Report {report['id']}: chart has no SQL or connection")
 
-    columns, rows, df = _execute_chart_sql(report["connection_id"], report["sql_query"])
+    columns, rows, df, _pq_path = _execute_chart_full(report["connection_id"], report["sql_query"], chart_config={}, skip_metrics=True)
 
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:

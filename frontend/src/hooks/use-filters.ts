@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { DashboardFilter, DashboardFilterCreate, DashboardFilterUpdate } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useDashboardFilters(dashboardId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["dashboard-filters", dashboardId],
@@ -19,7 +21,7 @@ export function useDashboardFilters(dashboardId: number | undefined) {
 
 export function useCreateFilter(dashboardId: number) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -34,7 +36,7 @@ export function useCreateFilter(dashboardId: number) {
 
 export function useUpdateFilter() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -49,7 +51,7 @@ export function useUpdateFilter() {
 
 export function useDeleteFilter() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -65,7 +67,7 @@ export function useDeleteFilter() {
 
 export function useFilterValues(filterId: number | undefined, parentValue?: string | null) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   const params = new URLSearchParams();
   if (parentValue) params.set("parent_value", parentValue);
@@ -83,7 +85,7 @@ export function useFilterValues(filterId: number | undefined, parentValue?: stri
 
 export function useDashboardDatasets(dashboardId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["dashboard-datasets", dashboardId],
@@ -96,7 +98,7 @@ export function useDashboardDatasets(dashboardId: number | undefined) {
 
 export function useDashboardChartColumns(dashboardId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["dashboard-chart-columns", dashboardId],
@@ -109,7 +111,7 @@ export function useDashboardChartColumns(dashboardId: number | undefined) {
 
 export function useDashboardColumnsTyped(dashboardId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["dashboard-columns-typed", dashboardId],
@@ -125,7 +127,7 @@ export function useDashboardColumnsTyped(dashboardId: number | undefined) {
 
 export function useDatasetColumns(datasetId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["dataset-columns", datasetId],

@@ -21,7 +21,7 @@ import {
   useUpdateSQLTab,
   useDeleteSQLTab,
 } from "@/hooks/use-sql-tabs";
-import type { Connection, SchemaTable, SQLResult, SQLTab } from "@/types";
+import type { SchemaTable, SQLResult, SQLTab } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -112,7 +112,7 @@ function SchemaBrowser({
       if (hasColMatch) toExpand[table.table_name] = true;
     }
     if (Object.keys(toExpand).length > 0) {
-      setExpanded((prev) => ({ ...prev, ...toExpand }));
+      queueMicrotask(() => setExpanded((prev) => ({ ...prev, ...toExpand })));
     }
   }, [search, tables]);
 
@@ -238,7 +238,7 @@ function ResultsTable({ result }: { result: SQLResult }) {
           return String(value);
         },
       })),
-    [result.columns]
+    [result.columns, t]
   );
 
   const data = useMemo(
@@ -501,7 +501,6 @@ function TabBar({
 
 export default function SQLLabPage() {
   const t = useTranslations("sqlLab");
-  const tc = useTranslations("common");
   const ta = useTranslations("aiAssistant");
   const tr = useTranslations("roles");
   const { canSqlLab } = useRoles();
@@ -542,9 +541,11 @@ export default function SQLLabPage() {
   useEffect(() => {
     if (activeTab && activeTab.id !== prevActiveTabIdRef.current) {
       prevActiveTabIdRef.current = activeTab.id;
-      setLocalSql(null);
-      setLocalConnectionId(undefined);
-      setResult(null);
+      queueMicrotask(() => {
+        setLocalSql(null);
+        setLocalConnectionId(undefined);
+        setResult(null);
+      });
     }
   }, [activeTab]);
 
@@ -570,14 +571,16 @@ export default function SQLLabPage() {
     const paramSql = searchParams.get("sql");
     if (!paramCid && !paramSql) { urlParamsAppliedRef.current = true; return; }
     urlParamsAppliedRef.current = true;
-    if (paramCid) setLocalConnectionId(parseInt(paramCid));
-    if (paramSql) setLocalSql(paramSql);
+    queueMicrotask(() => {
+      if (paramCid) setLocalConnectionId(parseInt(paramCid));
+      if (paramSql) setLocalSql(paramSql);
+    });
     // Clean URL without reload
     window.history.replaceState({}, "", "/sql-lab");
   }, [tabs, tabsLoading, searchParams]);
 
   const { data: schema, isLoading: schemaLoading } = useConnectionSchema(activeConnectionId);
-  schemaRef.current = schema;
+  useEffect(() => { schemaRef.current = schema; }, [schema]);
 
   const handleRun = useCallback(() => {
     if (!activeConnectionId || !sql.trim()) return;

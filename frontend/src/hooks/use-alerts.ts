@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { AlertRule, AlertRuleCreate, AlertRuleUpdate, AlertHistory } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useAlerts() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["alerts"],
@@ -19,7 +21,7 @@ export function useAlerts() {
 
 export function useCreateAlert() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -34,7 +36,7 @@ export function useCreateAlert() {
 
 export function useUpdateAlert() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -49,7 +51,7 @@ export function useUpdateAlert() {
 
 export function useDeleteAlert() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -63,7 +65,7 @@ export function useDeleteAlert() {
 
 export function useTestAlert() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useMutation({
     mutationFn: (id: number) =>
@@ -75,7 +77,7 @@ export function useTestAlert() {
 
 export function useAlertHistory(alertId: number | null) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["alert-history", alertId],
@@ -86,7 +88,7 @@ export function useAlertHistory(alertId: number | null) {
 
 export function useAllAlertHistory() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["alert-history-all"],

@@ -44,7 +44,7 @@ def _get_excel_format(fmt: dict) -> str | None:
 def export_xlsx(body: ExcelExportRequest, current_user: dict = Depends(get_current_user)):
     """Accept columns + rows + formatting config, return .xlsx file download."""
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.styles import Font, PatternFill
 
     wb = Workbook()
     ws = wb.active

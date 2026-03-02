@@ -34,7 +34,7 @@ export default function StoriesPage() {
 
   const handleCreate = async () => {
     if (!title.trim()) return;
-    const story = await createStory.mutateAsync({ title: title.trim() });
+    await createStory.mutateAsync({ title: title.trim() });
     setTitle("");
     setShowCreate(false);
   };

@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { Chart, ChartCreate, ChartUpdate, ChartExecuteResult, ChartPreviewRequest, LayoutItem, ChartInsight } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export interface ChartListItem {
   id: number;
   dashboard_id: number;
@@ -23,7 +25,7 @@ export interface ChartListItem {
 
 export function useAllCharts() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["charts", "all"],
@@ -34,7 +36,7 @@ export function useAllCharts() {
 
 export function useDashboardCharts(dashboardId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["charts", dashboardId],
@@ -45,7 +47,7 @@ export function useDashboardCharts(dashboardId: number | undefined) {
 
 export function useChart(chartId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["chart", chartId],
@@ -56,7 +58,7 @@ export function useChart(chartId: number | undefined) {
 
 export function useCreateChart(dashboardId: number) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -64,7 +66,7 @@ export function useCreateChart(dashboardId: number) {
       api.post<Chart>(`/api/dashboards/${dashboardId}/charts`, data, token),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["charts", dashboardId] });
-      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
+      queryClient.invalidateQueries({ queryKey: ["charts", "all"] });
       toast.success("Chart created");
     },
   });
@@ -72,7 +74,7 @@ export function useCreateChart(dashboardId: number) {
 
 export function useCreateStandaloneChart() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -80,7 +82,6 @@ export function useCreateStandaloneChart() {
       api.post<Chart>("/api/charts", data, token),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["charts"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
       toast.success("Chart created");
     },
   });
@@ -88,7 +89,7 @@ export function useCreateStandaloneChart() {
 
 export function useUpdateChart() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -104,7 +105,7 @@ export function useUpdateChart() {
 
 export function useDeleteChart() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -112,7 +113,6 @@ export function useDeleteChart() {
       api.delete(`/api/charts/${chartId}`, token),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["charts"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
       toast.success("Chart deleted");
     },
   });
@@ -120,7 +120,7 @@ export function useDeleteChart() {
 
 export function useExecuteChart() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useMutation({
     mutationFn: ({ chartId, filters, force }: { chartId: number; filters?: Record<string, unknown>; force?: boolean }) =>
@@ -144,7 +144,7 @@ export function chartResultKey(chartId: number, filters?: Record<string, unknown
 
 export function usePreviewChart() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useMutation({
     mutationFn: (data: ChartPreviewRequest) =>
@@ -154,7 +154,7 @@ export function usePreviewChart() {
 
 export function useDuplicateChart() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -162,7 +162,6 @@ export function useDuplicateChart() {
       api.post<Chart>(`/api/charts/${chartId}/duplicate`, {}, token),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["charts"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
       toast.success("Chart duplicated");
     },
   });
@@ -170,7 +169,7 @@ export function useDuplicateChart() {
 
 export function useImportChart(dashboardId: number) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -178,7 +177,7 @@ export function useImportChart(dashboardId: number) {
       api.post<Chart>(`/api/dashboards/${dashboardId}/import-chart/${chartId}`, {}, token),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["charts", dashboardId] });
-      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
+      queryClient.invalidateQueries({ queryKey: ["charts", "all"] });
       toast.success("Chart added");
     },
   });
@@ -186,7 +185,7 @@ export function useImportChart(dashboardId: number) {
 
 export function useSaveLayout(dashboardId: number) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -201,7 +200,7 @@ export function useSaveLayout(dashboardId: number) {
 
 export function useChartInsights(chartId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["chart-insights", chartId],

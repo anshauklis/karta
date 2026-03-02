@@ -85,7 +85,7 @@ def upsert_draft(chart_id: str, req: ChartDraftUpsert, current_user: dict = Depe
             draft_id = existing[0]
         else:
             result = conn.execute(
-                text(f"""
+                text("""
                     INSERT INTO chart_drafts (user_id, chart_id, dashboard_id, connection_id,
                         dataset_id, title, description, mode, chart_type,
                         chart_config, chart_code, sql_query, variables)

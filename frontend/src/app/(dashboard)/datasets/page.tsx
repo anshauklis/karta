@@ -258,8 +258,8 @@ function DatasetEditorDialog({
     try {
       const result = await previewDataset.mutateAsync(dataset.id);
       setPreviewResult(result);
-    } catch (err: any) {
-      setPreviewError(err?.message || "Preview failed");
+    } catch (err: unknown) {
+      setPreviewError(err instanceof Error ? err.message : "Preview failed");
     } finally {
       setIsPreviewing(false);
     }

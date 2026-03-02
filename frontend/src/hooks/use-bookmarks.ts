@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { Bookmark, BookmarkCreate } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useBookmarks(dashboardId: number | null) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["bookmarks", dashboardId],
@@ -19,7 +21,7 @@ export function useBookmarks(dashboardId: number | null) {
 
 export function useCreateBookmark(dashboardId: number) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -35,7 +37,7 @@ export function useCreateBookmark(dashboardId: number) {
 
 export function useDeleteBookmark(dashboardId: number) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({

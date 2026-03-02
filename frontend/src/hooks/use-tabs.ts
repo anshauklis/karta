@@ -3,9 +3,11 @@ import { useSession } from "next-auth/react";
 import { api } from "@/lib/api";
 import type { DashboardTab, TabCreate } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useDashboardTabs(dashboardId: number) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useQuery({
     queryKey: ["dashboard-tabs", dashboardId],
     queryFn: () => api.get<DashboardTab[]>(`/api/dashboards/${dashboardId}/tabs`, token),
@@ -15,7 +17,7 @@ export function useDashboardTabs(dashboardId: number) {
 
 export function useCreateTab(dashboardId: number) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: TabCreate) =>
@@ -28,7 +30,7 @@ export function useCreateTab(dashboardId: number) {
 
 export function useUpdateTab(dashboardId: number) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ tabId, data }: { tabId: number; data: Partial<TabCreate> }) =>
@@ -41,7 +43,7 @@ export function useUpdateTab(dashboardId: number) {
 
 export function useDeleteTab(dashboardId: number) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (tabId: number) =>
@@ -55,7 +57,7 @@ export function useDeleteTab(dashboardId: number) {
 
 export function useReorderTabs(dashboardId: number) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (tabIds: number[]) =>
@@ -68,7 +70,7 @@ export function useReorderTabs(dashboardId: number) {
 
 export function useMoveChartToTab() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ chartId, tabId }: { chartId: number; tabId: number }) =>

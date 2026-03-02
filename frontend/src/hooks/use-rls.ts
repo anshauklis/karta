@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { RLSRule, RLSRuleCreate } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useRLSRules() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["rls-rules"],
@@ -19,7 +21,7 @@ export function useRLSRules() {
 
 export function useCreateRLSRule() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -34,7 +36,7 @@ export function useCreateRLSRule() {
 
 export function useDeleteRLSRule() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({

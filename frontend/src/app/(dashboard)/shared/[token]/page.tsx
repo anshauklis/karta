@@ -7,15 +7,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart3 } from "lucide-react";
 import { ChartCard } from "@/components/charts/chart-card";
 import { MobileDashboard } from "@/components/dashboard/mobile-dashboard";
+import type { Chart, ChartExecuteResult } from "@/types";
 import { useContainerWidth } from "@/hooks/use-container-width";
 import { useIsMobile } from "@/hooks/use-mobile";
 import dynamic from "next/dynamic";
 import "react-grid-layout/css/styles.css";
 
 const ReactGridLayout = dynamic(
-  () => import("react-grid-layout/legacy").then((mod) => mod.default || mod) as any,
+  () => import("react-grid-layout/legacy").then((mod) => mod.default || mod) as unknown as Promise<React.ComponentType<Record<string, unknown>>>,
   { ssr: false }
-) as any;
+) as React.ComponentType<Record<string, unknown>>;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -37,11 +38,12 @@ export default function SharedDashboardPage({ params }: { params: Promise<{ toke
     },
   });
 
-  const charts = data?.charts || [];
+  type SharedChart = Chart & { result?: ChartExecuteResult };
+  const charts: SharedChart[] = useMemo(() => data?.charts || [], [data?.charts]);
 
   const layout = useMemo(
     () =>
-      charts.map((chart: any) => ({
+      charts.map((chart) => ({
         i: String(chart.id),
         x: chart.grid_x ?? 0,
         y: chart.grid_y ?? 0,
@@ -92,7 +94,7 @@ export default function SharedDashboardPage({ params }: { params: Promise<{ toke
             charts={charts}
             allCharts={charts}
             results={Object.fromEntries(
-              charts.map((c: any) => [c.id, c.result]).filter(([, r]: any) => r)
+              charts.map((c) => [c.id, c.result]).filter(([, r]) => r)
             )}
             executing={new Set()}
             showActions={false}
@@ -110,7 +112,7 @@ export default function SharedDashboardPage({ params }: { params: Promise<{ toke
               compactType="vertical"
               margin={[16, 0]}
             >
-              {charts.map((chart: any) => (
+              {charts.map((chart) => (
                 <div key={String(chart.id)}>
                   <ChartCard
                     chart={chart}

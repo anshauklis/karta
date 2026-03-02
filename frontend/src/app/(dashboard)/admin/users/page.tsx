@@ -138,8 +138,8 @@ function CreateUserForm({ onClose }: { onClose: () => void }) {
         roles: newUserRoles,
       });
       onClose();
-    } catch (err: any) {
-      setError(err?.message || t("failedToCreate"));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t("failedToCreate"));
     }
   };
 
@@ -288,8 +288,8 @@ function EditUserForm({
         await updateUserRoles.mutateAsync({ userId: user.id, roles: editRoles });
       }
       onClose();
-    } catch (err: any) {
-      setError(err?.message || t("failedToUpdate"));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t("failedToUpdate"));
     }
   };
 
@@ -533,7 +533,7 @@ function UserRow({
 export default function AdminUsersPage() {
   const t = useTranslations("admin");
   const { data: session } = useSession();
-  const currentEmail = (session as any)?.user?.email;
+  const currentEmail = (session as { user?: { email?: string } } | null)?.user?.email;
 
   const { data: users, isLoading } = useUsers();
   const [showCreate, setShowCreate] = useState(false);

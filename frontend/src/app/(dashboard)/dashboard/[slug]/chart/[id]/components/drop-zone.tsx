@@ -135,7 +135,7 @@ export function DropZone({
   onRemove,
   color,
   placeholder = "Drop column here",
-  maxItems,
+  maxItems: _maxItems,
   getLabel,
   renderExtra,
   renderExpanded,

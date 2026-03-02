@@ -7,7 +7,7 @@ import { useDashboardFilters, useFilterValues, useUpdateFilter } from "@/hooks/u
 import { useUpdateDashboard } from "@/hooks/use-dashboards";
 import { useBookmarks, useCreateBookmark, useDeleteBookmark } from "@/hooks/use-bookmarks";
 import { useContainerWidth } from "@/hooks/use-container-width";
-import type { Dashboard, DashboardFilter } from "@/types";
+import type { Dashboard, DashboardFilter, FilterConfigHints } from "@/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
@@ -42,11 +42,10 @@ interface RGLLayoutItem {
   minH?: number;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactGridLayout = dynamic(
-  () => import("react-grid-layout/legacy").then((mod) => mod.default || mod) as any,
+  () => import("react-grid-layout/legacy").then((mod) => mod.default || mod) as unknown as Promise<React.ComponentType<Record<string, unknown>>>,
   { ssr: false }
-) as any;
+) as React.ComponentType<Record<string, unknown>>;
 
 // ============================================================
 // Auto-layout generation for filters
@@ -122,13 +121,13 @@ function FilterSelect({
   disabled?: boolean;
 }) {
   const tc = useTranslations("common");
-  const dependsOnId = (filter.config as any)?.depends_on_filter_id;
+  const dependsOnId = (filter.config as FilterConfigHints)?.depends_on_filter_id;
   const parentValue = dependsOnId ? (activeFilters[dependsOnId] as string) || null : null;
   const { data: valuesData, isLoading } = useFilterValues(filter.id, parentValue);
   const values = valuesData?.values || [];
 
   useEffect(() => {
-    if (values.length > 0 && !value && (filter.config as any)?.select_first_by_default) {
+    if (values.length > 0 && !value && (filter.config as FilterConfigHints)?.select_first_by_default) {
       onChange(values[0]);
     }
   }, [values]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -205,7 +204,7 @@ function FilterMultiSelect({
 }) {
   const tc = useTranslations("common");
   const td = useTranslations("dashboard");
-  const dependsOnId = (filter.config as any)?.depends_on_filter_id;
+  const dependsOnId = (filter.config as FilterConfigHints)?.depends_on_filter_id;
   const parentValue = dependsOnId ? (activeFilters[dependsOnId] as string) || null : null;
   const { data: valuesData, isLoading } = useFilterValues(filter.id, parentValue);
   const values = valuesData?.values || [];
@@ -368,7 +367,7 @@ function FilterTextSearch({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setLocal((value as string) || "");
+    queueMicrotask(() => setLocal((value as string) || ""));
   }, [value]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -491,15 +490,15 @@ function FilterCard({
         )}
         <Label className="text-xs text-slate-500 flex items-center gap-1 truncate">
           {filter.label}
-          {(filter.config as any)?.is_required && (
+          {(filter.config as FilterConfigHints)?.is_required && (
             <span className="text-red-500">*</span>
           )}
-          {(filter.config as any)?.description && (
+          {(filter.config as FilterConfigHints)?.description && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Info className="h-3 w-3 text-muted-foreground" />
               </TooltipTrigger>
-              <TooltipContent>{(filter.config as any).description}</TooltipContent>
+              <TooltipContent>{(filter.config as FilterConfigHints).description}</TooltipContent>
             </Tooltip>
           )}
         </Label>
@@ -741,7 +740,10 @@ export function FilterGrid({
     return new Set(saved);
   });
 
-  const groupMeta = (dashboard.filter_layout?.groups as Record<string, { collapsible?: boolean }>) || {};
+  const groupMeta = useMemo(
+    () => (dashboard.filter_layout?.groups as Record<string, { collapsible?: boolean }>) || {},
+    [dashboard.filter_layout?.groups]
+  );
 
   // Compute grouped and standalone filters
   const { standaloneFilters, groupedFilters } = useMemo(() => {
@@ -789,7 +791,7 @@ export function FilterGrid({
 
   // Sync draft from active filters when they change externally
   useEffect(() => {
-    setDraftFilters({ ...activeFilters });
+    queueMicrotask(() => setDraftFilters({ ...activeFilters }));
   }, [activeFilters]);
 
   const updateDraft = useCallback((column: string, value: unknown) => {
@@ -814,8 +816,14 @@ export function FilterGrid({
   };
 
   const hasActiveFilters = Object.keys(activeFilters).length > 0;
-  const hasDraftChanges =
-    JSON.stringify(draftFilters) !== JSON.stringify(activeFilters);
+  const hasDraftChanges = useMemo(() => {
+    const draftKeys = Object.keys(draftFilters);
+    const activeKeys = Object.keys(activeFilters);
+    if (draftKeys.length !== activeKeys.length) return true;
+    return draftKeys.some(
+      (k) => draftFilters[k] !== activeFilters[k]
+    );
+  }, [draftFilters, activeFilters]);
 
   // Build layout from dashboard.filter_layout.items or auto-generate
   const layout = useMemo(() => {
@@ -1012,6 +1020,14 @@ export function FilterGrid({
     [isEditing, unfreezeWidth, saveLayout]
   );
 
+  const handleMergeCancel = useCallback(() => {
+    // Revert to previous layout
+    if (prevLayoutRef.current.length > 0) {
+      saveLayout(prevLayoutRef.current);
+    }
+    setMergeCandidate(null);
+  }, [saveLayout]);
+
   // Merge handler — "stack" or "group" mode
   const handleMerge = useCallback(async (type: "stack" | "group") => {
     if (!mergeCandidate || !filters) return;
@@ -1048,15 +1064,7 @@ export function FilterGrid({
     });
 
     setMergeCandidate(null);
-  }, [mergeCandidate, filters, groupMeta, dashboard, updateFilter, updateDashboard]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleMergeCancel = useCallback(() => {
-    // Revert to previous layout
-    if (prevLayoutRef.current.length > 0) {
-      saveLayout(prevLayoutRef.current);
-    }
-    setMergeCandidate(null);
-  }, [saveLayout]);
+  }, [mergeCandidate, filters, groupMeta, dashboard, updateFilter, updateDashboard, handleMergeCancel]);
 
   // Ungroup/unstack — clear group_name for all filters in a group
   const handleUngroup = useCallback(async (groupName: string) => {
@@ -1094,7 +1102,7 @@ export function FilterGrid({
   }
 
   const hasRequiredEmpty = filters.some((f) => {
-    return (f.config as any)?.is_required && !draftFilters[f.id];
+    return (f.config as FilterConfigHints)?.is_required && !draftFilters[f.id];
   });
 
   // Build active filter chips for the indicator bar (not a hook — after early returns)

@@ -5,9 +5,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 import type { ChartDraft, ChartDraftUpsert } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useChartDraft(chartId: string | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const key = chartId ?? "new";
 
   return useQuery({
@@ -27,7 +29,7 @@ export function useChartDraft(chartId: string | undefined) {
 
 export function useUpsertChartDraft() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const qc = useQueryClient();
 
   return useMutation({
@@ -41,7 +43,7 @@ export function useUpsertChartDraft() {
 
 export function useDeleteChartDraft() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const qc = useQueryClient();
 
   return useMutation({

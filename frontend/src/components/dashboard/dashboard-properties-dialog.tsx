@@ -86,14 +86,16 @@ export function DashboardPropertiesDialog({
   // Reset form when dashboard changes or dialog opens
   useEffect(() => {
     if (open) {
-      setTitle(dashboard.title);
-      setIcon(dashboard.icon);
-      setUrlSlug(dashboard.url_slug);
-      setDescription(dashboard.description);
-      setColorScheme(dashboard.color_scheme || "");
-      setOwnerIds(dashboard.owners?.map((o) => String(o.id)) || []);
-      setRoles(dashboard.roles || []);
-      setSlugError("");
+      queueMicrotask(() => {
+        setTitle(dashboard.title);
+        setIcon(dashboard.icon);
+        setUrlSlug(dashboard.url_slug);
+        setDescription(dashboard.description);
+        setColorScheme(dashboard.color_scheme || "");
+        setOwnerIds(dashboard.owners?.map((o) => String(o.id)) || []);
+        setRoles(dashboard.roles || []);
+        setSlugError("");
+      });
     }
   }, [open, dashboard]);
 
@@ -154,8 +156,8 @@ export function DashboardPropertiesDialog({
       if (data.url_slug) {
         router.replace(`/dashboard/${data.url_slug}`);
       }
-    } catch (err: any) {
-      if (err?.message?.includes("slug")) {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message?.includes("slug")) {
         setSlugError(t("slugTaken"));
       }
     }

@@ -3,7 +3,7 @@
 import { useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { locales, type Locale } from "@/i18n/config";
+import { type Locale } from "@/i18n/config";
 
 export function LocaleSwitcher({ collapsed }: { collapsed?: boolean }) {
   const locale = useLocale() as Locale;

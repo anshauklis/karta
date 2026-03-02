@@ -4,6 +4,8 @@ import { useSession } from "next-auth/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export interface ChartTemplate {
   id: string;
   name: string;
@@ -32,7 +34,7 @@ function toClientTemplate(s: ServerTemplate): ChartTemplate {
 
 export function useTemplates() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const qc = useQueryClient();
 
   const { data: raw = [] } = useQuery({

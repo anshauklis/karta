@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { parseCodeToVisual } from "@/lib/parse-code";
 import type { ChartExecuteResult } from "@/types";
-import type { MutableRefObject } from "react";
+import { useState, useRef, useCallback, type MutableRefObject } from "react";
 
 import dynamic from "next/dynamic";
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -32,7 +32,7 @@ export function CodeTab({
   setChartCode,
   codeSubTab,
   setCodeSubTab,
-  codeUpdatedVisual,
+  codeUpdatedVisual: _codeUpdatedVisual,
   setCodeUpdatedVisual,
   codeEditingRef,
   codeEditTimerRef,
@@ -43,6 +43,25 @@ export function CodeTab({
   setChartConfig,
 }: CodeTabProps) {
   const t = useTranslations("chart");
+  const parseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isCodeEditing, setIsCodeEditing] = useState(false);
+
+  const debouncedParse = useCallback((code: string) => {
+    if (parseTimerRef.current) clearTimeout(parseTimerRef.current);
+    parseTimerRef.current = setTimeout(() => {
+      const parsed = parseCodeToVisual(code);
+      if (parsed) {
+        const { _chartType, ...configPatch } = parsed;
+        if (_chartType && typeof _chartType === "string") {
+          setChartType(_chartType);
+        }
+        if (Object.keys(configPatch).length > 0) {
+          setChartConfig((prev: Record<string, unknown>) => ({ ...prev, ...configPatch }));
+          setCodeUpdatedVisual(true);
+        }
+      }
+    }, 300);
+  }, [setChartType, setChartConfig, setCodeUpdatedVisual]);
 
   return (
     <Tabs value={codeSubTab} onValueChange={(v) => setCodeSubTab(v as typeof codeSubTab)} className="flex flex-col flex-1 min-h-0 gap-0">
@@ -57,7 +76,7 @@ export function CodeTab({
           </TabsTrigger>
         </TabsList>
         <div className="ml-auto flex items-center gap-2">
-          {codeEditingRef.current ? (
+          {isCodeEditing ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 text-[10px] text-yellow-600 dark:text-yellow-400">
               <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
               Syncing...
@@ -81,21 +100,13 @@ export function CodeTab({
             onChange={(v) => {
               const newCode = v || "";
               codeEditingRef.current = true;
+              setIsCodeEditing(true);
               setChartCode(newCode);
-              const parsed = parseCodeToVisual(newCode);
-              if (parsed) {
-                const { _chartType, ...configPatch } = parsed;
-                if (_chartType && typeof _chartType === "string") {
-                  setChartType(_chartType);
-                }
-                if (Object.keys(configPatch).length > 0) {
-                  setChartConfig((prev: Record<string, unknown>) => ({ ...prev, ...configPatch }));
-                  setCodeUpdatedVisual(true);
-                }
-              }
+              debouncedParse(newCode);
               if (codeEditTimerRef.current) clearTimeout(codeEditTimerRef.current);
               codeEditTimerRef.current = setTimeout(() => {
                 codeEditingRef.current = false;
+                setIsCodeEditing(false);
               }, 2000);
             }}
             options={{

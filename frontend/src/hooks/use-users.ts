@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { User, UserCreate, UserUpdate, DashboardOwner } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useUsersBasic() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["users-basic"],
@@ -19,7 +21,7 @@ export function useUsersBasic() {
 
 export function useUsers() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["users"],
@@ -30,7 +32,7 @@ export function useUsers() {
 
 export function useCreateUser() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -45,7 +47,7 @@ export function useCreateUser() {
 
 export function useUpdateUser() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -60,7 +62,7 @@ export function useUpdateUser() {
 
 export function useDeleteUser() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -75,7 +77,7 @@ export function useDeleteUser() {
 
 export function useUpdateUserRoles() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({

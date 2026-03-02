@@ -4,12 +4,12 @@ import re
 import uuid
 
 import duckdb
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy import text
 
 from api.database import engine, SHARED_DUCKDB_PATH
-from api.auth.dependencies import get_current_user, require_role
+from api.auth.dependencies import require_role
 from api.crypto import encrypt_password_safe
 
 router = APIRouter(prefix="/api/csv", tags=["file-upload"])

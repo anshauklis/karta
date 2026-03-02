@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { ScheduledReport } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 interface ReportCreate {
   name: string;
   chart_id: number;
@@ -26,7 +28,7 @@ interface ReportUpdate {
 
 export function useReports() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["reports"],
@@ -37,7 +39,7 @@ export function useReports() {
 
 export function useCreateReport() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -52,7 +54,7 @@ export function useCreateReport() {
 
 export function useUpdateReport() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -67,7 +69,7 @@ export function useUpdateReport() {
 
 export function useDeleteReport() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -81,7 +83,7 @@ export function useDeleteReport() {
 
 export function useSendReport() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useMutation({
     mutationFn: (id: number) =>

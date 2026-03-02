@@ -1,5 +1,5 @@
-import json
-from fastapi import APIRouter, HTTPException, Depends
+import api.json_util as json
+from fastapi import APIRouter, Depends
 from sqlalchemy import text
 
 from api.database import engine

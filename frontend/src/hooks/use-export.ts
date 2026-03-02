@@ -4,9 +4,11 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 import type { SharedLink } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useShareLinks(dashboardId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useQuery({
     queryKey: ["share-links", dashboardId],
     queryFn: () => api.get<SharedLink[]>(`/api/dashboards/${dashboardId}/shares`, token),
@@ -16,7 +18,7 @@ export function useShareLinks(dashboardId: number | undefined) {
 
 export function useCreateShareLink(dashboardId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { expires_in_hours?: number }) =>
@@ -31,7 +33,7 @@ export function useCreateShareLink(dashboardId: number | undefined) {
 
 export function useRevokeShareLink(dashboardId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (linkId: number) => api.delete(`/api/shares/${linkId}`, token),
@@ -45,7 +47,7 @@ export function useRevokeShareLink(dashboardId: number | undefined) {
 
 export function useChartShareLinks(chartId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useQuery({
     queryKey: ["chart-share-links", chartId],
     queryFn: () => api.get<SharedLink[]>(`/api/charts/${chartId}/shares`, token),
@@ -55,7 +57,7 @@ export function useChartShareLinks(chartId: number | undefined) {
 
 export function useCreateChartShareLink(chartId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { expires_in_hours?: number }) =>
@@ -98,7 +100,7 @@ export interface ImportPreviewResponse {
 
 export function useImportPreview() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useMutation({
     mutationFn: (data: Record<string, unknown>) =>
@@ -108,7 +110,7 @@ export function useImportPreview() {
 
 export function useImportConfirm() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({

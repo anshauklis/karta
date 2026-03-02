@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react";
 import { api } from "@/lib/api";
 import { useState, useCallback } from "react";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 // --- Types ---
 
 export interface AISession {
@@ -50,7 +52,7 @@ export interface AIStreamEvent {
 
 export function useAISessions() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useQuery({
     queryKey: ["ai-sessions"],
     queryFn: () => api.get<AISession[]>("/api/ai/sessions", token),
@@ -60,7 +62,7 @@ export function useAISessions() {
 
 export function useAISessionMessages(sessionId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useQuery({
     queryKey: ["ai-session", sessionId],
     queryFn: () => api.get<AIMessage[]>(`/api/ai/sessions/${sessionId}`, token),
@@ -70,7 +72,7 @@ export function useAISessionMessages(sessionId: number | undefined) {
 
 export function useDeleteAISession() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (sessionId: number) => api.delete(`/api/ai/sessions/${sessionId}`, token),
@@ -84,7 +86,7 @@ export function useDeleteAISession() {
 
 export function useAIChat() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   const [messages, setMessages] = useState<AIMessage[]>([]);
@@ -215,7 +217,7 @@ export function useAIChat() {
 
 export function useGenerateSQL() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useMutation({
     mutationFn: (data: { connection_id: number; prompt: string; current_sql?: string }) =>
       api.post<{ text: string; sql: string | null }>("/api/ai/generate-sql", data, token),
@@ -224,7 +226,7 @@ export function useGenerateSQL() {
 
 export function useFixSQL() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useMutation({
     mutationFn: (data: { connection_id: number; sql: string; error: string }) =>
       api.post<{ text: string; sql: string | null }>("/api/ai/fix-sql", data, token),
@@ -233,7 +235,7 @@ export function useFixSQL() {
 
 export function useSummarizeChart() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useMutation({
     mutationFn: (data: {
       chart_type?: string;
@@ -266,7 +268,7 @@ export interface SuggestChartConfigResult {
 
 export function useSuggestChartConfig() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useMutation({
     mutationFn: (params: SuggestChartConfigParams) =>
       api.post<SuggestChartConfigResult>("/api/ai/suggest-chart-config", params, token),
@@ -277,7 +279,7 @@ export function useSuggestChartConfig() {
 
 export function useParseDashboardFilters() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useMutation({
     mutationFn: (params: {
       prompt: string;
@@ -295,7 +297,7 @@ export function useParseDashboardFilters() {
 
 export function useAIGlossary() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useQuery({
     queryKey: ["ai-glossary"],
     queryFn: () => api.get<AIGlossaryTerm[]>("/api/ai/glossary", token),
@@ -305,7 +307,7 @@ export function useAIGlossary() {
 
 export function useCreateGlossaryTerm() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: { term: string; definition: string; sql_hint?: string }) =>
@@ -316,7 +318,7 @@ export function useCreateGlossaryTerm() {
 
 export function useUpdateGlossaryTerm() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...data }: { id: number; term?: string; definition?: string; sql_hint?: string }) =>
@@ -327,7 +329,7 @@ export function useUpdateGlossaryTerm() {
 
 export function useDeleteGlossaryTerm() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api.delete(`/api/ai/glossary/${id}`, token),

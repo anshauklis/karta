@@ -50,11 +50,10 @@ const FILTER_CONCURRENCY = 4;
 
 // Dynamic import for react-grid-layout (needs window)
 import dynamic from "next/dynamic";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactGridLayout = dynamic(
-  () => import("react-grid-layout/legacy").then((mod) => mod.default || mod) as any,
+  () => import("react-grid-layout/legacy").then((mod) => mod.default || mod) as unknown as Promise<React.ComponentType<Record<string, unknown>>>,
   { ssr: false }
-) as any;
+) as React.ComponentType<Record<string, unknown>>;
 
 // Import react-grid-layout CSS
 import "react-grid-layout/css/styles.css";
@@ -63,7 +62,7 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
   const { slug } = use(params);
   const router = useRouter();
   const { data: dashboard, isLoading: dashLoading } = useDashboardBySlug(slug);
-  const { data: charts, isLoading: chartsLoading } = useDashboardCharts(dashboard?.id);
+  const { data: charts } = useDashboardCharts(dashboard?.id);
   const { data: session } = useSession();
   const { canEdit } = useRoles();
   const isMobile = useIsMobile();
@@ -93,7 +92,6 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
   const [editingTextChartId, setEditingTextChartId] = useState<number | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const t = useTranslations("dashboard");
-  const td = useTranslations("dashboard");
   const tc = useTranslations("common");
   const tn = useTranslations("nav");
   const { data: tabs } = useDashboardTabs(dashboard?.id ?? 0);
@@ -109,15 +107,15 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
     } else if (!activeTab || !tabs.some((t) => String(t.id) === activeTab)) {
       setActiveTab(String(tabs[0].id));
     }
-  }, [tabs, activeTabParam]);
+  }, [tabs, activeTabParam, activeTab]);
 
   const containedChartIds = useMemo(() => {
     if (!charts) return new Set<number>();
     const ids = new Set<number>();
     charts.forEach((chart) => {
       if (chart.chart_type === "tabs" && chart.chart_config?.tabs) {
-        (chart.chart_config.tabs as any[]).forEach((tab: any) => {
-          (tab.charts as any[])?.forEach((c: any) => ids.add(c.chart_id));
+        (chart.chart_config.tabs as Array<{ charts?: Array<{ chart_id: number }> }>).forEach((tab) => {
+          tab.charts?.forEach((c) => ids.add(c.chart_id));
         });
       }
     });
@@ -225,11 +223,11 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
       startTransition(() => {
         setResults((prev) => ({ ...prev, [chartId]: result }));
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       startTransition(() => {
         setResults((prev) => ({
           ...prev,
-          [chartId]: { figure: null, columns: [], rows: [], row_count: 0, error: e.message },
+          [chartId]: { figure: null, columns: [], rows: [], row_count: 0, error: e instanceof Error ? e.message : String(e) },
         }));
       });
     } finally {
@@ -412,7 +410,7 @@ export default function DashboardViewPage({ params }: { params: Promise<{ slug: 
                 onClick={async () => {
                   try {
                     const response = await fetch(`/api/dashboards/${dashboard.id}/export`, {
-                      headers: { Authorization: `Bearer ${(session as any)?.accessToken}` },
+                      headers: { Authorization: `Bearer ${(session as { accessToken?: string } | null)?.accessToken}` },
                     });
                     const blob = await response.blob();
                     const url = URL.createObjectURL(blob);

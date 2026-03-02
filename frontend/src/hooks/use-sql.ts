@@ -5,9 +5,11 @@ import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { SQLResult } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useExecuteSQL() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useMutation({
     mutationFn: (data: { connection_id: number; sql: string; limit?: number }) =>

@@ -4,9 +4,11 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 import type { Story, StoryDetail, StoryCreate, StorySlide, StorySlideCreate } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useStories() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useQuery({
     queryKey: ["stories"],
     queryFn: () => api.get<Story[]>("/api/stories", token),
@@ -16,7 +18,7 @@ export function useStories() {
 
 export function useStory(id: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useQuery({
     queryKey: ["stories", id],
     queryFn: () => api.get<StoryDetail>(`/api/stories/${id}`, token),
@@ -26,7 +28,7 @@ export function useStory(id: number | undefined) {
 
 export function useCreateStory() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: StoryCreate) => api.post<Story>("/api/stories", body, token),
@@ -40,7 +42,7 @@ export function useCreateStory() {
 
 export function useUpdateStory(id: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: Partial<StoryCreate>) => api.put<Story>(`/api/stories/${id}`, body, token),
@@ -55,7 +57,7 @@ export function useUpdateStory(id: number | undefined) {
 
 export function useDeleteStory() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api.delete(`/api/stories/${id}`, token),
@@ -69,7 +71,7 @@ export function useDeleteStory() {
 
 export function useCreateSlide(storyId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: StorySlideCreate) =>
@@ -83,7 +85,7 @@ export function useCreateSlide(storyId: number | undefined) {
 
 export function useUpdateSlide(storyId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ slideId, data }: { slideId: number; data: Partial<StorySlideCreate & { slide_order: number }> }) =>
@@ -97,7 +99,7 @@ export function useUpdateSlide(storyId: number | undefined) {
 
 export function useReorderSlides(storyId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (items: { id: number; sort_order: number }[]) =>
@@ -111,7 +113,7 @@ export function useReorderSlides(storyId: number | undefined) {
 
 export function useDeleteSlide(storyId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (slideId: number) => api.delete(`/api/stories/slides/${slideId}`, token),

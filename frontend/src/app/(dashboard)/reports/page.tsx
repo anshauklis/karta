@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   FileText, Plus, Trash2, Send, Pencil,
-  Bell as ChannelIcon, Settings, Loader2,
+  Settings, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,12 +22,12 @@ import {
   useReports, useCreateReport, useUpdateReport, useDeleteReport, useSendReport,
 } from "@/hooks/use-reports";
 import {
-  useChannels, useCreateChannel, useUpdateChannel, useDeleteChannel, useTestChannel,
+  useChannels, useCreateChannel, useDeleteChannel, useTestChannel,
 } from "@/hooks/use-channels";
 import { useDashboards } from "@/hooks/use-dashboards";
 import { useDashboardCharts } from "@/hooks/use-charts";
 import { describeCron } from "@/lib/cron-describe";
-import type { ScheduledReport, NotificationChannel } from "@/types";
+import type { ScheduledReport } from "@/types";
 import { useRoles } from "@/hooks/use-roles";
 
 function getCronPresets(t: (key: string) => string) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -254,7 +254,7 @@ export function DataTable({
   className,
   formatCell,
 }: DataTableProps) {
-  const displayAlias = (name: string) => columnAliases?.[name] || name;
+  const displayAlias = useCallback((name: string) => columnAliases?.[name] || name, [columnAliases]);
   const [sorting, setSorting] = useState<SortingState>([]);
 
   // Safeguard: limit columns to prevent browser freeze on wide pivots
@@ -323,7 +323,7 @@ export function DataTable({
           return String(va).localeCompare(String(vb));
         },
       })),
-    [displayColumns],
+    [displayColumns, displayAlias],
   );
 
   const table = useReactTable({
@@ -379,7 +379,7 @@ export function DataTable({
   }, [renderedRows, pivotRowIndexCount]);
 
   // Cell formatting helper
-  const renderCellValue = (value: unknown, colIdx: number): string => {
+  const renderCellValue = useCallback((value: unknown, colIdx: number): string => {
     const colName = displayColumns[colIdx];
     // Pivot value formatting takes priority for non-index columns
     if ((pivotValueFormats || pivotPctMode) && colIdx >= pivotRowIndexCount) {
@@ -388,10 +388,10 @@ export function DataTable({
     }
     if (formatCell) return formatCell(value, colName);
     return formatCellValue(value, columnFormats?.[colName]);
-  };
+  }, [displayColumns, pivotValueFormats, pivotPctMode, pivotRowIndexCount, formatCell, columnFormats]);
 
   // Pivot conditional formatting style helper
-  const getPivotCondCellStyle = (colName: string, cellValue: unknown): React.CSSProperties | undefined => {
+  const getPivotCondCellStyle = useCallback((colName: string, cellValue: unknown): React.CSSProperties | undefined => {
     if (!pivotCondFormat || !pivotCondFormat.length) return undefined;
     const numValue = typeof cellValue === "number" ? cellValue : parseFloat(String(cellValue));
     if (isNaN(numValue)) return undefined;
@@ -411,7 +411,7 @@ export function DataTable({
     }
 
     return bg ? { backgroundColor: bg } : undefined;
-  };
+  }, [pivotCondFormat, pivotCondFormatMeta]);
 
   return (
     <div className={className}>

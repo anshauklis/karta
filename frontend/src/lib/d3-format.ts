@@ -106,7 +106,7 @@ function parseCustomFormat(value: number, fmt: string): string {
 
   // Detect percentage (multiply by 100)
   const isPct = fmt.includes("%");
-  let v = isPct ? value * 100 : value;
+  const v = isPct ? value * 100 : value;
 
   // Detect currency prefix
   let prefix = "";

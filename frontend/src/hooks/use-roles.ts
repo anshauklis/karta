@@ -2,9 +2,11 @@
 
 import { useSession } from "next-auth/react";
 
+type SessionWithRoles = { user?: { roles?: string[] } } | null;
+
 export function useRoles() {
   const { data: session } = useSession();
-  const roles: string[] = (session as any)?.user?.roles || [];
+  const roles: string[] = (session as SessionWithRoles)?.user?.roles || [];
 
   return {
     roles,

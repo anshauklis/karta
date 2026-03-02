@@ -24,6 +24,16 @@ def start_scheduler():
         return
     scheduler.start()
     logger.info("Scheduler started")
+
+    # Schedule Parquet cache cleanup every hour
+    from apscheduler.triggers.interval import IntervalTrigger
+    scheduler.add_job(
+        _cleanup_parquet_cache,
+        trigger=IntervalTrigger(hours=1),
+        id="parquet_cache_cleanup",
+        replace_existing=True,
+    )
+
     asyncio.get_event_loop().create_task(_load_jobs())
 
 
@@ -120,3 +130,12 @@ async def _run_alert(alert_id: int):
         await execute_alert(alert_id)
     except Exception as e:
         logger.error(f"Alert {alert_id} failed: {e}")
+
+
+async def _cleanup_parquet_cache():
+    """Clean up expired Parquet cache files."""
+    from api.parquet_cache import cleanup_expired
+    try:
+        await asyncio.to_thread(cleanup_expired)
+    except Exception as e:
+        logger.error(f"Parquet cache cleanup failed: {e}")

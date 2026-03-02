@@ -7,6 +7,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import type { LucideIcon } from "lucide-react";
 import {
   BarChart3, BarChart, LineChart, AreaChart, PieChart,
   ScatterChart as ScatterIcon, Table2, Circle, ArrowUpDown,
@@ -53,7 +54,7 @@ const CHART_TYPES = [
   { value: "correlation", icon: Grid3X3,    categories: ["statistical"] },
   { value: "pareto",  icon: ArrowUpDown,    categories: ["statistical"] },
   { value: "control", icon: LineChart,      categories: ["statistical"] },
-] satisfies { value: string; icon: any; categories: string[]; rotate?: boolean }[];
+] satisfies { value: string; icon: LucideIcon; categories: string[]; rotate?: boolean }[];
 
 interface ChartTypeGalleryProps {
   open: boolean;

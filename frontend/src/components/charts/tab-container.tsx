@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ChartCard } from "./chart-card";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,7 @@ interface TabContainerProps {
   onDuplicate?: (chartId: number) => void;
 }
 
-export function TabContainer({
+export const TabContainer = memo(function TabContainer({
   chart,
   allCharts,
   results,
@@ -290,4 +290,4 @@ export function TabContainer({
       </Tabs>
     </div>
   );
-}
+});

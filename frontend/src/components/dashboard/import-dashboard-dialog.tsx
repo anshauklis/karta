@@ -49,7 +49,6 @@ export function ImportDashboardDialog({ open, onOpenChange }: Props) {
   const [fileData, setFileData] = useState<Record<string, unknown> | null>(
     null,
   );
-  const [fileName, setFileName] = useState<string>("");
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [connectionMapping, setConnectionMapping] = useState<
     Record<string, number>
@@ -62,7 +61,6 @@ export function ImportDashboardDialog({ open, onOpenChange }: Props) {
 
   const reset = useCallback(() => {
     setFileData(null);
-    setFileName("");
     setPreview(null);
     setConnectionMapping({});
     setDragOver(false);
@@ -80,7 +78,6 @@ export function ImportDashboardDialog({ open, onOpenChange }: Props) {
       const text = await file.text();
       const data = JSON.parse(text) as Record<string, unknown>;
       setFileData(data);
-      setFileName(file.name);
 
       const result = await importPreview.mutateAsync(data);
       setPreview(result);
@@ -96,7 +93,6 @@ export function ImportDashboardDialog({ open, onOpenChange }: Props) {
     } catch {
       toast.error(t("importInvalidFile"));
       setFileData(null);
-      setFileName("");
       setPreview(null);
     }
   };

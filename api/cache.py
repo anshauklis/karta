@@ -1,7 +1,8 @@
 """Optional Redis query cache. Silently skips if Redis is unavailable."""
 
 import os
-import json
+import time
+import api.json_util as json
 import hashlib
 import logging
 
@@ -11,23 +12,26 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 CACHE_TTL = int(os.environ.get("CACHE_TTL", "300"))  # 5 minutes default
 
 _redis = None
-_disabled = False
+_last_failure: float = 0
+_RETRY_COOLDOWN = 30  # seconds before retrying after failure
 
 
 def _get_redis():
-    global _redis, _disabled
-    if _disabled:
+    global _redis, _last_failure
+    if _redis is not None:
+        return _redis
+    if time.time() - _last_failure < _RETRY_COOLDOWN:
         return None
-    if _redis is None:
-        try:
-            import redis
-            _redis = redis.from_url(REDIS_URL, decode_responses=True, socket_timeout=2)
-            _redis.ping()
-        except Exception as e:
-            log.warning("Redis unavailable, caching disabled: %s", e)
-            _disabled = True
-            _redis = None
-    return _redis
+    try:
+        import redis
+        _redis = redis.from_url(REDIS_URL, decode_responses=True, socket_timeout=2)
+        _redis.ping()
+        return _redis
+    except Exception as e:
+        log.warning("Redis unavailable: %s", e)
+        _last_failure = time.time()
+        _redis = None
+        return None
 
 
 def cache_key(connection_id: int, sql: str, filters: dict | None = None) -> str:
@@ -83,8 +87,9 @@ def set_cached(key: str, data: dict, ttl: int = CACHE_TTL):
         pass
 
 
-def chart_exec_key(chart_id: int, filters: dict | None, config_hash: str) -> str:
+def chart_exec_key(chart_id: int, filters: dict | None, config_hash: str, user_id: int = 0) -> str:
     """Cache key for full chart execution result.
+    Includes user_id to isolate RLS-filtered data between users.
     Format: chart_exec:{chart_id}:{hash} — allows pattern-based invalidation."""
-    raw = f"{json.dumps(filters or {}, sort_keys=True)}:{config_hash}"
+    raw = f"{user_id}:{json.dumps(filters or {}, sort_keys=True)}:{config_hash}"
     return f"chart_exec:{chart_id}:{hashlib.sha256(raw.encode()).hexdigest()[:16]}"

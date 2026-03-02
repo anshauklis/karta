@@ -123,7 +123,7 @@ export function AiChatDrawer({ onClose, context }: AiChatDrawerProps) {
             <SelectValue placeholder={t("selectConnection")} />
           </SelectTrigger>
           <SelectContent>
-            {connections?.map((c: any) => (
+            {connections?.map((c) => (
               <SelectItem key={c.id} value={String(c.id)}>
                 {c.name} ({c.db_type})
               </SelectItem>

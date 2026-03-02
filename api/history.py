@@ -1,6 +1,6 @@
 """Shared change history helpers."""
 
-import json
+import api.json_util as json
 from sqlalchemy import text
 from api.database import engine
 

@@ -68,6 +68,7 @@ export function MultiSelect({
           type="button"
           role="combobox"
           aria-expanded={open}
+          aria-controls="multi-select-list"
           className={cn(
             "border-input bg-background ring-offset-background placeholder:text-muted-foreground focus:ring-ring flex min-h-9 w-full items-center justify-between rounded-md border px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
             className
@@ -101,7 +102,7 @@ export function MultiSelect({
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList>
+          <CommandList id="multi-select-list">
             <CommandEmpty>{emptyMessage}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (

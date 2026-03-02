@@ -1,7 +1,7 @@
 "use client";
 
 export function ColumnPill({
-  col, type, chartConfig, setChartConfig, chartType,
+  col, type, chartConfig, setChartConfig, chartType: _chartType,
 }: {
   col: string;
   type: "number" | "text" | "date";

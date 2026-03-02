@@ -347,7 +347,7 @@ function SettingsTab({
 
   // Sync dependsEnabled when switching filters
   useEffect(() => {
-    setDependsEnabled(!!form.depends_on_filter_id);
+    queueMicrotask(() => setDependsEnabled(!!form.depends_on_filter_id));
   }, [form.depends_on_filter_id]);
 
   const columns = allColumns.filter((col) => {
@@ -811,7 +811,7 @@ export function FilterEditor({ dashboardId, dashboard }: { dashboardId: number; 
     if (selectedId && filters) {
       const found = filters.find((f) => f.id === selectedId);
       if (found) {
-        setForm(filterToForm(found));
+        queueMicrotask(() => setForm(filterToForm(found)));
       }
     }
   }, [selectedId, filters]);
@@ -819,11 +819,13 @@ export function FilterEditor({ dashboardId, dashboard }: { dashboardId: number; 
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
-      setSelectedId(null);
-      setIsNew(false);
-      setForm(EMPTY_FORM);
-      setActiveTab("settings");
-      setConfirmDelete(null);
+      queueMicrotask(() => {
+        setSelectedId(null);
+        setIsNew(false);
+        setForm(EMPTY_FORM);
+        setActiveTab("settings");
+        setConfirmDelete(null);
+      });
     }
   }, [open]);
 

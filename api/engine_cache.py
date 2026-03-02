@@ -30,7 +30,7 @@ def get_engine(connection_id: int, url: str, db_type: str):
                 pass
             del _cache[connection_id]
 
-        eng = create_engine(url, pool_pre_ping=True, pool_size=2, max_overflow=3)
+        eng = create_engine(url, pool_pre_ping=True, pool_size=5, max_overflow=3)
         _cache[connection_id] = (eng, now)
         return eng
 

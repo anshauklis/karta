@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useSession } from "next-auth/react";
 import { Command } from "cmdk";
 import { useDashboards } from "@/hooks/use-dashboards";
 import { useAllCharts } from "@/hooks/use-charts";
@@ -23,7 +22,6 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const router = useRouter();
-  const { data: session } = useSession();
   const { isAdmin, canSqlLab } = useRoles();
   const { data: dashboards } = useDashboards();
   const { data: charts } = useAllCharts();

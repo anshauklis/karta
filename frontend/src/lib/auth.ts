@@ -1,6 +1,9 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
+type UserWithToken = { accessToken?: string; isAdmin?: boolean; roles?: string[] };
+type SessionWithToken = { accessToken?: string; user: { isAdmin?: boolean; roles?: string[] } };
+
 const API_URL = process.env.API_URL_INTERNAL || "http://api:8000";
 
 export const authOptions: NextAuthOptions = {
@@ -46,16 +49,16 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.accessToken = (user as any).accessToken;
-        token.isAdmin = (user as any).isAdmin;
-        token.roles = (user as any).roles;
+        token.accessToken = (user as UserWithToken).accessToken;
+        token.isAdmin = (user as UserWithToken).isAdmin;
+        token.roles = (user as UserWithToken).roles;
       }
       return token;
     },
     async session({ session, token }) {
-      (session as any).accessToken = token.accessToken;
-      (session as any).user.isAdmin = token.isAdmin;
-      (session as any).user.roles = token.roles;
+      (session as SessionWithToken).accessToken = token.accessToken as string | undefined;
+      (session as SessionWithToken).user.isAdmin = token.isAdmin as boolean | undefined;
+      (session as SessionWithToken).user.roles = token.roles as string[] | undefined;
       return session;
     },
   },

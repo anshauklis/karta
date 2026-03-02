@@ -160,9 +160,9 @@ export default function ChartEditorPage({
     // Route/identity
     isNew, isStandalone, chartId, router, dashboard, allDashboards, existingChart, connections, datasets, isDark,
     // Standalone dashboard selector
-    selectedDashboardId, setSelectedDashboardId,
+    selectedDashboardId, setSelectedDashboardId: _setSelectedDashboardId,
     // Tab selector
-    dashboardTabs, selectedTabId, setSelectedTabId,
+    dashboardTabs: _dashboardTabs, selectedTabId: _selectedTabId, setSelectedTabId: _setSelectedTabId,
     // Mutations
     updateChart, createChart, createStandaloneChart,
     // Form state
@@ -196,7 +196,7 @@ export default function ChartEditorPage({
     addThresholdSubRule, removeThresholdSubRule, updateThresholdSubRule,
     // Derived booleans
     isPivot, isTable, isKPI, isHistogram,
-    showXAxis, showYAxis, showColor, showStyling, showConditionalFormatting, canPreview,
+    showXAxis, showYAxis, showColor, showStyling, showConditionalFormatting, canPreview: _canPreview,
     // Refs
     codeEditingRef, codeEditTimerRef,
   } = editor;
@@ -238,9 +238,11 @@ export default function ChartEditorPage({
   useEffect(() => {
     const hasConnection = dataSource === "sql" ? !!connectionId : !!datasetId;
     if (hasConnection && chartType && !isNew) {
-      setHeaderCollapsed(true);
+      queueMicrotask(() => setHeaderCollapsed(true));
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedDataset = dataSource === "dataset" && datasetId
     ? datasets?.find((ds) => ds.id === datasetId)

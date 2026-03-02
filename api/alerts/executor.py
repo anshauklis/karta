@@ -1,11 +1,11 @@
 import asyncio
-import json
+import api.json_util as json
 import logging
 import operator
 from sqlalchemy import text
 
 from api.database import engine
-from api.charts.router import _execute_chart_sql
+from api.charts.router import _execute_chart_full
 from api.notifications.dispatcher import send_message
 from api.alerts.baseline import check_anomaly
 
@@ -40,7 +40,9 @@ def _run_alert_check(alert_id: int) -> tuple[dict | None, dict | None]:
         return None, None
 
     try:
-        columns, rows, df = _execute_chart_sql(rule["connection_id"], rule["sql_query"])
+        columns, rows, df, _pq_path = _execute_chart_full(
+            rule["connection_id"], rule["sql_query"], chart_config={}, skip_metrics=True,
+        )
     except Exception as e:
         logger.error(f"Alert {alert_id} SQL failed: {e}")
         return None, None

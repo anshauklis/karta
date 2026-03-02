@@ -207,7 +207,7 @@ export function ChartSourcePanel({
             </button>
             {metricsOpen && (
               <div className="px-1 pb-2 space-y-0.5">
-                {filteredMetrics.map((m, i) => (
+                {filteredMetrics.map((m) => (
                   <DraggableMetric key={`${m.aggregate}:${m.column}`} metric={m} />
                 ))}
               </div>

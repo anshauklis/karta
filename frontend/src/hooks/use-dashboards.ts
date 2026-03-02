@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { Dashboard } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useDashboards() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["dashboards"],
@@ -19,7 +21,7 @@ export function useDashboards() {
 
 export function useCreateDashboard() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -46,7 +48,7 @@ export interface DashboardUpdateData {
 
 export function useUpdateDashboard() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -62,7 +64,7 @@ export function useUpdateDashboard() {
 
 export function useGroups() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["dashboard-groups"],
@@ -73,7 +75,7 @@ export function useGroups() {
 
 export function useDeleteDashboard() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -88,7 +90,7 @@ export function useDeleteDashboard() {
 
 export function useDashboardBySlug(slug: string | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["dashboard", "slug", slug],

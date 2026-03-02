@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { NotificationChannel, ChannelCreate, ChannelUpdate } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useChannels() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["channels"],
@@ -19,7 +21,7 @@ export function useChannels() {
 
 export function useCreateChannel() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -34,7 +36,7 @@ export function useCreateChannel() {
 
 export function useUpdateChannel() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -49,7 +51,7 @@ export function useUpdateChannel() {
 
 export function useDeleteChannel() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -63,7 +65,7 @@ export function useDeleteChannel() {
 
 export function useTestChannel() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useMutation({
     mutationFn: (id: number) =>

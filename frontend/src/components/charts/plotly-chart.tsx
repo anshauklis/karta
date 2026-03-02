@@ -4,7 +4,16 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(
+  () =>
+    Promise.all([
+      import("react-plotly.js/factory"),
+      import("@/lib/plotly-custom"),
+    ]).then(([{ default: createPlotlyComponent }, { default: Plotly }]) =>
+      createPlotlyComponent(Plotly)
+    ),
+  { ssr: false },
+);
 
 export interface DataPointClickData {
   x?: unknown;

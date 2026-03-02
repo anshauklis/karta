@@ -1,4 +1,3 @@
-import api.json_util as json
 import logging
 import multiprocessing
 import re
@@ -6,7 +5,6 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 log = logging.getLogger(__name__)
 from api.pivot_postprocessing import run_pipeline
@@ -908,7 +906,7 @@ def build_pivot_table(config: dict, df: pd.DataFrame) -> dict:
                 special_rows = None
                 pivot_no_total = pivot
         else:
-            present = [l for l in special_labels if l in pivot.index]
+            present = [lb for lb in special_labels if lb in pivot.index]
             if present:
                 special_rows = pivot.loc[present]
                 pivot_no_total = pivot.drop(present, axis=0)
@@ -991,7 +989,6 @@ def build_pivot_table(config: dict, df: pd.DataFrame) -> dict:
             # Rename the values level (level 0 when values are first)
             new_levels = []
             for level_i in range(pivot.columns.nlevels):
-                codes = pivot.columns.codes[level_i]
                 level_values = pivot.columns.levels[level_i]
                 renamed = [value_labels.get(str(v), str(v)) for v in level_values]
                 new_levels.append(renamed)

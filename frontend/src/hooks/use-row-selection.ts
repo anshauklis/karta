@@ -5,8 +5,10 @@ export function useRowSelection(resetKey?: unknown) {
   const anchorRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setSelectedRows(new Set());
-    anchorRef.current = null;
+    queueMicrotask(() => {
+      setSelectedRows(new Set());
+      anchorRef.current = null;
+    });
   }, [resetKey]);
 
   const handleRowClick = useCallback(

@@ -19,7 +19,7 @@ export function DropZone({
   values,
   onRemove,
   placeholder = "+ Drop columns here or click",
-  multiple = false,
+  multiple: _multiple = false,
   className = "",
 }: DropZoneProps) {
   const { isOver, setNodeRef } = useDroppable({ id });

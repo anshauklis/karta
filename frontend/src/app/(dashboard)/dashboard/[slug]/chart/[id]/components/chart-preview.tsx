@@ -13,6 +13,8 @@ import { formatDateByGrain } from "@/lib/date-format";
 import { downloadCSV, downloadExcel } from "@/lib/export";
 import type { ChartExecuteResult, ConditionalFormatRule, ColumnFormat } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 interface ChartPreviewProps {
   result: ChartExecuteResult | null;
   previewing: boolean;
@@ -33,13 +35,13 @@ export function ChartPreview({
   chartType,
   chartConfig,
   title,
-  isDark,
-  onPreview,
+  isDark: _isDark,
+  onPreview: _onPreview,
   dataSource,
   mode,
 }: ChartPreviewProps) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const t = useTranslations("chart");
   const [previewTab, setPreviewTab] = useState<"results" | "samples">("results");
   const [samplesSearch, setSamplesSearch] = useState("");

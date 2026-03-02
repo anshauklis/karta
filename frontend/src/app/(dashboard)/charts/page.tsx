@@ -3,7 +3,6 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useAllCharts, useDeleteChart, useDuplicateChart } from "@/hooks/use-charts";
-import { useDashboards } from "@/hooks/use-dashboards";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -70,12 +69,33 @@ function formatDate(iso: string): string {
 type SortKey = "title" | "chart_type" | "dashboard_title" | "updated_at";
 type SortDir = "asc" | "desc";
 
+function SortHeader({
+  label,
+  field,
+  sortKey,
+  toggleSort,
+}: {
+  label: string;
+  field: SortKey;
+  sortKey: SortKey;
+  toggleSort: (key: SortKey) => void;
+}) {
+  return (
+    <button
+      onClick={() => toggleSort(field)}
+      className="flex items-center gap-1 hover:text-foreground transition-colors"
+    >
+      {label}
+      <ArrowUpDown className={`h-3 w-3 ${sortKey === field ? "text-primary" : "text-muted-foreground/50"}`} />
+    </button>
+  );
+}
+
 export default function ChartsPage() {
   const t = useTranslations("chart");
   const tc = useTranslations("common");
   const { canEdit } = useRoles();
   const { data: charts, isLoading } = useAllCharts();
-  const { data: dashboards } = useDashboards();
   const deleteChart = useDeleteChart();
   const duplicateChart = useDuplicateChart();
 
@@ -132,16 +152,6 @@ export default function ChartsPage() {
   const handleDelete = (id: number, title: string) => {
     setDeleteTarget({ id, title });
   };
-
-  const SortHeader = ({ label, field }: { label: string; field: SortKey }) => (
-    <button
-      onClick={() => toggleSort(field)}
-      className="flex items-center gap-1 hover:text-foreground transition-colors"
-    >
-      {label}
-      <ArrowUpDown className={`h-3 w-3 ${sortKey === field ? "text-primary" : "text-muted-foreground/50"}`} />
-    </button>
-  );
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -222,11 +232,11 @@ export default function ChartsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[40%]"><SortHeader label="Title" field="title" /></TableHead>
-                <TableHead><SortHeader label="Type" field="chart_type" /></TableHead>
-                <TableHead><SortHeader label="Dashboard" field="dashboard_title" /></TableHead>
+                <TableHead className="w-[40%]"><SortHeader label="Title" field="title" sortKey={sortKey} toggleSort={toggleSort} /></TableHead>
+                <TableHead><SortHeader label="Type" field="chart_type" sortKey={sortKey} toggleSort={toggleSort} /></TableHead>
+                <TableHead><SortHeader label="Dashboard" field="dashboard_title" sortKey={sortKey} toggleSort={toggleSort} /></TableHead>
                 <TableHead>Mode</TableHead>
-                <TableHead><SortHeader label="Modified" field="updated_at" /></TableHead>
+                <TableHead><SortHeader label="Modified" field="updated_at" sortKey={sortKey} toggleSort={toggleSort} /></TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>

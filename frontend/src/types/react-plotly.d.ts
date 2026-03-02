@@ -1,24 +1,46 @@
 declare module "react-plotly.js" {
   import { Component } from "react";
 
+  /** Plotly figure object containing data, layout, and frames */
+  interface PlotlyFigure {
+    data: Record<string, unknown>[];
+    layout: Record<string, unknown>;
+    frames?: Record<string, unknown>[];
+  }
+
+  /** Plotly event object passed to click/hover/select callbacks */
+  interface PlotlyEvent {
+    points: Array<{
+      x?: unknown;
+      y?: unknown;
+      z?: unknown;
+      label?: string;
+      text?: string;
+      data?: Record<string, unknown>;
+      pointIndex?: number;
+      curveNumber?: number;
+    }>;
+    event?: MouseEvent;
+  }
+
   interface PlotParams {
-    data: any[];
-    layout?: any;
-    config?: any;
-    frames?: any[];
+    data: Record<string, unknown>[];
+    layout?: Record<string, unknown>;
+    config?: Record<string, unknown>;
+    frames?: Record<string, unknown>[];
     useResizeHandler?: boolean;
     style?: React.CSSProperties;
     className?: string;
-    onInitialized?: (figure: any, graphDiv: HTMLElement) => void;
-    onUpdate?: (figure: any, graphDiv: HTMLElement) => void;
-    onPurge?: (figure: any, graphDiv: HTMLElement) => void;
+    onInitialized?: (figure: PlotlyFigure, graphDiv: HTMLElement) => void;
+    onUpdate?: (figure: PlotlyFigure, graphDiv: HTMLElement) => void;
+    onPurge?: (figure: PlotlyFigure, graphDiv: HTMLElement) => void;
     onError?: (err: Error) => void;
-    onClick?: (event: any) => void;
-    onHover?: (event: any) => void;
-    onUnhover?: (event: any) => void;
-    onSelected?: (event: any) => void;
-    onRelayout?: (event: any) => void;
-    onRestyle?: (event: any) => void;
+    onClick?: (event: PlotlyEvent) => void;
+    onHover?: (event: PlotlyEvent) => void;
+    onUnhover?: (event: PlotlyEvent) => void;
+    onSelected?: (event: PlotlyEvent | null) => void;
+    onRelayout?: (update: Record<string, unknown>) => void;
+    onRestyle?: (update: Record<string, unknown>) => void;
     onRedraw?: () => void;
     onAnimated?: () => void;
     revision?: number;
@@ -27,4 +49,10 @@ declare module "react-plotly.js" {
 
   class Plot extends Component<PlotParams> {}
   export default Plot;
+}
+
+declare module "react-plotly.js/factory" {
+  import Plot from "react-plotly.js";
+  function createPlotlyComponent(plotly: unknown): typeof Plot;
+  export default createPlotlyComponent;
 }

@@ -4,7 +4,6 @@ Each operation: (DataFrame, config) -> DataFrame
 Pipeline runs after base pivoting + pct_mode + filtering, before subtotals.
 """
 import pandas as pd
-import numpy as np
 
 
 def apply_cumulative(pivot: pd.DataFrame, config: dict) -> pd.DataFrame:

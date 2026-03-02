@@ -4,9 +4,11 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 import type { Annotation, AnnotationCreate } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 export function useChartAnnotations(chartId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useQuery({
     queryKey: ["annotations", "chart", chartId],
     queryFn: () => api.get<Annotation[]>(`/api/charts/${chartId}/annotations`, token),
@@ -16,7 +18,7 @@ export function useChartAnnotations(chartId: number | undefined) {
 
 export function useCreateChartAnnotation(chartId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: AnnotationCreate) =>
@@ -30,7 +32,7 @@ export function useCreateChartAnnotation(chartId: number | undefined) {
 
 export function useDashboardAnnotations(dashboardId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   return useQuery({
     queryKey: ["annotations", "dashboard", dashboardId],
     queryFn: () => api.get<Annotation[]>(`/api/dashboards/${dashboardId}/annotations`, token),
@@ -40,7 +42,7 @@ export function useDashboardAnnotations(dashboardId: number | undefined) {
 
 export function useCreateDashboardAnnotation(dashboardId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: AnnotationCreate) =>
@@ -54,7 +56,7 @@ export function useCreateDashboardAnnotation(dashboardId: number | undefined) {
 
 export function useDeleteAnnotation(entityType: "chart" | "dashboard", entityId: number | undefined) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api.delete(`/api/annotations/${id}`, token),

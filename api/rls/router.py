@@ -3,7 +3,7 @@ from sqlalchemy import text
 
 from api.database import engine
 from api.models import RLSRuleCreate, RLSRuleUpdate, RLSRuleResponse
-from api.auth.dependencies import require_admin, get_current_user
+from api.auth.dependencies import require_admin
 
 router = APIRouter(prefix="/api/rls", tags=["rls"])
 
@@ -90,8 +90,9 @@ def _invalidate_rls_cache(connection_id: int, user_id: int | None):
 
 
 def get_rls_filters(connection_id: int, user_id: int) -> dict[str, list[str]]:
-    """Get RLS filters for a user on a connection. Cached in Redis for 60s.
-    Matches rules by user_id directly OR by group_name membership."""
+    """Get RLS filters for a user on a connection. Cached in Redis for 1h.
+    Matches rules by user_id directly OR by group_name membership.
+    Cache is event-invalidated on RLS rule create/update/delete."""
     from api.cache import rls_cache_key, get_cached, set_cached
 
     key = rls_cache_key(connection_id, user_id)
@@ -132,5 +133,5 @@ def get_rls_filters(connection_id: int, user_id: int) -> dict[str, list[str]]:
             col = row["column_name"]
             filters.setdefault(col, []).append(row["filter_value"])
 
-    set_cached(key, filters, ttl=60)
+    set_cached(key, filters, ttl=3600)
     return filters

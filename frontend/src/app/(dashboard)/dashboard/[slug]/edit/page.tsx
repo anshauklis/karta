@@ -97,11 +97,10 @@ import { useLayoutHistory } from "@/hooks/use-layout-history";
 import type { Chart, ChartExecuteResult, LayoutItem } from "@/types";
 
 import dynamic from "next/dynamic";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactGridLayout = dynamic(
-  () => import("react-grid-layout/legacy").then((mod) => mod.default || mod) as any,
+  () => import("react-grid-layout/legacy").then((mod) => mod.default || mod) as unknown as Promise<React.ComponentType<Record<string, unknown>>>,
   { ssr: false }
-) as any;
+) as React.ComponentType<Record<string, unknown>>;
 import "react-grid-layout/css/styles.css";
 
 const VISUAL_TYPES = new Set(["text", "divider", "header", "spacer", "tabs"]);
@@ -223,7 +222,7 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
     if (tabs && tabs.length > 0 && (!activeTab || !tabs.some((t) => String(t.id) === activeTab))) {
       setActiveTab(String(tabs[0].id));
     }
-  }, [tabs]);
+  }, [tabs, activeTab]);
 
   const [containerRef, containerWidth, freezeWidth, unfreezeWidth] = useContainerWidth();
   const [results, setResults] = useState<Record<number, ChartExecuteResult>>({});
@@ -252,8 +251,8 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
     const ids = new Set<number>();
     charts.forEach((chart) => {
       if (chart.chart_type === "tabs" && chart.chart_config?.tabs) {
-        (chart.chart_config.tabs as any[]).forEach((tab: any) => {
-          (tab.charts as any[])?.forEach((c: any) => ids.add(c.chart_id));
+        (chart.chart_config.tabs as Array<{ charts?: Array<{ chart_id: number }> }>).forEach((tab) => {
+          tab.charts?.forEach((c) => ids.add(c.chart_id));
         });
       }
     });
@@ -312,7 +311,26 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
         }))
       );
     }
-  }, [visibleCharts]);
+  }, [visibleCharts, layoutHistory]);
+
+  const executeChartById = useCallback(async (chartId: number) => {
+    setExecuting((prev) => new Set(prev).add(chartId));
+    try {
+      const result = await executeChart.mutateAsync({ chartId });
+      setResults((prev) => ({ ...prev, [chartId]: result }));
+    } catch (e: unknown) {
+      setResults((prev) => ({
+        ...prev,
+        [chartId]: { figure: null, columns: [], rows: [], row_count: 0, error: e instanceof Error ? e.message : String(e) },
+      }));
+    } finally {
+      setExecuting((prev) => {
+        const next = new Set(prev);
+        next.delete(chartId);
+        return next;
+      });
+    }
+  }, [executeChart]);
 
   // Execute all charts on load
   useEffect(() => {
@@ -325,33 +343,13 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
         executeChartById(chart.id);
       }
     });
-  }, [charts]);
-
-  const executeChartById = async (chartId: number) => {
-    setExecuting((prev) => new Set(prev).add(chartId));
-    try {
-      const result = await executeChart.mutateAsync({ chartId });
-      setResults((prev) => ({ ...prev, [chartId]: result }));
-    } catch (e: any) {
-      setResults((prev) => ({
-        ...prev,
-        [chartId]: { figure: null, columns: [], rows: [], row_count: 0, error: e.message },
-      }));
-    } finally {
-      setExecuting((prev) => {
-        const next = new Set(prev);
-        next.delete(chartId);
-        return next;
-      });
-    }
-  };
+  }, [charts, executeChartById]);
 
   // Ref for adding CSS class during drag/resize — avoids React re-renders
   const gridRef = useRef<HTMLDivElement>(null);
 
   const handleDragStart = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
-    (_layout: any, _oldItem: any) => {
+    (_layout: LayoutItem[], _oldItem: LayoutItem) => {
       setSelectedIds(new Set());
       gridRef.current?.classList.add("grid-interacting");
       if (gridRef.current) {
@@ -390,9 +388,9 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
   }, [freezeWidth, containerWidth]);
 
   // Save layout on drag stop — also handles cross-tab chart moves
+  type RGLItem = { i: string; x: number; y: number; w: number; h: number };
   const handleDragStop = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (finalLayout: { i: string; x: number; y: number; w: number; h: number }[], _oldItem: any, newItem: any) => {
+    (finalLayout: RGLItem[], _oldItem: RGLItem, newItem: RGLItem) => {
       gridRef.current?.classList.remove("grid-interacting");
       unfreezeWidth();
       // Clean up pointermove listener
@@ -552,8 +550,7 @@ export default function DashboardEditPage({ params }: { params: Promise<{ slug: 
 
   const handleRefreshChart = useCallback((chartId: number) => {
     executeChartById(chartId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [executeChartById]);
 
   const handleUndo = useCallback(() => {
     const restored = layoutHistory.undo();

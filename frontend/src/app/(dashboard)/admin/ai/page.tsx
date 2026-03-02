@@ -74,7 +74,7 @@ export default function AdminAiPage() {
 function ConfigSection() {
   const t = useTranslations("aiAssistant");
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as { accessToken?: string } | null)?.accessToken;
 
   const { data: status } = useQuery({
     queryKey: ["ai-status"],
@@ -142,7 +142,7 @@ function ConfigSection() {
 function SessionsSection() {
   const t = useTranslations("aiAssistant");
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as { accessToken?: string } | null)?.accessToken;
 
   const { data: sessions } = useQuery({
     queryKey: ["ai-admin-sessions"],

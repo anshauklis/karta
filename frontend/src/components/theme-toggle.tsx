@@ -12,7 +12,7 @@ export function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
   const [mounted, setMounted] = useState(false);
   const t = useTranslations("theme");
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => { queueMicrotask(() => setMounted(true)); }, []);
   if (!mounted) return null;
 
   const next = theme === "dark" ? "light" : theme === "light" ? "system" : "dark";

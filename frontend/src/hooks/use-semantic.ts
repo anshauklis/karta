@@ -9,11 +9,13 @@ import type {
   SemanticQueryResult,
 } from "@/types";
 
+type SessionWithToken = { accessToken?: string } | null;
+
 // ===== Models ================================================================
 
 export function useSemanticModels(connectionId?: number) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   const params = connectionId ? `?connection_id=${connectionId}` : "";
 
@@ -28,7 +30,7 @@ export function useSemanticModels(connectionId?: number) {
 
 export function useSemanticModel(modelId: number | null) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["semantic-model", modelId],
@@ -40,7 +42,7 @@ export function useSemanticModel(modelId: number | null) {
 
 export function useCreateSemanticModel() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -54,7 +56,7 @@ export function useCreateSemanticModel() {
 
 export function useUpdateSemanticModel() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -71,7 +73,7 @@ export function useUpdateSemanticModel() {
 
 export function useDeleteSemanticModel() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -87,7 +89,7 @@ export function useDeleteSemanticModel() {
 
 export function useCreateMeasure() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -110,7 +112,7 @@ export function useCreateMeasure() {
 
 export function useUpdateMeasure() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -126,7 +128,7 @@ export function useUpdateMeasure() {
 
 export function useDeleteMeasure() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -144,7 +146,7 @@ export function useDeleteMeasure() {
 
 export function useCreateDimension() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -167,7 +169,7 @@ export function useCreateDimension() {
 
 export function useUpdateDimension() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -183,7 +185,7 @@ export function useUpdateDimension() {
 
 export function useDeleteDimension() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -201,7 +203,7 @@ export function useDeleteDimension() {
 
 export function useCreateJoin() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -224,7 +226,7 @@ export function useCreateJoin() {
 
 export function useDeleteJoin() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -242,7 +244,7 @@ export function useDeleteJoin() {
 
 export function useSemanticQuery() {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = (session as SessionWithToken)?.accessToken;
 
   return useMutation({
     mutationFn: (data: {
