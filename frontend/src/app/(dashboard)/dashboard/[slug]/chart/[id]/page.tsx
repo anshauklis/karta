@@ -87,8 +87,6 @@ import { CustomizeTab } from "./components/customize-tab";
 import { DataTab } from "./components/data-tab";
 import { useHotkey } from "@/hooks/use-hotkey";
 import { AIChartBuilder } from "@/components/ai/ai-chart-builder";
-import { MetricsBrowser } from "@/components/metrics/metrics-browser";
-import { useSemanticModels } from "@/hooks/use-semantic";
 import type { SuggestChartConfigResult } from "@/hooks/use-ai";
 
 const CHART_TYPE_ICONS: Record<string, { icon: React.ComponentType<{ className?: string }>; rotate?: boolean }> = {
@@ -201,17 +199,6 @@ export default function ChartEditorPage({
     codeEditingRef, codeEditTimerRef,
   } = editor;
 
-  // Semantic models — show metrics tab only when models exist for current connection
-  const { data: semanticModels } = useSemanticModels(connectionId);
-  const hasMetrics = !!connectionId && (semanticModels?.length ?? 0) > 0;
-
-  // If user is on metrics tab but no models exist anymore, reset to data tab
-  useEffect(() => {
-    if (activeTab === "metrics" && !hasMetrics) {
-      setActiveTab("data");
-    }
-  }, [activeTab, hasMetrics, setActiveTab]);
-
   // Ctrl+S / Cmd+S opens the save modal
   useHotkey("s", useCallback(() => setSaveModalOpen(true), [setSaveModalOpen]));
 
@@ -303,24 +290,6 @@ export default function ChartEditorPage({
 
     const activeId = String(active.id);
     const overId = String(over.id);
-
-    // Dragged from metrics browser — use drag data instead of parsing IDs
-    const dragData = active.data.current;
-    if (dragData?.type === "measure") {
-      const yItems = (chartConfig.y_columns as string[]) || [];
-      if (overId === "zone-y" || yItems.includes(overId)) {
-        updateConfig("y_columns", [...yItems, dragData.name]);
-      }
-      return;
-    }
-    if (dragData?.type === "dimension") {
-      if (overId === "zone-x" || overId === chartConfig.x_column) {
-        updateConfig("x_column", dragData.columnName);
-      } else if (overId === "zone-color" || overId === chartConfig.color_column) {
-        updateConfig("color_column", dragData.columnName);
-      }
-      return;
-    }
 
     // Dragged from column list to a drop zone
     if (activeId.startsWith("source-")) {
@@ -731,12 +700,6 @@ export default function ChartEditorPage({
                 <Code2 className="h-4 w-4" />
                 {t("code")}
               </TabsTrigger>
-              {hasMetrics && (
-                <TabsTrigger value="metrics" className="px-3 py-1.5 text-sm">
-                  <Layers className="h-4 w-4" />
-                  {t("metrics")}
-                </TabsTrigger>
-              )}
             </TabsList>
           </div>
 
@@ -822,10 +785,6 @@ export default function ChartEditorPage({
             />
           </TabsContent>
 
-          <TabsContent value="metrics" className="flex-1 overflow-y-auto p-3 space-y-1 mt-0" style={{ zoom: editorZoom }}>
-            <MetricsBrowser connectionId={connectionId} />
-          </TabsContent>
-
           </Tabs>{/* end tabs */}
         </div>{/* end flex h-full flex-col */}
         </Panel>
@@ -909,18 +868,6 @@ export default function ChartEditorPage({
           <div className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs font-medium shadow-lg">
             <GripVertical className="h-3 w-3 text-muted-foreground/40" />
             <span>{activeDragId.replace("source-", "")}</span>
-          </div>
-        ) : activeDragId?.startsWith("metric-measure-") ? (
-          <div className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs font-medium shadow-lg">
-            <GripVertical className="h-3 w-3 text-muted-foreground/40" />
-            <Hash className="h-3 w-3 text-primary" />
-            <span>{activeDragId.replace(/^metric-measure-\d+-/, "")}</span>
-          </div>
-        ) : activeDragId?.startsWith("metric-dimension-") ? (
-          <div className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs font-medium shadow-lg">
-            <GripVertical className="h-3 w-3 text-muted-foreground/40" />
-            <Calendar className="h-3 w-3 text-primary" />
-            <span>{activeDragId.replace(/^metric-dimension-\d+-/, "")}</span>
           </div>
         ) : activeDragId ? (
           <div className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium shadow-lg">

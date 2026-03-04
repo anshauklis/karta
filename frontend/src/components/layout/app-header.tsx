@@ -26,7 +26,6 @@ import {
   Monitor,
   ChevronDown,
   Bot,
-  Layers,
   Puzzle,
   ScrollText,
   UsersRound,
@@ -65,7 +64,6 @@ const PRIMARY_NAV_ITEMS = [
   { href: "/sql-lab", icon: Terminal, labelKey: "sqlLab" },
   { href: "/connections", icon: Database, labelKey: "connections" },
   { href: "/datasets", icon: FileSpreadsheet, labelKey: "datasets" },
-  { href: "/metrics", icon: Layers, labelKey: "metrics" },
 ] as const;
 
 const MORE_NAV_ITEMS = [
