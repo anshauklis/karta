@@ -9,13 +9,22 @@ import {
   usePreviewDataset,
   useUpdateDataset,
   useDatasetColumns,
+  useDatasetMeasures,
+  useCreateDatasetMeasure,
+  useUpdateDatasetMeasure,
+  useDeleteDatasetMeasure,
+  useDatasetDimensions,
+  useCreateDatasetDimension,
+  useUpdateDatasetDimension,
+  useDeleteDatasetDimension,
 } from "@/hooks/use-datasets";
+import type { DatasetMeasure, DatasetDimension } from "@/hooks/use-datasets";
 import { useConnections, useConnectionSchemas, useConnectionSchema } from "@/hooks/use-connections";
 import { useDashboards } from "@/hooks/use-dashboards";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Dataset, DatasetCreate, DatasetUpdate, SQLResult, SchemaTable } from "@/types";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +63,8 @@ import {
   BarChart3,
   Upload,
   Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -96,6 +107,369 @@ function formatDate(iso: string): string {
     month: "short",
     day: "numeric",
   });
+}
+
+// ---------------------------------------------------------------------------
+// Measures Tab
+// ---------------------------------------------------------------------------
+
+function MeasuresTab({ datasetId }: { datasetId: number }) {
+  const t = useTranslations("dataset");
+  const { data: measures, isLoading } = useDatasetMeasures(datasetId);
+  const createMeasure = useCreateDatasetMeasure();
+  const updateMeasure = useUpdateDatasetMeasure();
+  const deleteMeasure = useDeleteDatasetMeasure();
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    name: "", label: "", expression: "", agg_type: "sum", format: "", description: "",
+  });
+
+  const resetForm = () => {
+    setForm({ name: "", label: "", expression: "", agg_type: "sum", format: "", description: "" });
+    setEditingId(null);
+    setShowForm(false);
+  };
+
+  const startEdit = (m: DatasetMeasure) => {
+    setForm({
+      name: m.name, label: m.label, expression: m.expression,
+      agg_type: m.agg_type, format: m.format, description: m.description,
+    });
+    setEditingId(m.id);
+    setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim() || !form.label.trim() || !form.expression.trim()) return;
+    if (editingId) {
+      await updateMeasure.mutateAsync({
+        datasetId, measureId: editingId,
+        data: { ...form },
+      });
+    } else {
+      await createMeasure.mutateAsync({
+        datasetId,
+        data: { ...form, filters: [], sort_order: (measures?.length ?? 0) },
+      });
+    }
+    resetForm();
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm(t("confirmDeleteMeasure"))) return;
+    await deleteMeasure.mutateAsync({ datasetId, measureId: id });
+  };
+
+  const isSaving = createMeasure.isPending || updateMeasure.isPending;
+
+  const aggOptions = [
+    { value: "sum", label: t("aggSum") },
+    { value: "count", label: t("aggCount") },
+    { value: "avg", label: t("aggAvg") },
+    { value: "min", label: t("aggMin") },
+    { value: "max", label: t("aggMax") },
+    { value: "count_distinct", label: t("aggCountDistinct") },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading...
+        </div>
+      ) : measures && measures.length > 0 ? (
+        <div className="rounded-md border overflow-auto max-h-[240px]">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">{t("measureName")}</TableHead>
+                <TableHead className="text-xs">{t("measureLabel")}</TableHead>
+                <TableHead className="text-xs">{t("measureExpression")}</TableHead>
+                <TableHead className="text-xs">{t("measureAggType")}</TableHead>
+                <TableHead className="text-xs w-[80px]" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {measures.map((m) => (
+                <TableRow key={m.id}>
+                  <TableCell className="text-xs font-mono py-1">{m.name}</TableCell>
+                  <TableCell className="text-xs py-1">{m.label}</TableCell>
+                  <TableCell className="text-xs font-mono py-1">{m.expression}</TableCell>
+                  <TableCell className="text-xs py-1">{m.agg_type}</TableCell>
+                  <TableCell className="text-xs py-1">
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => startEdit(m)}>
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-700" onClick={() => handleDelete(m.id)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground py-4">{t("noMeasures")}</p>
+      )}
+
+      {showForm ? (
+        <div className="space-y-3 rounded-md border p-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">{t("measureName")}</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="revenue" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t("measureLabel")}</Label>
+              <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Revenue" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">{t("measureExpression")}</Label>
+              <Input value={form.expression} onChange={(e) => setForm({ ...form, expression: e.target.value })} placeholder="amount" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t("measureAggType")}</Label>
+              <Select value={form.agg_type} onValueChange={(v) => setForm({ ...form, agg_type: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {aggOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">{t("measureFormat")}</Label>
+              <Input value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value })} placeholder="$,.2f" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t("measureDescription")}</Label>
+              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleSave} disabled={isSaving || !form.name.trim() || !form.label.trim() || !form.expression.trim()}>
+              {isSaving && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+              <Check className="mr-1 h-3 w-3" />
+              {t("saveMeasure")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={resetForm}>
+              <X className="mr-1 h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(true); }}>
+          <Plus className="mr-1 h-3 w-3" />
+          {t("addMeasure")}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dimensions Tab
+// ---------------------------------------------------------------------------
+
+function DimensionsTab({ datasetId }: { datasetId: number }) {
+  const t = useTranslations("dataset");
+  const { data: dimensions, isLoading } = useDatasetDimensions(datasetId);
+  const createDimension = useCreateDatasetDimension();
+  const updateDimension = useUpdateDatasetDimension();
+  const deleteDimension = useDeleteDatasetDimension();
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    name: "", label: "", column_name: "", dimension_type: "categorical",
+    time_grain: null as string | null, format: "", description: "",
+  });
+
+  const resetForm = () => {
+    setForm({ name: "", label: "", column_name: "", dimension_type: "categorical", time_grain: null, format: "", description: "" });
+    setEditingId(null);
+    setShowForm(false);
+  };
+
+  const startEdit = (d: DatasetDimension) => {
+    setForm({
+      name: d.name, label: d.label, column_name: d.column_name,
+      dimension_type: d.dimension_type, time_grain: d.time_grain,
+      format: d.format, description: d.description,
+    });
+    setEditingId(d.id);
+    setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim() || !form.label.trim() || !form.column_name.trim()) return;
+    const payload = {
+      ...form,
+      time_grain: form.dimension_type === "time" ? form.time_grain : null,
+    };
+    if (editingId) {
+      await updateDimension.mutateAsync({
+        datasetId, dimensionId: editingId, data: payload,
+      });
+    } else {
+      await createDimension.mutateAsync({
+        datasetId,
+        data: { ...payload, sort_order: (dimensions?.length ?? 0) },
+      });
+    }
+    resetForm();
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm(t("confirmDeleteDimension"))) return;
+    await deleteDimension.mutateAsync({ datasetId, dimensionId: id });
+  };
+
+  const isSaving = createDimension.isPending || updateDimension.isPending;
+
+  const timeGrainOptions = [
+    { value: "day", label: "Day" },
+    { value: "week", label: "Week" },
+    { value: "month", label: "Month" },
+    { value: "quarter", label: "Quarter" },
+    { value: "year", label: "Year" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading...
+        </div>
+      ) : dimensions && dimensions.length > 0 ? (
+        <div className="rounded-md border overflow-auto max-h-[240px]">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">{t("dimensionName")}</TableHead>
+                <TableHead className="text-xs">{t("dimensionLabel")}</TableHead>
+                <TableHead className="text-xs">{t("dimensionColumn")}</TableHead>
+                <TableHead className="text-xs">{t("dimensionType")}</TableHead>
+                <TableHead className="text-xs w-[80px]" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dimensions.map((d) => (
+                <TableRow key={d.id}>
+                  <TableCell className="text-xs font-mono py-1">{d.name}</TableCell>
+                  <TableCell className="text-xs py-1">{d.label}</TableCell>
+                  <TableCell className="text-xs font-mono py-1">{d.column_name}</TableCell>
+                  <TableCell className="text-xs py-1">
+                    {d.dimension_type === "time" ? `${t("time")}${d.time_grain ? ` (${d.time_grain})` : ""}` : t("categorical")}
+                  </TableCell>
+                  <TableCell className="text-xs py-1">
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => startEdit(d)}>
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-700" onClick={() => handleDelete(d.id)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground py-4">{t("noDimensions")}</p>
+      )}
+
+      {showForm ? (
+        <div className="space-y-3 rounded-md border p-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">{t("dimensionName")}</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="region" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t("dimensionLabel")}</Label>
+              <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Region" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">{t("dimensionColumn")}</Label>
+              <Input value={form.column_name} onChange={(e) => setForm({ ...form, column_name: e.target.value })} placeholder="region" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t("dimensionType")}</Label>
+              <Select value={form.dimension_type} onValueChange={(v) => setForm({ ...form, dimension_type: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="categorical">{t("categorical")}</SelectItem>
+                  <SelectItem value="time">{t("time")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {form.dimension_type === "time" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">{t("dimensionTimeGrain")}</Label>
+                <Select value={form.time_grain ?? "day"} onValueChange={(v) => setForm({ ...form, time_grain: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeGrainOptions.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div />
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">{t("dimensionFormat")}</Label>
+              <Input value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t("dimensionDescription")}</Label>
+              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleSave} disabled={isSaving || !form.name.trim() || !form.label.trim() || !form.column_name.trim()}>
+              {isSaving && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+              <Check className="mr-1 h-3 w-3" />
+              {t("saveDimension")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={resetForm}>
+              <X className="mr-1 h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(true); }}>
+          <Plus className="mr-1 h-3 w-3" />
+          {t("addDimension")}
+        </Button>
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -282,94 +656,101 @@ function DatasetEditorDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-auto px-6 pb-6 space-y-4">
-          {/* Virtual / Physical tabs — hidden when editing (type is fixed) */}
-          {!isEdit && (
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "virtual" | "physical")}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="virtual">{t("virtual")}</TabsTrigger>
-                <TabsTrigger value="physical">{t("physical")}</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          )}
+        {isEdit ? (
+          <Tabs defaultValue="general" className="flex-1 overflow-hidden flex flex-col px-6 pb-6">
+            <TabsList className="grid w-full grid-cols-3 mb-4">
+              <TabsTrigger value="general">{t("general")}</TabsTrigger>
+              <TabsTrigger value="measures">{t("measures")}</TabsTrigger>
+              <TabsTrigger value="dimensions">{t("dimensions")}</TabsTrigger>
+            </TabsList>
 
-          {/* Connection + Name row (shared) */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>{t("connection")} *</Label>
-              <Select value={connectionId} onValueChange={setConnectionId} disabled={isEdit}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a connection" />
-                </SelectTrigger>
-                <SelectContent>
-                  {connections.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>{t("name")} *</Label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Daily Revenue"
-              />
-            </div>
-          </div>
-
-          {/* Physical-only: Schema + Table selects */}
-          {activeTab === "physical" && (
-            <>
+            <TabsContent value="general" className="overflow-auto space-y-4">
+              {/* Connection + Name row */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>{t("schema")}</Label>
-                  <Select
-                    value={selectedSchema}
-                    onValueChange={setSelectedSchema}
-                    disabled={isEdit || !connectionId || schemasLoading}
-                  >
+                  <Label>{t("connection")} *</Label>
+                  <Select value={connectionId} onValueChange={setConnectionId} disabled={isEdit}>
                     <SelectTrigger>
-                      <SelectValue placeholder={schemasLoading ? "Loading..." : t("selectSchema")} />
+                      <SelectValue placeholder="Select a connection" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(schemas ?? []).map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
+                      {connections.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("table")} *</Label>
-                  <Select
-                    value={selectedTable}
-                    onValueChange={setSelectedTable}
-                    disabled={isEdit || !connectionId || tablesLoading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={tablesLoading ? "Loading..." : t("selectTable")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(schemaTables ?? []).map((st) => (
-                        <SelectItem key={st.table_name} value={st.table_name}>
-                          {st.table_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>{t("name")} *</Label>
+                  <Input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Daily Revenue"
+                  />
                 </div>
               </div>
 
-              {/* Column preview */}
-              {selectedTableColumns && selectedTableColumns.columns.length > 0 && (
+              {/* Description + Cache TTL */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_160px]">
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">
-                    {t("columnsPreview")} ({selectedTableColumns.columns.length})
-                  </Label>
+                  <Label>{t("description")}</Label>
+                  <Input
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Optional description"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("cacheTTL")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={cacheTTL}
+                    onChange={(e) => setCacheTTL(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Virtual-only: SQL Editor */}
+              {activeTab === "virtual" && (
+                <div className="space-y-2">
+                  <Label>{t("sqlQuery")} *</Label>
+                  <div className="rounded-md border overflow-hidden">
+                    <Editor
+                      height="200px"
+                      language="sql"
+                      theme="vs"
+                      value={sqlQuery}
+                      onChange={(v) => setSqlQuery(v ?? "")}
+                      options={{
+                        minimap: { enabled: false },
+                        fontSize: 13,
+                        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                        lineNumbers: "on",
+                        scrollBeyondLastLine: false,
+                        wordWrap: "on",
+                        padding: { top: 8, bottom: 8 },
+                        automaticLayout: true,
+                        tabSize: 2,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Columns list */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">
+                  {t("columnsPreview")} {datasetColumns.length > 0 && `(${datasetColumns.length})`}
+                </Label>
+                {columnsLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Loading columns...
+                  </div>
+                ) : datasetColumns.length > 0 ? (
                   <div className="rounded-md border overflow-auto max-h-[200px]">
                     <Table>
                       <TableHeader>
@@ -379,7 +760,7 @@ function DatasetEditorDialog({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {selectedTableColumns.columns.map((col) => (
+                        {datasetColumns.map((col) => (
                           <TableRow key={col.name}>
                             <TableCell className="text-xs font-mono py-1">{col.name}</TableCell>
                             <TableCell className="text-xs text-muted-foreground py-1">{col.type}</TableCell>
@@ -388,189 +769,285 @@ function DatasetEditorDialog({
                       </TableBody>
                     </Table>
                   </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">{t("noColumns")}</p>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-3">
+                {activeTab === "virtual" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreview}
+                    disabled={isPreviewing || !sqlQuery.trim()}
+                  >
+                    {isPreviewing ? (
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Eye className="mr-1 h-4 w-4" />
+                    )}
+                    {t("runPreview")}
+                  </Button>
+                )}
+                <div className="flex-1" />
+                <Button variant="secondary" onClick={() => onOpenChange(false)}>
+                  {tc("cancel")}
+                </Button>
+                <Button onClick={handleSubmit} disabled={isSaving || !canSubmit}>
+                  {isSaving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                  {tc("save")}
+                </Button>
+              </div>
+
+              {/* Preview error/result */}
+              {previewError && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  {previewError}
                 </div>
               )}
-            </>
-          )}
 
-          {/* Description + Cache TTL (shared) */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_160px]">
-            <div className="space-y-2">
-              <Label>{t("description")}</Label>
-              <Input
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional description"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t("cacheTTL")}</Label>
-              <Input
-                type="number"
-                min={0}
-                value={cacheTTL}
-                onChange={(e) => setCacheTTL(e.target.value)}
-              />
-            </div>
-          </div>
+              {previewResult && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-4 text-xs text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <TableIcon className="h-3 w-3" />
+                      {previewResult.row_count} row{previewResult.row_count !== 1 ? "s" : ""}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {previewResult.execution_time_ms}ms
+                    </span>
+                  </div>
+                  <div className="rounded-md border overflow-auto max-h-[300px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          {previewResult.columns.map((col) => (
+                            <TableHead
+                              key={col}
+                              className="whitespace-nowrap text-xs font-semibold"
+                            >
+                              {col}
+                            </TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {previewResult.rows.length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={previewResult.columns.length}
+                              className="text-center text-sm text-slate-400 py-8"
+                            >
+                              No rows returned
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          previewResult.rows.map((row, i) => (
+                            <TableRow key={i}>
+                              {row.map((cell, j) => (
+                                <TableCell
+                                  key={j}
+                                  className="whitespace-nowrap text-xs"
+                                >
+                                  {cell === null ? (
+                                    <span className="text-slate-300 italic">NULL</span>
+                                  ) : (
+                                    String(cell)
+                                  )}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
 
-          {/* Virtual-only: SQL Editor */}
-          {activeTab === "virtual" && (
-            <div className="space-y-2">
-              <Label>{t("sqlQuery")} *</Label>
-              <div className="rounded-md border overflow-hidden">
-                <Editor
-                  height="200px"
-                  language="sql"
-                  theme="vs"
-                  value={sqlQuery}
-                  onChange={(v) => setSqlQuery(v ?? "")}
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 13,
-                    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                    lineNumbers: "on",
-                    scrollBeyondLastLine: false,
-                    wordWrap: "on",
-                    padding: { top: 8, bottom: 8 },
-                    automaticLayout: true,
-                    tabSize: 2,
-                  }}
+            <TabsContent value="measures" className="overflow-auto">
+              <MeasuresTab datasetId={dataset.id} />
+            </TabsContent>
+
+            <TabsContent value="dimensions" className="overflow-auto">
+              <DimensionsTab datasetId={dataset.id} />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <div className="flex-1 overflow-auto px-6 pb-6 space-y-4">
+            {/* Virtual / Physical tabs */}
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "virtual" | "physical")}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="virtual">{t("virtual")}</TabsTrigger>
+                <TabsTrigger value="physical">{t("physical")}</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {/* Connection + Name row */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>{t("connection")} *</Label>
+                <Select value={connectionId} onValueChange={setConnectionId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a connection" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {connections.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("name")} *</Label>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Daily Revenue"
                 />
               </div>
             </div>
-          )}
 
-          {/* Columns list for existing datasets */}
-          {isEdit && (
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">
-                {t("columnsPreview")} {datasetColumns.length > 0 && `(${datasetColumns.length})`}
-              </Label>
-              {columnsLoading ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Loading columns...
+            {/* Physical-only: Schema + Table selects */}
+            {activeTab === "physical" && (
+              <>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>{t("schema")}</Label>
+                    <Select
+                      value={selectedSchema}
+                      onValueChange={setSelectedSchema}
+                      disabled={!connectionId || schemasLoading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={schemasLoading ? "Loading..." : t("selectSchema")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(schemas ?? []).map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t("table")} *</Label>
+                    <Select
+                      value={selectedTable}
+                      onValueChange={setSelectedTable}
+                      disabled={!connectionId || tablesLoading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={tablesLoading ? "Loading..." : t("selectTable")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(schemaTables ?? []).map((st) => (
+                          <SelectItem key={st.table_name} value={st.table_name}>
+                            {st.table_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-              ) : datasetColumns.length > 0 ? (
-                <div className="rounded-md border overflow-auto max-h-[200px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">Column</TableHead>
-                        <TableHead className="text-xs">Type</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {datasetColumns.map((col) => (
-                        <TableRow key={col.name}>
-                          <TableCell className="text-xs font-mono py-1">{col.name}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground py-1">{col.type}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">{t("noColumns")}</p>
-              )}
-            </div>
-          )}
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-3">
-            {isEdit && activeTab === "virtual" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePreview}
-                disabled={isPreviewing || !sqlQuery.trim()}
-              >
-                {isPreviewing ? (
-                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                ) : (
-                  <Eye className="mr-1 h-4 w-4" />
-                )}
-                {t("runPreview")}
-              </Button>
-            )}
-            <div className="flex-1" />
-            <Button variant="secondary" onClick={() => onOpenChange(false)}>
-              {tc("cancel")}
-            </Button>
-            <Button onClick={handleSubmit} disabled={isSaving || !canSubmit}>
-              {isSaving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-              {tc("save")}
-            </Button>
-          </div>
-
-          {/* Preview error/result (virtual edit mode only) */}
-          {previewError && (
-            <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-              {previewError}
-            </div>
-          )}
-
-          {previewResult && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-4 text-xs text-slate-500">
-                <span className="flex items-center gap-1">
-                  <TableIcon className="h-3 w-3" />
-                  {previewResult.row_count} row{previewResult.row_count !== 1 ? "s" : ""}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {previewResult.execution_time_ms}ms
-                </span>
-              </div>
-              <div className="rounded-md border overflow-auto max-h-[300px]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {previewResult.columns.map((col) => (
-                        <TableHead
-                          key={col}
-                          className="whitespace-nowrap text-xs font-semibold"
-                        >
-                          {col}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {previewResult.rows.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={previewResult.columns.length}
-                          className="text-center text-sm text-slate-400 py-8"
-                        >
-                          No rows returned
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      previewResult.rows.map((row, i) => (
-                        <TableRow key={i}>
-                          {row.map((cell, j) => (
-                            <TableCell
-                              key={j}
-                              className="whitespace-nowrap text-xs"
-                            >
-                              {cell === null ? (
-                                <span className="text-slate-300 italic">NULL</span>
-                              ) : (
-                                String(cell)
-                              )}
-                            </TableCell>
+                {/* Column preview */}
+                {selectedTableColumns && selectedTableColumns.columns.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">
+                      {t("columnsPreview")} ({selectedTableColumns.columns.length})
+                    </Label>
+                    <div className="rounded-md border overflow-auto max-h-[200px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Column</TableHead>
+                            <TableHead className="text-xs">Type</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedTableColumns.columns.map((col) => (
+                            <TableRow key={col.name}>
+                              <TableCell className="text-xs font-mono py-1">{col.name}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground py-1">{col.type}</TableCell>
+                            </TableRow>
                           ))}
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Description + Cache TTL */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_160px]">
+              <div className="space-y-2">
+                <Label>{t("description")}</Label>
+                <Input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Optional description"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("cacheTTL")}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={cacheTTL}
+                  onChange={(e) => setCacheTTL(e.target.value)}
+                />
               </div>
             </div>
-          )}
-        </div>
+
+            {/* Virtual-only: SQL Editor */}
+            {activeTab === "virtual" && (
+              <div className="space-y-2">
+                <Label>{t("sqlQuery")} *</Label>
+                <div className="rounded-md border overflow-hidden">
+                  <Editor
+                    height="200px"
+                    language="sql"
+                    theme="vs"
+                    value={sqlQuery}
+                    onChange={(v) => setSqlQuery(v ?? "")}
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 13,
+                      fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                      lineNumbers: "on",
+                      scrollBeyondLastLine: false,
+                      wordWrap: "on",
+                      padding: { top: 8, bottom: 8 },
+                      automaticLayout: true,
+                      tabSize: 2,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1" />
+              <Button variant="secondary" onClick={() => onOpenChange(false)}>
+                {tc("cancel")}
+              </Button>
+              <Button onClick={handleSubmit} disabled={isSaving || !canSubmit}>
+                {isSaving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                {tc("save")}
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
