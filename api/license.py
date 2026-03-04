@@ -12,7 +12,7 @@ from functools import lru_cache
 import jwt
 from fastapi import HTTPException
 
-from license_keys import PUBLIC_KEY
+from api.license_keys import PUBLIC_KEY
 
 logger = logging.getLogger("karta.license")
 

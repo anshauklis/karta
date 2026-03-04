@@ -152,34 +152,6 @@ def build_system_prompt(
                 config_str = json.dumps(chart["chart_config"], default=str)[:500]
                 parts.append(f"Config: {config_str}")
 
-    # Semantic context: pre-defined metrics for the active connection
-    if connection_id:
-        with engine.connect() as conn:
-            models = conn.execute(text(
-                "SELECT id, name, description FROM semantic_models "
-                "WHERE connection_id = :cid"
-            ), {"cid": connection_id}).mappings().all()
-            if models:
-                parts.append("")
-                parts.append("## Semantic Models")
-                parts.append(
-                    "Pre-defined metrics available via "
-                    "`list_semantic_models` and `semantic_query` tools:"
-                )
-                for m in models:
-                    measures = conn.execute(text(
-                        "SELECT name, label FROM model_measures WHERE model_id = :mid"
-                    ), {"mid": m["id"]}).mappings().all()
-                    dims = conn.execute(text(
-                        "SELECT name, label FROM model_dimensions WHERE model_id = :mid"
-                    ), {"mid": m["id"]}).mappings().all()
-                    measure_names = ", ".join(r["name"] for r in measures) or "none"
-                    dim_names = ", ".join(r["name"] for r in dims) or "none"
-                    parts.append(
-                        f"- **{m['name']}**: measures=[{measure_names}], "
-                        f"dimensions=[{dim_names}]"
-                    )
-
     return "\n".join(parts)
 
 
@@ -424,7 +396,6 @@ _AGENT_PROMPTS: dict[str, str] = {
         "- Use get_table_profile before writing SQL to understand columns and values.\n"
         "- Use validate_sql to check queries before execution.\n"
         "- Explain query results clearly: highlight key numbers, trends, and outliers.\n"
-        "- Use semantic models when available for consistent metric definitions.\n"
         "- Prefer get_table_profile over get_sample + execute_sql — it gives everything in one call.\n"
     ),
     "chart_builder": (

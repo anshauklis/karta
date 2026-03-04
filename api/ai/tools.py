@@ -685,66 +685,6 @@ async def clone_dashboard_tool(dashboard_id: int) -> dict:
         return dict(new_dash)
 
 
-async def list_semantic_models(connection_id: int | None = None) -> dict:
-    """List available semantic models with their measures and dimensions."""
-    with engine.connect() as conn:
-        if connection_id:
-            models = conn.execute(text(
-                "SELECT id, name, description FROM semantic_models WHERE connection_id = :cid"
-            ), {"cid": connection_id}).mappings().all()
-        else:
-            models = conn.execute(text(
-                "SELECT id, name, description, connection_id FROM semantic_models"
-            )).mappings().all()
-
-        result = []
-        for m in models:
-            measures = conn.execute(text(
-                "SELECT name, label, agg_type FROM model_measures WHERE model_id = :mid ORDER BY sort_order"
-            ), {"mid": m["id"]}).mappings().all()
-            dimensions = conn.execute(text(
-                "SELECT name, label, dimension_type FROM model_dimensions WHERE model_id = :mid ORDER BY sort_order"
-            ), {"mid": m["id"]}).mappings().all()
-            result.append({
-                **dict(m),
-                "measures": [dict(r) for r in measures],
-                "dimensions": [dict(r) for r in dimensions],
-            })
-        return {"models": result}
-
-
-async def semantic_query_tool(
-    model_id: int,
-    measures: list[str],
-    dimensions: list[str] | None = None,
-    filters: list[dict] | None = None,
-    limit: int | None = 100,
-) -> dict:
-    """Execute a semantic query and return results."""
-    from api.semantic.query_builder import build_semantic_query
-    try:
-        sql = build_semantic_query(
-            model_id=model_id,
-            measure_names=measures,
-            dimension_names=dimensions or [],
-            filters=filters,
-            limit=limit,
-        )
-    except (ValueError, Exception) as e:
-        return {"error": str(e)}
-
-    # Get connection_id from the model
-    with engine.connect() as conn:
-        model = conn.execute(text(
-            "SELECT connection_id FROM semantic_models WHERE id = :id"
-        ), {"id": model_id}).mappings().first()
-        if not model:
-            return {"error": f"Model {model_id} not found"}
-
-    result = await execute_sql(model["connection_id"], sql)
-    result["generated_sql"] = sql
-    return result
-
 
 # --- Tool definitions for OpenAI function calling ---
 
@@ -1092,60 +1032,6 @@ TOOL_DEFINITIONS = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_semantic_models",
-            "description": "List available semantic models (metrics/dimensions). Each model has named measures (aggregations like SUM, COUNT) and dimensions (columns to group/filter by). Use this to discover what pre-defined metrics are available before writing raw SQL.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "connection_id": {
-                        "type": "integer",
-                        "description": "Optional: filter models by connection ID",
-                    },
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "semantic_query",
-            "description": "Execute a query using semantic model definitions. Specify measures (what to calculate) and dimensions (how to group). The system generates optimized SQL with proper JOINs, GROUP BY, and aggregations. Prefer this over raw SQL when a semantic model exists for the data.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "model_id": {"type": "integer", "description": "Semantic model ID"},
-                    "measures": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Measure names to calculate (e.g. ['total_revenue', 'order_count'])",
-                    },
-                    "dimensions": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Dimension names to group by (e.g. ['region', 'order_date'])",
-                    },
-                    "filters": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "dimension": {"type": "string"},
-                                "operator": {"type": "string", "enum": ["=", "!=", ">", "<", ">=", "<=", "IN", "IS NULL", "IS NOT NULL"]},
-                                "value": {},
-                            },
-                            "required": ["dimension", "operator", "value"],
-                        },
-                        "description": "Optional filters",
-                    },
-                    "limit": {"type": "integer", "description": "Max rows to return (default 100)"},
-                },
-                "required": ["model_id", "measures"],
-            },
-        },
-    },
 ]
 
 # Map function names to callables
@@ -1173,6 +1059,4 @@ TOOL_MAP = {
     "clone_chart": clone_chart,
     "validate_sql": validate_sql_tool,
     "clone_dashboard": clone_dashboard_tool,
-    "list_semantic_models": list_semantic_models,
-    "semantic_query": semantic_query_tool,
 }

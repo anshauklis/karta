@@ -32,8 +32,6 @@ AGENTS: dict[str, dict] = {
             "get_table_profile",
             "execute_sql",
             "list_datasets",
-            "list_semantic_models",
-            "semantic_query",
             "validate_sql",
         ],
     },
@@ -57,8 +55,6 @@ AGENTS: dict[str, dict] = {
             "patch_chart_config",
             "get_chart_config_schema",
             "clone_chart",
-            "list_semantic_models",
-            "semantic_query",
         ],
     },
     "dashboard_manager": {
@@ -114,7 +110,7 @@ _ROUTING_SYSTEM_PROMPT = (
     "specialist agent should handle it.\n\n"
     "Agents:\n"
     "- data_analyst: SQL queries, data exploration, table profiling, "
-    "executing/validating SQL, explaining results, semantic queries.\n"
+    "executing/validating SQL, explaining results.\n"
     "- chart_builder: creating/updating/deleting charts, visualization config, "
     "chart types, preview, styling.\n"
     "- dashboard_manager: creating/cloning dashboards, adding filters, "

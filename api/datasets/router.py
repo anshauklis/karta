@@ -10,8 +10,8 @@ from sqlalchemy import text
 from api.database import engine
 from api.models import (
     DatasetCreate, DatasetUpdate, DatasetResponse, SQLExecuteRequest, SQLExecuteResponse,
-    DatasetMeasureCreate, DatasetMeasureUpdate, DatasetMeasureResponse,
-    DatasetDimensionCreate, DatasetDimensionUpdate, DatasetDimensionResponse,
+    DatasetMeasureCreate, DatasetMeasureUpdate,
+    DatasetDimensionCreate, DatasetDimensionUpdate,
 )
 from api.auth.dependencies import get_current_user, check_ownership, require_role
 from api.sql_lab.router import execute_sql

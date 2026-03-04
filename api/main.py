@@ -84,7 +84,6 @@ app = FastAPI(
         {"name": "reports", "description": "Scheduled chart reports"},
         {"name": "stories", "description": "Narrative presentations"},
         {"name": "ai", "description": "AI assistant, SQL generation, glossary"},
-        {"name": "semantic", "description": "Semantic layer: models, measures, dimensions, joins"},
         {"name": "rls", "description": "Row-Level Security rules (admin)"},
         {"name": "analytics", "description": "Usage analytics (admin)"},
         {"name": "lineage", "description": "Data lineage graph"},
@@ -155,7 +154,6 @@ from api.favorites.router import router as favorites_router
 from api.templates.router import router as templates_router
 from api.tabs.router import router as tabs_router
 from api.meta.router import router as meta_router
-from api.semantic.router import router as semantic_router
 from api.versions.router import router as versions_router
 from api.dbt.router import router as dbt_router
 from api.audit.router import router as audit_router
@@ -191,7 +189,6 @@ app.include_router(favorites_router)
 app.include_router(templates_router)
 app.include_router(tabs_router)
 app.include_router(meta_router)
-app.include_router(semantic_router)
 app.include_router(versions_router)
 app.include_router(dbt_router)
 app.include_router(audit_router)

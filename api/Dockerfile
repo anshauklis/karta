@@ -17,6 +17,8 @@ RUN uv run playwright install --with-deps chromium
 
 COPY . ./api/
 
+ENV PYTHONPATH=/app/api
+
 RUN useradd -m -u 1000 app && chown -R app:app /app
 USER app
 
