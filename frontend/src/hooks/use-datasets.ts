@@ -197,3 +197,131 @@ export function useImportDbt() {
     },
   });
 }
+
+// ---------- Dataset Measures ----------
+
+export interface DatasetMeasure {
+  id: number;
+  dataset_id: number;
+  name: string;
+  label: string;
+  description: string;
+  expression: string;
+  agg_type: string;
+  format: string;
+  filters: unknown[];
+  sort_order: number;
+}
+
+export function useDatasetMeasures(datasetId: number | null) {
+  const { data: session } = useSession();
+  const token = (session as SessionWithToken)?.accessToken;
+  return useQuery({
+    queryKey: ["datasets", datasetId, "measures"],
+    queryFn: () => api.get<DatasetMeasure[]>(`/api/datasets/${datasetId}/measures`, token),
+    enabled: !!token && datasetId !== null,
+  });
+}
+
+export function useCreateDatasetMeasure() {
+  const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const token = (session as SessionWithToken)?.accessToken;
+  return useMutation({
+    mutationFn: ({ datasetId, data }: { datasetId: number; data: Omit<DatasetMeasure, "id" | "dataset_id"> }) =>
+      api.post<DatasetMeasure>(`/api/datasets/${datasetId}/measures`, data, token),
+    onSuccess: (_, { datasetId }) => {
+      queryClient.invalidateQueries({ queryKey: ["datasets", datasetId, "measures"] });
+    },
+  });
+}
+
+export function useUpdateDatasetMeasure() {
+  const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const token = (session as SessionWithToken)?.accessToken;
+  return useMutation({
+    mutationFn: ({ datasetId, measureId, data }: { datasetId: number; measureId: number; data: Partial<DatasetMeasure> }) =>
+      api.put<DatasetMeasure>(`/api/datasets/${datasetId}/measures/${measureId}`, data, token),
+    onSuccess: (_, { datasetId }) => {
+      queryClient.invalidateQueries({ queryKey: ["datasets", datasetId, "measures"] });
+    },
+  });
+}
+
+export function useDeleteDatasetMeasure() {
+  const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const token = (session as SessionWithToken)?.accessToken;
+  return useMutation({
+    mutationFn: ({ datasetId, measureId }: { datasetId: number; measureId: number }) =>
+      api.delete(`/api/datasets/${datasetId}/measures/${measureId}`, token),
+    onSuccess: (_, { datasetId }) => {
+      queryClient.invalidateQueries({ queryKey: ["datasets", datasetId, "measures"] });
+    },
+  });
+}
+
+// ---------- Dataset Dimensions ----------
+
+export interface DatasetDimension {
+  id: number;
+  dataset_id: number;
+  name: string;
+  label: string;
+  description: string;
+  column_name: string;
+  dimension_type: string;
+  time_grain: string | null;
+  format: string;
+  sort_order: number;
+}
+
+export function useDatasetDimensions(datasetId: number | null) {
+  const { data: session } = useSession();
+  const token = (session as SessionWithToken)?.accessToken;
+  return useQuery({
+    queryKey: ["datasets", datasetId, "dimensions"],
+    queryFn: () => api.get<DatasetDimension[]>(`/api/datasets/${datasetId}/dimensions`, token),
+    enabled: !!token && datasetId !== null,
+  });
+}
+
+export function useCreateDatasetDimension() {
+  const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const token = (session as SessionWithToken)?.accessToken;
+  return useMutation({
+    mutationFn: ({ datasetId, data }: { datasetId: number; data: Omit<DatasetDimension, "id" | "dataset_id"> }) =>
+      api.post<DatasetDimension>(`/api/datasets/${datasetId}/dimensions`, data, token),
+    onSuccess: (_, { datasetId }) => {
+      queryClient.invalidateQueries({ queryKey: ["datasets", datasetId, "dimensions"] });
+    },
+  });
+}
+
+export function useUpdateDatasetDimension() {
+  const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const token = (session as SessionWithToken)?.accessToken;
+  return useMutation({
+    mutationFn: ({ datasetId, dimensionId, data }: { datasetId: number; dimensionId: number; data: Partial<DatasetDimension> }) =>
+      api.put<DatasetDimension>(`/api/datasets/${datasetId}/dimensions/${dimensionId}`, data, token),
+    onSuccess: (_, { datasetId }) => {
+      queryClient.invalidateQueries({ queryKey: ["datasets", datasetId, "dimensions"] });
+    },
+  });
+}
+
+export function useDeleteDatasetDimension() {
+  const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const token = (session as SessionWithToken)?.accessToken;
+  return useMutation({
+    mutationFn: ({ datasetId, dimensionId }: { datasetId: number; dimensionId: number }) =>
+      api.delete(`/api/datasets/${datasetId}/dimensions/${dimensionId}`, token),
+    onSuccess: (_, { datasetId }) => {
+      queryClient.invalidateQueries({ queryKey: ["datasets", datasetId, "dimensions"] });
+    },
+  });
+}
