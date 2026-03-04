@@ -321,3 +321,62 @@ def delete_measure(dataset_id: int, measure_id: int, user=Depends(get_current_us
         )
         conn.commit()
         return {"ok": True}
+
+
+# ---------- Dimensions ----------
+
+@router.get("/{dataset_id}/dimensions")
+def list_dimensions(dataset_id: int, user=Depends(get_current_user)):
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT * FROM dataset_dimensions WHERE dataset_id = :did ORDER BY sort_order"),
+            {"did": dataset_id},
+        ).mappings().fetchall()
+        return [dict(r) for r in rows]
+
+
+@router.post("/{dataset_id}/dimensions")
+def create_dimension(dataset_id: int, req: DatasetDimensionCreate, user=Depends(get_current_user)):
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("""
+                INSERT INTO dataset_dimensions (dataset_id, name, label, description, column_name, dimension_type, time_grain, format, sort_order)
+                VALUES (:did, :name, :label, :desc, :col, :dtype, :tgrain, :fmt, :sort)
+                RETURNING *
+            """),
+            {"did": dataset_id, "name": req.name, "label": req.label,
+             "desc": req.description, "col": req.column_name, "dtype": req.dimension_type,
+             "tgrain": req.time_grain, "fmt": req.format, "sort": req.sort_order},
+        ).mappings().fetchone()
+        conn.commit()
+        return dict(row)
+
+
+@router.put("/{dataset_id}/dimensions/{dimension_id}")
+def update_dimension(dataset_id: int, dimension_id: int, req: DatasetDimensionUpdate, user=Depends(get_current_user)):
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(400, "No fields to update")
+    set_clause = ", ".join(f"{k} = :{k}" for k in updates)
+    updates["did"] = dataset_id
+    updates["dimid"] = dimension_id
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(f"UPDATE dataset_dimensions SET {set_clause} WHERE id = :dimid AND dataset_id = :did RETURNING *"),
+            updates,
+        ).mappings().fetchone()
+        conn.commit()
+        if not row:
+            raise HTTPException(404, "Dimension not found")
+        return dict(row)
+
+
+@router.delete("/{dataset_id}/dimensions/{dimension_id}")
+def delete_dimension(dataset_id: int, dimension_id: int, user=Depends(get_current_user)):
+    with engine.connect() as conn:
+        conn.execute(
+            text("DELETE FROM dataset_dimensions WHERE id = :dimid AND dataset_id = :did"),
+            {"dimid": dimension_id, "did": dataset_id},
+        )
+        conn.commit()
+        return {"ok": True}
