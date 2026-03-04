@@ -406,6 +406,82 @@ class DatasetResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# ---------- Dataset Measures ----------
+
+class DatasetMeasureCreate(BaseModel):
+    name: str
+    label: str
+    description: str = ""
+    expression: str
+    agg_type: str
+    format: str = ""
+    filters: list = []
+    sort_order: int = 0
+
+
+class DatasetMeasureUpdate(BaseModel):
+    name: Optional[str] = None
+    label: Optional[str] = None
+    description: Optional[str] = None
+    expression: Optional[str] = None
+    agg_type: Optional[str] = None
+    format: Optional[str] = None
+    filters: Optional[list] = None
+    sort_order: Optional[int] = None
+
+
+class DatasetMeasureResponse(BaseModel):
+    id: int
+    dataset_id: int
+    name: str
+    label: str
+    description: str = ""
+    expression: str
+    agg_type: str
+    format: str = ""
+    filters: list = []
+    sort_order: int = 0
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------- Dataset Dimensions ----------
+
+class DatasetDimensionCreate(BaseModel):
+    name: str
+    label: str
+    description: str = ""
+    column_name: str
+    dimension_type: str = "categorical"
+    time_grain: Optional[str] = None
+    format: str = ""
+    sort_order: int = 0
+
+
+class DatasetDimensionUpdate(BaseModel):
+    name: Optional[str] = None
+    label: Optional[str] = None
+    description: Optional[str] = None
+    column_name: Optional[str] = None
+    dimension_type: Optional[str] = None
+    time_grain: Optional[str] = None
+    format: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+class DatasetDimensionResponse(BaseModel):
+    id: int
+    dataset_id: int
+    name: str
+    label: str
+    description: str = ""
+    column_name: str
+    dimension_type: str = "categorical"
+    time_grain: Optional[str] = None
+    format: str = ""
+    sort_order: int = 0
+    model_config = ConfigDict(from_attributes=True)
+
+
 # --- Usage Analytics ---
 
 class PopularContentItem(BaseModel):

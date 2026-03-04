@@ -427,23 +427,9 @@ ALTER TABLE dashboards ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT TRUE;
 ALTER TABLE connections ADD COLUMN IF NOT EXISTS team_id INTEGER;
 ALTER TABLE datasets ADD COLUMN IF NOT EXISTS team_id INTEGER;
 
-CREATE TABLE IF NOT EXISTS semantic_models (
+CREATE TABLE IF NOT EXISTS dataset_measures (
     id              SERIAL PRIMARY KEY,
-    connection_id   INTEGER NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
-    name            TEXT NOT NULL,
-    description     TEXT DEFAULT '',
-    source_type     TEXT NOT NULL DEFAULT 'table',
-    source_table    TEXT,
-    source_sql      TEXT,
-    created_by      INTEGER REFERENCES users(id),
-    created_at      TIMESTAMPTZ DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(connection_id, name)
-);
-
-CREATE TABLE IF NOT EXISTS model_measures (
-    id              SERIAL PRIMARY KEY,
-    model_id        INTEGER NOT NULL REFERENCES semantic_models(id) ON DELETE CASCADE,
+    dataset_id      INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,
     label           TEXT NOT NULL,
     description     TEXT DEFAULT '',
@@ -452,12 +438,12 @@ CREATE TABLE IF NOT EXISTS model_measures (
     format          TEXT DEFAULT '',
     filters         JSONB DEFAULT '[]',
     sort_order      INTEGER DEFAULT 0,
-    UNIQUE(model_id, name)
+    UNIQUE(dataset_id, name)
 );
 
-CREATE TABLE IF NOT EXISTS model_dimensions (
+CREATE TABLE IF NOT EXISTS dataset_dimensions (
     id              SERIAL PRIMARY KEY,
-    model_id        INTEGER NOT NULL REFERENCES semantic_models(id) ON DELETE CASCADE,
+    dataset_id      INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,
     label           TEXT NOT NULL,
     description     TEXT DEFAULT '',
@@ -466,17 +452,7 @@ CREATE TABLE IF NOT EXISTS model_dimensions (
     time_grain      TEXT,
     format          TEXT DEFAULT '',
     sort_order      INTEGER DEFAULT 0,
-    UNIQUE(model_id, name)
-);
-
-CREATE TABLE IF NOT EXISTS model_joins (
-    id              SERIAL PRIMARY KEY,
-    from_model_id   INTEGER NOT NULL REFERENCES semantic_models(id) ON DELETE CASCADE,
-    to_model_id     INTEGER NOT NULL REFERENCES semantic_models(id) ON DELETE CASCADE,
-    join_type       TEXT NOT NULL DEFAULT 'left',
-    from_column     TEXT NOT NULL,
-    to_column       TEXT NOT NULL,
-    UNIQUE(from_model_id, to_model_id)
+    UNIQUE(dataset_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS dashboard_versions (
@@ -549,6 +525,11 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     current_period_end      TIMESTAMPTZ,
     created_at              TIMESTAMPTZ DEFAULT NOW()
 );
+
+DROP TABLE IF EXISTS model_joins;
+DROP TABLE IF EXISTS model_measures;
+DROP TABLE IF EXISTS model_dimensions;
+DROP TABLE IF EXISTS semantic_models;
 """
 
 
@@ -831,23 +812,9 @@ CREATE TABLE IF NOT EXISTS team_members (
     UNIQUE(team_id, user_id)
 );
 
-CREATE TABLE IF NOT EXISTS semantic_models (
+CREATE TABLE IF NOT EXISTS dataset_measures (
     id              SERIAL PRIMARY KEY,
-    connection_id   INTEGER NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
-    name            TEXT NOT NULL,
-    description     TEXT DEFAULT '',
-    source_type     TEXT NOT NULL DEFAULT 'table',
-    source_table    TEXT,
-    source_sql      TEXT,
-    created_by      INTEGER,
-    created_at      TIMESTAMPTZ DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(connection_id, name)
-);
-
-CREATE TABLE IF NOT EXISTS model_measures (
-    id              SERIAL PRIMARY KEY,
-    model_id        INTEGER NOT NULL REFERENCES semantic_models(id) ON DELETE CASCADE,
+    dataset_id      INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,
     label           TEXT NOT NULL,
     description     TEXT DEFAULT '',
@@ -856,12 +823,12 @@ CREATE TABLE IF NOT EXISTS model_measures (
     format          TEXT DEFAULT '',
     filters         JSONB DEFAULT '[]',
     sort_order      INTEGER DEFAULT 0,
-    UNIQUE(model_id, name)
+    UNIQUE(dataset_id, name)
 );
 
-CREATE TABLE IF NOT EXISTS model_dimensions (
+CREATE TABLE IF NOT EXISTS dataset_dimensions (
     id              SERIAL PRIMARY KEY,
-    model_id        INTEGER NOT NULL REFERENCES semantic_models(id) ON DELETE CASCADE,
+    dataset_id      INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,
     label           TEXT NOT NULL,
     description     TEXT DEFAULT '',
@@ -870,17 +837,7 @@ CREATE TABLE IF NOT EXISTS model_dimensions (
     time_grain      TEXT,
     format          TEXT DEFAULT '',
     sort_order      INTEGER DEFAULT 0,
-    UNIQUE(model_id, name)
-);
-
-CREATE TABLE IF NOT EXISTS model_joins (
-    id              SERIAL PRIMARY KEY,
-    from_model_id   INTEGER NOT NULL REFERENCES semantic_models(id) ON DELETE CASCADE,
-    to_model_id     INTEGER NOT NULL REFERENCES semantic_models(id) ON DELETE CASCADE,
-    join_type       TEXT NOT NULL DEFAULT 'left',
-    from_column     TEXT NOT NULL,
-    to_column       TEXT NOT NULL,
-    UNIQUE(from_model_id, to_model_id)
+    UNIQUE(dataset_id, name)
 );
 """
 
