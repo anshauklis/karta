@@ -271,7 +271,7 @@ async def create_connection(req: ConnectionCreate, request: Request, current_use
                 INSERT INTO connections (name, db_type, host, port, database_name,
                     username, password_encrypted, ssl_enabled, sqlalchemy_uri, extra_params, created_by)
                 VALUES (:name, :db_type, :host, :port, :database_name,
-                    :username, :password_encrypted, :ssl_enabled, :sqlalchemy_uri, :extra_params::jsonb, :created_by)
+                    :username, :password_encrypted, :ssl_enabled, :sqlalchemy_uri, CAST(:extra_params AS jsonb), :created_by)
                 RETURNING {_CONN_COLS}
             """),
             {
@@ -331,7 +331,7 @@ async def update_connection(conn_id: int, req: ConnectionUpdate, request: Reques
     set_parts = []
     for k in updates:
         if k == "extra_params":
-            set_parts.append(f"{k} = :{k}::jsonb")
+            set_parts.append(f"{k} = CAST(:{k} AS jsonb)")
         else:
             set_parts.append(f"{k} = :{k}")
     set_clauses = ", ".join(set_parts)
