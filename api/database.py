@@ -16,7 +16,10 @@ DATABASE_URL = os.environ.get(
     "postgresql://karta:karta@localhost:5432/karta",
 )
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=15, max_overflow=5)
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(DATABASE_URL)
+else:
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=15, max_overflow=5)
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS users (

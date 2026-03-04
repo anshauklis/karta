@@ -8,7 +8,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from api.database import engine
-from api.models import DatasetCreate, DatasetUpdate, DatasetResponse, SQLExecuteRequest, SQLExecuteResponse
+from api.models import (
+    DatasetCreate, DatasetUpdate, DatasetResponse, SQLExecuteRequest, SQLExecuteResponse,
+    DatasetMeasureCreate, DatasetMeasureUpdate, DatasetMeasureResponse,
+    DatasetDimensionCreate, DatasetDimensionUpdate, DatasetDimensionResponse,
+)
 from api.auth.dependencies import get_current_user, check_ownership, require_role
 from api.sql_lab.router import execute_sql
 from api.audit import log_action
@@ -256,3 +260,64 @@ def get_dataset_columns(dataset_id: int, current_user: dict = Depends(get_curren
         else:
             columns = [{"name": k, "type": "unknown"} for k in result.keys()]
     return {"columns": columns}
+
+
+# ---------- Measures ----------
+
+@router.get("/{dataset_id}/measures")
+def list_measures(dataset_id: int, user=Depends(get_current_user)):
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT * FROM dataset_measures WHERE dataset_id = :did ORDER BY sort_order"),
+            {"did": dataset_id},
+        ).mappings().fetchall()
+        return [dict(r) for r in rows]
+
+
+@router.post("/{dataset_id}/measures")
+def create_measure(dataset_id: int, req: DatasetMeasureCreate, user=Depends(get_current_user)):
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("""
+                INSERT INTO dataset_measures (dataset_id, name, label, description, expression, agg_type, format, filters, sort_order)
+                VALUES (:did, :name, :label, :desc, :expr, :agg, :fmt, :filters::jsonb, :sort)
+                RETURNING *
+            """),
+            {"did": dataset_id, "name": req.name, "label": req.label,
+             "desc": req.description, "expr": req.expression, "agg": req.agg_type,
+             "fmt": req.format, "filters": json.dumps(req.filters), "sort": req.sort_order},
+        ).mappings().fetchone()
+        conn.commit()
+        return dict(row)
+
+
+@router.put("/{dataset_id}/measures/{measure_id}")
+def update_measure(dataset_id: int, measure_id: int, req: DatasetMeasureUpdate, user=Depends(get_current_user)):
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(400, "No fields to update")
+    if "filters" in updates:
+        updates["filters"] = json.dumps(updates["filters"])
+    set_clause = ", ".join(f"{k} = :{k}" for k in updates)
+    updates["mid"] = measure_id
+    updates["did"] = dataset_id
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(f"UPDATE dataset_measures SET {set_clause} WHERE id = :mid AND dataset_id = :did RETURNING *"),
+            updates,
+        ).mappings().fetchone()
+        conn.commit()
+        if not row:
+            raise HTTPException(404, "Measure not found")
+        return dict(row)
+
+
+@router.delete("/{dataset_id}/measures/{measure_id}")
+def delete_measure(dataset_id: int, measure_id: int, user=Depends(get_current_user)):
+    with engine.connect() as conn:
+        conn.execute(
+            text("DELETE FROM dataset_measures WHERE id = :mid AND dataset_id = :did"),
+            {"mid": measure_id, "did": dataset_id},
+        )
+        conn.commit()
+        return {"ok": True}
