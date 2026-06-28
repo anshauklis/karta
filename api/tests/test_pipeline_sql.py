@@ -7,6 +7,8 @@ from pipeline_sql import (
     _chart_filters_cte,
     _time_range_cte,
     _time_grain_cte,
+    _quote_ident,
+    SQLValidationError,
 )
 
 
@@ -203,6 +205,29 @@ class TestChartFiltersCte:
         assert '"deleted_at" IS NULL' in cte
         assert params == {}
 
+    def test_custom_sql_filter_blocks_file_read(self):
+        """A custom_sql filter using a DuckDB file function is rejected (C2)."""
+        config = {
+            "chart_filters": [
+                {"expressionType": "custom_sql",
+                 "sqlExpression": "1=1 OR read_text('/etc/passwd') IS NOT NULL"},
+            ],
+        }
+        with pytest.raises(SQLValidationError):
+            _chart_filters_cte(config, "_base", skip_metrics=False)
+
+    def test_custom_sql_filter_allows_benign_expression(self):
+        """A benign custom_sql filter still passes through."""
+        config = {
+            "chart_filters": [
+                {"expressionType": "custom_sql", "sqlExpression": "amount > 100"},
+            ],
+        }
+        result = _chart_filters_cte(config, "_base", skip_metrics=False)
+        assert result is not None
+        cte, _ = result
+        assert "(amount > 100)" in cte
+
     def test_skip_metrics_returns_none(self):
         """skip_metrics=True always returns None."""
         config = {
@@ -220,6 +245,35 @@ class TestChartFiltersCte:
 
         result2 = _chart_filters_cte({}, "_base", skip_metrics=False)
         assert result2 is None
+
+
+# ---------------------------------------------------------------------------
+# _quote_ident — identifier-injection hardening (C1)
+# ---------------------------------------------------------------------------
+
+
+class TestQuoteIdent:
+    def test_plain_identifier(self):
+        assert _quote_ident("revenue") == '"revenue"'
+
+    def test_embedded_quote_doubled(self):
+        # An attacker label cannot break out of the quoted identifier.
+        assert _quote_ident('x" , read_text(\'/etc/passwd\') AS "leak') == \
+            '"x"" , read_text(\'/etc/passwd\') AS ""leak"'
+
+    def test_metric_label_injection_is_neutralised(self):
+        """A malicious metric label is contained inside one quoted alias."""
+        config = {
+            "x_column": "category",
+            "metrics": [
+                {"column": "revenue", "aggregate": "SUM",
+                 "label": 'a" , read_text(\'/etc/passwd\') AS "b'},
+            ],
+        }
+        sql, _ = build_pipeline_sql("read_parquet('/tmp/d.parquet')", config)
+        # The payload survives only as a doubled-quote alias, never as bare SQL.
+        assert 'read_text(\'/etc/passwd\') AS ""b"' in sql
+        assert ', read_text(\'/etc/passwd\') AS "b"' not in sql
 
 
 # ---------------------------------------------------------------------------

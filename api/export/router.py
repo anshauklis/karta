@@ -13,6 +13,16 @@ from api.models import SharedLinkCreate, SharedLinkResponse, ImportConfirmReques
 
 router = APIRouter(tags=["export"])
 
+# Fields that must never be exposed on public (unauthenticated) share/embed
+# responses: raw SQL, server-side Python, and internal connection identity.
+_PUBLIC_CHART_REDACT = ("sql_query", "chart_code", "connection_id", "created_by")
+
+
+def _scrub_public_chart(chart_dict: dict) -> None:
+    """Remove sensitive internal fields from a chart dict served to anonymous users."""
+    for key in _PUBLIC_CHART_REDACT:
+        chart_dict.pop(key, None)
+
 
 def _get_excel_format(fmt: dict) -> str | None:
     """Convert column format config to Excel number format string."""
@@ -157,6 +167,10 @@ def export_xlsx(body: ExcelExportRequest, current_user: dict = Depends(get_curre
 def export_dashboard(dashboard_id: int, current_user: dict = Depends(get_current_user)):
     """Export a dashboard with all tabs, connections, datasets, charts, and filters as a downloadable JSON file."""
     with engine.connect() as conn:
+        # Export reveals connection host/port/database/username, so restrict it to
+        # the dashboard owner or an admin (not every authenticated user).
+        check_ownership(conn, "dashboards", dashboard_id, current_user)
+
         # 1. Dashboard
         dash = conn.execute(text("""
             SELECT id, title, description, icon, url_slug, color_scheme, filter_layout
@@ -672,10 +686,8 @@ def create_share_link(dashboard_id: int, body: SharedLinkCreate, current_user: d
         expires_at = datetime.now(timezone.utc) + timedelta(hours=body.expires_in_hours)
 
     with engine.connect() as conn:
-        # Verify dashboard exists
-        dash = conn.execute(text("SELECT id FROM dashboards WHERE id = :id"), {"id": dashboard_id}).first()
-        if not dash:
-            raise HTTPException(404, "Dashboard not found")
+        # Verify dashboard exists and the caller owns it (or is admin)
+        check_ownership(conn, "dashboards", dashboard_id, current_user)
 
         row = conn.execute(text("""
             INSERT INTO shared_links (dashboard_id, token, created_by, expires_at)
@@ -690,6 +702,7 @@ def create_share_link(dashboard_id: int, body: SharedLinkCreate, current_user: d
 def list_share_links(dashboard_id: int, current_user: dict = Depends(get_current_user)):
     """Return all share links for a dashboard, most recent first."""
     with engine.connect() as conn:
+        check_ownership(conn, "dashboards", dashboard_id, current_user)
         rows = conn.execute(text("""
             SELECT * FROM shared_links
             WHERE dashboard_id = :did
@@ -718,6 +731,7 @@ def create_chart_share_link(chart_id: int, body: SharedLinkCreate, current_user:
         expires_at = datetime.now(timezone.utc) + timedelta(hours=body.expires_in_hours)
 
     with engine.connect() as conn:
+        check_ownership(conn, "charts", chart_id, current_user)
         chart = conn.execute(text("SELECT id, dashboard_id FROM charts WHERE id = :id"), {"id": chart_id}).mappings().first()
         if not chart:
             raise HTTPException(404, "Chart not found")
@@ -793,6 +807,7 @@ def get_shared_chart(token: str, filters: str | None = Query(None)):
             result["error"] = str(e)
 
         chart_dict["result"] = result
+        _scrub_public_chart(chart_dict)
         return {"chart": chart_dict}
 
 
@@ -800,6 +815,7 @@ def get_shared_chart(token: str, filters: str | None = Query(None)):
 def list_chart_share_links(chart_id: int, current_user: dict = Depends(get_current_user)):
     """Return all share links for a chart."""
     with engine.connect() as conn:
+        check_ownership(conn, "charts", chart_id, current_user)
         rows = conn.execute(text("""
             SELECT * FROM shared_links
             WHERE chart_id = :cid
@@ -879,9 +895,12 @@ def get_shared_dashboard(token: str, filters: str | None = Query(None)):
             except Exception as e:
                 result["error"] = str(e)
             chart_dict["result"] = result
+            _scrub_public_chart(chart_dict)
             chart_results.append(chart_dict)
 
+        dashboard_dict = dict(dashboard)
+        dashboard_dict.pop("created_by", None)
         return {
-            "dashboard": dict(dashboard),
+            "dashboard": dashboard_dict,
             "charts": chart_results,
         }

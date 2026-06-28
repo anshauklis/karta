@@ -8,6 +8,23 @@ import re
 
 import pyarrow.parquet as pq
 
+# SQLValidationError is re-exported (noqa) so callers/tests can catch the exact
+# class instance that validate_duckdb_expression raises across both import paths.
+try:  # app context (run as api.*) vs unit-test context (api/ on sys.path)
+    from api.sql_validator import validate_duckdb_expression, SQLValidationError  # noqa: F401
+except ImportError:  # pragma: no cover
+    from sql_validator import validate_duckdb_expression, SQLValidationError  # noqa: F401
+
+
+def _quote_ident(name: str) -> str:
+    """Safely quote a SQL identifier/alias, escaping embedded double-quotes.
+
+    Standard SQL identifier escaping doubles the quote character, so a value
+    containing `"` (e.g. an attacker-controlled metric label or column name)
+    cannot break out of the quoted-identifier context and inject SQL.
+    """
+    return '"' + str(name).replace('"', '""') + '"'
+
 
 def build_pipeline_sql(
     source: str,
@@ -176,10 +193,12 @@ def _chart_filters_cte(config: dict, prev: str, skip_metrics: bool) -> tuple[str
     params = {}
 
     for i, f in enumerate(filters):
-        # Custom SQL expressions — inject directly (validated by DuckDB)
+        # Custom SQL expressions — validate against the DuckDB file/system
+        # function denylist before interpolating (prevents read_text/glob/ATTACH).
         if f.get("expressionType") == "custom_sql":
             expr = f.get("sqlExpression", "")
             if expr:
+                validate_duckdb_expression(expr)  # raises SQLValidationError if unsafe
                 conditions.append(f"({expr})")
             continue
 
@@ -347,7 +366,7 @@ def _calculated_columns_cte(config: dict, prev: str) -> str | None:
         expr_lower = expr.lower()
         if any(tok in expr_lower for tok in _BLOCKED_TOKENS):
             continue
-        expressions.append(f'({expr}) AS "{name}"')
+        expressions.append(f'({expr}) AS {_quote_ident(name)}')
 
     if not expressions:
         return None
@@ -376,7 +395,7 @@ def _metrics_cte(config: dict, prev: str) -> str | None:
         "MIN": "MIN", "MAX": "MAX", "COUNT_DISTINCT": "COUNT_DISTINCT",
     }
 
-    select_parts = [f'"{c}"' for c in group_cols]
+    select_parts = [_quote_ident(c) for c in group_cols]
     has_any = False
 
     for idx, m in enumerate(metrics):
@@ -389,15 +408,15 @@ def _metrics_cte(config: dict, prev: str) -> str | None:
         label = m.get("label", f"{agg}({col})")
 
         if agg == "COUNT" and col == "*":
-            select_parts.append(f'COUNT(*) AS "{label}"')
+            select_parts.append(f'COUNT(*) AS {_quote_ident(label)}')
             has_any = True
         elif col:
             if agg == "COUNT_DISTINCT":
-                select_parts.append(f'COUNT(DISTINCT "{col}") AS "{label}"')
+                select_parts.append(f'COUNT(DISTINCT {_quote_ident(col)}) AS {_quote_ident(label)}')
             elif agg in agg_map:
-                select_parts.append(f'{agg}("{col}") AS "{label}"')
+                select_parts.append(f'{agg}({_quote_ident(col)}) AS {_quote_ident(label)}')
             else:
-                select_parts.append(f'SUM("{col}") AS "{label}"')
+                select_parts.append(f'SUM({_quote_ident(col)}) AS {_quote_ident(label)}')
             has_any = True
 
     if not has_any:
@@ -406,7 +425,7 @@ def _metrics_cte(config: dict, prev: str) -> str | None:
     select_str = ", ".join(select_parts)
 
     if group_cols:
-        group_str = ", ".join(f'"{c}"' for c in group_cols)
+        group_str = ", ".join(_quote_ident(c) for c in group_cols)
         return (
             f"_met AS (\n"
             f"    SELECT {select_str}\n"

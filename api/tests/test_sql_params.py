@@ -66,6 +66,15 @@ class TestSubstitute:
         result = substitute("{{ name }}", {"name": "O'Brien"})
         assert result == "'O''Brien'"
 
+    def test_backslash_escaped(self):
+        # A trailing backslash must not escape the closing quote (MySQL/ClickHouse).
+        result = substitute("{{ name }}", {"name": "evil\\"})
+        assert result == "'evil\\\\'"
+
+    def test_backslash_and_quote_escaped(self):
+        result = substitute("{{ name }}", {"name": "a\\'; DROP"})
+        assert result == "'a\\\\''; DROP'"
+
     def test_missing_variable_raises(self):
         with pytest.raises(ValueError, match="no value and no default"):
             substitute("{{ missing }}", {})

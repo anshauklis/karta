@@ -58,6 +58,7 @@ def _fetch_report(report_id: int) -> dict:
             text("""
                 SELECT r.id, r.name, r.chart_id, r.channel_id,
                     COALESCE(r.format, 'excel') as format,
+                    r.created_by,
                     c.connection_id, c.sql_query, c.title as chart_title,
                     c.dashboard_id
                 FROM scheduled_reports r
@@ -78,7 +79,10 @@ def _run_excel_report(report: dict) -> tuple[dict, bytes, str, int]:
     if not report["sql_query"] or not report["connection_id"]:
         raise ValueError(f"Report {report['id']}: chart has no SQL or connection")
 
-    columns, rows, df, _pq_path = _execute_chart_full(report["connection_id"], report["sql_query"], chart_config={}, skip_metrics=True)
+    # Run under the report owner's identity so row-level security applies.
+    columns, rows, df, _pq_path = _execute_chart_full(
+        report["connection_id"], report["sql_query"], chart_config={},
+        skip_metrics=True, user_id=report.get("created_by"))
 
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
@@ -105,8 +109,9 @@ async def _run_screenshot_report(report: dict, fmt: str) -> tuple[bytes, str]:
             f"PNG/PDF export requires a dashboard. Use 'excel' format for standalone charts."
         )
 
-    # Create a temporary share link
-    token = await asyncio.to_thread(_create_temp_share_link, dashboard_id)
+    # Create a temporary share link owned by the report creator so that the
+    # screenshot render applies that user's row-level security (not a NULL owner).
+    token = await asyncio.to_thread(_create_temp_share_link, dashboard_id, report.get("created_by"))
 
     try:
         from api.screenshot import capture_dashboard
@@ -122,16 +127,20 @@ async def _run_screenshot_report(report: dict, fmt: str) -> tuple[bytes, str]:
     return file_bytes, filename
 
 
-def _create_temp_share_link(dashboard_id: int) -> str:
-    """Create a temporary share link for screenshot capture."""
+def _create_temp_share_link(dashboard_id: int, created_by: int | None = None) -> str:
+    """Create a temporary share link for screenshot capture.
+
+    created_by carries the report owner's identity so the screenshot render applies
+    that user's row-level security instead of running with no RLS (NULL owner).
+    """
     token = secrets.token_urlsafe(32)
     with engine.connect() as conn:
         conn.execute(
             text("""
                 INSERT INTO shared_links (dashboard_id, token, created_by, expires_at)
-                VALUES (:did, :token, NULL, NOW() + INTERVAL '5 minutes')
+                VALUES (:did, :token, :uid, NOW() + INTERVAL '5 minutes')
             """),
-            {"did": dashboard_id, "token": token},
+            {"did": dashboard_id, "token": token, "uid": created_by},
         )
         conn.commit()
     return token

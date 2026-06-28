@@ -24,6 +24,24 @@ _FORBIDDEN_RE = re.compile(
     re.IGNORECASE,
 )
 
+# DuckDB-specific functions/keywords that allow local-file, attach or network
+# access. These must be blocked in user-supplied expression fragments that are
+# interpolated into the DuckDB pipeline SQL (chart custom_sql filters/metrics),
+# which never passes through validate_sql(). The PostgreSQL FORBIDDEN_FUNCTIONS
+# above do not cover the DuckDB surface.
+DUCKDB_FORBIDDEN = {
+    "read_csv", "read_csv_auto", "read_parquet", "parquet_scan",
+    "read_json", "read_json_auto", "read_json_objects",
+    "read_ndjson", "read_ndjson_auto", "read_ndjson_objects",
+    "read_text", "read_blob", "glob", "sniff_csv",
+    "attach", "detach", "install", "load",
+}
+
+_DUCKDB_FORBIDDEN_RE = re.compile(
+    r"\b(?:" + "|".join(sorted(DUCKDB_FORBIDDEN)) + r")\b",
+    re.IGNORECASE,
+)
+
 # Match string literals (single-quoted, with '' escapes) for stripping
 _STRING_LITERAL_RE = re.compile(r"'(?:[^']|'')*'")
 
@@ -102,4 +120,20 @@ def validate_sql_expression(expr: str) -> str:
     if re.search(r'\bSELECT\b', check_str, re.IGNORECASE):
         raise SQLValidationError("Subqueries are not allowed in expressions")
 
+    return expr
+
+
+def validate_duckdb_expression(expr: str) -> str:
+    """Validate an expression fragment that is interpolated into DuckDB pipeline SQL.
+
+    Stricter than validate_sql_expression(): in addition to keyword/subquery/semicolon
+    checks, it blocks DuckDB file/attach/network functions (read_csv, read_text,
+    read_parquet, glob, ATTACH, INSTALL, ...) that would otherwise allow arbitrary
+    local-file reads from the chart pipeline. Raises SQLValidationError if unsafe.
+    """
+    expr = validate_sql_expression(expr)
+    check_str = _strip_string_literals(_strip_sql_comments(expr))
+    match = _DUCKDB_FORBIDDEN_RE.search(check_str)
+    if match:
+        raise SQLValidationError(f"Forbidden DuckDB function: {match.group()}")
     return expr

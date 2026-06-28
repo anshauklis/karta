@@ -1,11 +1,12 @@
 """Karta Cloud: tenant provisioning and onboarding."""
 
+import hmac
 import logging
 import os
 import re
 
 import bcrypt as _bcrypt
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import text
 
@@ -15,6 +16,21 @@ logger = logging.getLogger("karta.cloud")
 router = APIRouter(prefix="/api/cloud", tags=["cloud"])
 
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-]{1,62}[a-z0-9]$")
+
+
+def _require_provision_secret(x_provision_secret: str | None = Header(default=None)) -> None:
+    """Authorize tenant provisioning with a control-plane shared secret.
+
+    Provisioning creates a tenant plus a fully privileged admin user, so it must
+    never be open. The secret is supplied out-of-band to the control plane via the
+    CLOUD_PROVISION_SECRET env var. When the env var is unset the endpoint is
+    disabled entirely (safe by default). Comparison is constant-time.
+    """
+    expected = os.environ.get("CLOUD_PROVISION_SECRET", "")
+    if not expected:
+        raise HTTPException(503, "Tenant provisioning is disabled")
+    if not x_provision_secret or not hmac.compare_digest(x_provision_secret, expected):
+        raise HTTPException(403, "Invalid provisioning credentials")
 
 
 def _hash_password(password: str) -> str:
@@ -37,8 +53,15 @@ class ProvisionResponse(BaseModel):
 
 
 @router.post("/provision", response_model=ProvisionResponse)
-async def provision_tenant(body: ProvisionRequest):
-    """Create a new tenant with schema and admin user."""
+async def provision_tenant(
+    body: ProvisionRequest,
+    _auth: None = Depends(_require_provision_secret),
+):
+    """Create a new tenant with schema and admin user.
+
+    Authorized via the CLOUD_PROVISION_SECRET control-plane shared secret
+    (X-Provision-Secret header); disabled when the secret is not configured.
+    """
     slug = body.slug.lower().strip()
     if not _SLUG_RE.match(slug):
         raise HTTPException(
