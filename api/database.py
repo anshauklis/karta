@@ -551,8 +551,13 @@ def ensure_schema():
                     conn.execute(text("SAVEPOINT sp"))
                     conn.execute(text(statement))
                     conn.execute(text("RELEASE SAVEPOINT sp"))
-                except (exc.ProgrammingError, exc.IntegrityError, exc.OperationalError):
+                except (exc.ProgrammingError, exc.IntegrityError, exc.OperationalError) as e:
                     conn.execute(text("ROLLBACK TO SAVEPOINT sp"))
+                    # Most failures are benign (IF NOT EXISTS races); log at debug so a
+                    # genuinely broken/misordered DDL statement is diagnosable instead
+                    # of vanishing silently.
+                    logger.debug("ensure_schema: skipped statement %r: %s",
+                                 statement[:120], e)
 
         # Create default tenant if none exists
         try:
