@@ -23,7 +23,25 @@ export function generateCodeFromVisual(
 ): string {
   const xCol = (cfg.x_column as string) || "df.columns[0]";
   const yCols = (cfg.y_columns as string[]) || [];
-  const yCol = yCols.length > 0 ? yCols[0] : "df.columns[1]";
+  const metrics = (cfg.metrics as Array<{ label?: string; aggregate?: string; column?: string }>) || [];
+  // y column: explicit y_columns win; otherwise the first metric's output column
+  // (its label == the pipeline's aggregated column name). Fall back to the
+  // positional df.columns[1] only when neither is set — that index is WRONG as
+  // soon as a Color/Group column exists, because the metric shifts to a later
+  // position and df.columns[1] then points at the group column.
+  let yCol: string;
+  if (metrics.length > 0) {
+    // When metrics exist the pipeline AGGREGATES into the metric's labelled
+    // column, so y must reference that label — not the raw y_column (which no
+    // longer exists post-aggregation, e.g. "amount" -> "Total Amount") and not
+    // the positional df.columns[1] (wrong once a Color/Group column is added).
+    const m = metrics[0];
+    yCol = m.label || `${(m.aggregate || "SUM").toUpperCase()}(${m.column || ""})`;
+  } else if (yCols.length > 0) {
+    yCol = yCols[0];
+  } else {
+    yCol = "df.columns[1]";
+  }
   const xRef = xCol === "df.columns[0]" ? xCol : `"${xCol}"`;
   const yRef = yCol === "df.columns[1]" ? yCol : `"${yCol}"`;
   const color = (cfg.color_column as string) || colorCol || "";
@@ -361,7 +379,7 @@ export function generateCodeFromVisual(
       code += `fig.update_layout(yaxis2=dict(overlaying="y", side="right"))\n`;
     } else if (type === "combo" && yCols.length === 1) {
       code += `fig = px.bar(df, x=${xRef}, y=${yRef}${colorArg})\n`;
-    } else if (yCols.length > 1) {
+    } else if (yCols.length > 1 && metrics.length === 0) {
       code += `df_melted = df.melt(id_vars=[${xRef}], value_vars=[${yCols.map(c => `"${c}"`).join(", ")}], var_name="series", value_name="value")\n`;
       code += `fig = px.${pxType}(df_melted, x=${xRef}, y="value", color="series")\n`;
     } else {
@@ -417,6 +435,18 @@ export function generateCodeFromVisual(
 
   if (layoutOpts.length > 0) {
     code += `fig.update_layout(${layoutOpts.join(", ")})\n`;
+  }
+
+  // Color palette & sort order — emitted as structured comments so they
+  // survive the visual<->code roundtrip (no clean single px arg exists for
+  // either; palette is applied server-side as a colorway, sort reorders data).
+  const colorPalette = cfg.color_palette as string | undefined;
+  if (colorPalette && colorPalette !== "default") {
+    code += `# @config: color_palette=${colorPalette}\n`;
+  }
+  const sortOrder = cfg.sort_order as string | undefined;
+  if (sortOrder && sortOrder !== "none") {
+    code += `# @config: sort_order=${sortOrder}\n`;
   }
 
   return code;

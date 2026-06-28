@@ -24,6 +24,7 @@ import { RichTextView } from "@/components/rich-text-view";
 import { downloadCSV, downloadExcel } from "@/lib/export";
 import { useSummarizeChart } from "@/hooks/use-ai";
 import { ChartInsightsBadge } from "./chart-insights-badge";
+import { ChartErrorBoundary } from "./chart-error-boundary";
 import { ChartSkeleton } from "@/components/charts/chart-skeleton";
 import type { Chart, ChartExecuteResult, ColumnFormat } from "@/types";
 import { useInView } from "@/hooks/use-in-view";
@@ -140,6 +141,7 @@ export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, i
   }
 
   return (
+    <ChartErrorBoundary chartTitle={chart.title} onRetry={handleRefresh}>
     <Card className="flex h-full min-h-[200px] flex-col overflow-hidden md:min-h-0">
       {/* Title bar */}
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
@@ -156,7 +158,7 @@ export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, i
               <Info className="h-3.5 w-3.5" />
             </button>
           )}
-          {chart.id && <ChartInsightsBadge chartId={chart.id} />}
+          {chart.id && <ChartInsightsBadge chartId={chart.id} enabled={isInView} />}
         </div>
         {showActions && (
           <div className="flex shrink-0 gap-1">
@@ -401,5 +403,6 @@ export const ChartCard = memo(function ChartCard({ chart, result, isExecuting, i
         </DialogContent>
       </Dialog>
     </Card>
+    </ChartErrorBoundary>
   );
 });

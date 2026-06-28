@@ -361,7 +361,7 @@ export function parseCodeToVisual(
       const suffixMatch = code.match(/"suffix"\s*:\s*"([^"]*)"/);
       if (suffixMatch) result.kpi_suffix = suffixMatch[1];
       // Parse target from delta={"reference": N}
-      const targetMatch = code.match(/"reference"\s*:\s*([\d.]+)/);
+      const targetMatch = code.match(/"reference"\s*:\s*(-?[\d.]+)/);
       if (targetMatch) result.kpi_target = parseFloat(targetMatch[1]);
       return result;
     }
@@ -497,9 +497,18 @@ export function parseCodeToVisual(
     );
     if (yMatch) result.y_columns = [yMatch[1] || yMatch[2]];
 
-    // Extract color
+    // Extract color. The synthetic "series" column from a multi-series
+    // melt/unpivot (var_name="series") is NOT a real column: when present we must
+    // explicitly CLEAR color_column, otherwise a stale phantom value (e.g. a
+    // previously-saved color_column="series") survives the code-tab config merge.
     const colorMatch = code.match(/color\s*=\s*["']([^"']+)["']/);
-    if (colorMatch) result.color_column = colorMatch[1];
+    const isSyntheticSeries =
+      colorMatch?.[1] === "series" && /var_name\s*=\s*["']series["']/.test(code);
+    if (colorMatch && !isSyntheticSeries) {
+      result.color_column = colorMatch[1];
+    } else if (isSyntheticSeries) {
+      result.color_column = "";
+    }
 
     // Extract melt value_vars for multi-series
     const meltMatch = code.match(/value_vars\s*=\s*\[([^\]]+)\]/);
@@ -554,6 +563,12 @@ export function parseCodeToVisual(
     if (/textposition\s*=\s*["']auto["']/.test(code)) {
       result.show_values = true;
     }
+
+    // Color palette & sort order from @config structured comments
+    const palMatch = code.match(/^#\s*@config:\s*color_palette=(\w+)/m);
+    if (palMatch) result.color_palette = palMatch[1];
+    const sortOrderMatch = code.match(/^#\s*@config:\s*sort_order=(\w+)/m);
+    if (sortOrderMatch) result.sort_order = sortOrderMatch[1];
 
     return result;
   } catch {
