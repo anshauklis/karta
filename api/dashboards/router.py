@@ -128,6 +128,24 @@ def _user_can_see_dashboard(dashboard: dict, user_id: int, user_groups: list[str
     return False
 
 
+def user_can_access_dashboard(conn, dashboard_id: int, current_user: dict) -> bool:
+    """Reusable access check: may this user view the given dashboard?
+
+    Mirrors the list/by-slug access rules (admin / owner / matching group / open)
+    so other routers (e.g. charts) can enforce the same visibility.
+    """
+    user_id = int(current_user["sub"])
+    is_admin = current_user.get("is_admin", False) or "admin" in current_user.get("roles", [])
+    if is_admin:
+        return True
+    dashboard = {
+        "id": dashboard_id,
+        "owners": _get_dashboard_owners(conn, dashboard_id),
+        "roles": _get_dashboard_roles(conn, dashboard_id),
+    }
+    return _user_can_see_dashboard(dashboard, user_id, _get_user_groups(user_id), is_admin)
+
+
 def _get_user_groups(user_id: int) -> list[str]:
     with engine.connect() as conn:
         result = conn.execute(

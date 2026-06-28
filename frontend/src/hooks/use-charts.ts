@@ -97,6 +97,7 @@ export function useUpdateChart() {
       api.put<Chart>(`/api/charts/${chartId}`, data, token),
     onSuccess: (_, { chartId }) => {
       queryClient.invalidateQueries({ queryKey: ["chart", chartId] });
+      queryClient.invalidateQueries({ queryKey: ["chart-insights", chartId] });
       queryClient.invalidateQueries({ queryKey: ["charts"] });
       toast.success("Chart saved");
     },
@@ -111,7 +112,9 @@ export function useDeleteChart() {
   return useMutation({
     mutationFn: (chartId: number) =>
       api.delete(`/api/charts/${chartId}`, token),
-    onSuccess: () => {
+    onSuccess: (_, chartId) => {
+      queryClient.invalidateQueries({ queryKey: ["chart", chartId] });
+      queryClient.invalidateQueries({ queryKey: ["chart-insights", chartId] });
       queryClient.invalidateQueries({ queryKey: ["charts"] });
       toast.success("Chart deleted");
     },
@@ -160,7 +163,9 @@ export function useDuplicateChart() {
   return useMutation({
     mutationFn: (chartId: number) =>
       api.post<Chart>(`/api/charts/${chartId}/duplicate`, {}, token),
-    onSuccess: () => {
+    onSuccess: (newChart) => {
+      queryClient.invalidateQueries({ queryKey: ["chart", newChart.id] });
+      queryClient.invalidateQueries({ queryKey: ["chart-insights", newChart.id] });
       queryClient.invalidateQueries({ queryKey: ["charts"] });
       toast.success("Chart duplicated");
     },
@@ -198,14 +203,14 @@ export function useSaveLayout(dashboardId: number) {
   });
 }
 
-export function useChartInsights(chartId: number | undefined) {
+export function useChartInsights(chartId: number | undefined, enabled: boolean = true) {
   const { data: session } = useSession();
   const token = (session as SessionWithToken)?.accessToken;
 
   return useQuery({
     queryKey: ["chart-insights", chartId],
     queryFn: () => api.get<{ insights: ChartInsight[] }>(`/api/charts/${chartId}/insights`, token),
-    enabled: !!token && !!chartId,
+    enabled: !!token && !!chartId && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

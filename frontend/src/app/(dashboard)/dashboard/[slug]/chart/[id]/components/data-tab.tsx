@@ -22,6 +22,7 @@ import { DropZone } from "./drop-zone";
 import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
 import type { ChartExecuteResult, ChartVariable } from "@/types";
+import { resolveMetricLabels, type EditorMetric } from "../lib/metric-labels";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -122,6 +123,14 @@ export function DataTab({
   onVariablesChange,
 }: DataTabProps) {
   const t = useTranslations("chart");
+
+  // Resolve metric labels (output column = source column name, with
+  // AGG(col) disambiguation on collision) and keep y_columns in sync.
+  const commitMetrics = (updated: Array<Record<string, string>>) => {
+    const { metrics, yColumns } = resolveMetricLabels(updated as unknown as EditorMetric[]);
+    updateConfig("metrics", metrics);
+    updateConfig("y_columns", yColumns);
+  };
 
   const movePivotField = (item: string, fromKey: string, toKey: string) => {
     setChartConfig((prev: Record<string, unknown>) => {
@@ -920,12 +929,7 @@ export function DataTab({
                                       onClick={() => {
                                         const updated = [...metrics];
                                         updated[idx] = { ...updated[idx], expressionType: "simple" };
-                                        updateConfig("metrics", updated);
-                                        const labels = updated.map(mm => {
-                                          if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
-                                          return mm.label || `${mm.aggregate}(${mm.column})`;
-                                        });
-                                        updateConfig("y_columns", labels);
+                                        commitMetrics(updated);
                                       }}
                                     >
                                       Simple
@@ -939,12 +943,7 @@ export function DataTab({
                                         const cur = updated[idx];
                                         const autoExpr = (cur.aggregate && cur.column) ? `${cur.aggregate}(${cur.column})` : (cur.sqlExpression || "");
                                         updated[idx] = { ...cur, expressionType: "custom_sql", sqlExpression: autoExpr || cur.sqlExpression || "" };
-                                        updateConfig("metrics", updated);
-                                        const labels = updated.map(mm => {
-                                          if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
-                                          return mm.label || `${mm.aggregate}(${mm.column})`;
-                                        });
-                                        updateConfig("y_columns", labels);
+                                        commitMetrics(updated);
                                       }}
                                     >
                                       Custom SQL
@@ -953,12 +952,7 @@ export function DataTab({
                                   <button
                                     onClick={() => {
                                       const updated = metrics.filter((_, i) => i !== idx);
-                                      updateConfig("metrics", updated);
-                                      const labels = updated.map(mm => {
-                                        if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
-                                        return mm.label || `${mm.aggregate}(${mm.column})`;
-                                      });
-                                      updateConfig("y_columns", labels);
+                                      commitMetrics(updated);
                                     }}
                                     className="text-red-400 hover:text-red-600"
                                   >
@@ -973,13 +967,8 @@ export function DataTab({
                                       value={m.aggregate || "SUM"}
                                       onValueChange={(agg) => {
                                         const updated = [...metrics];
-                                        updated[idx] = { ...updated[idx], aggregate: agg, label: `${agg}(${updated[idx].column || ""})` };
-                                        updateConfig("metrics", updated);
-                                        const labels = updated.map(mm => {
-                                          if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
-                                          return mm.label || `${mm.aggregate}(${mm.column})`;
-                                        });
-                                        updateConfig("y_columns", labels);
+                                        updated[idx] = { ...updated[idx], aggregate: agg };
+                                        commitMetrics(updated);
                                       }}
                                     >
                                       <SelectTrigger size="xs" className="h-7 bg-card">
@@ -1000,13 +989,8 @@ export function DataTab({
                                       onValueChange={(col) => {
                                         const c = col === "_empty_" ? "" : col;
                                         const updated = [...metrics];
-                                        updated[idx] = { ...updated[idx], column: c, label: `${updated[idx].aggregate || "SUM"}(${c})` };
-                                        updateConfig("metrics", updated);
-                                        const labels = updated.map(mm => {
-                                          if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
-                                          return mm.label || `${mm.aggregate}(${mm.column})`;
-                                        });
-                                        updateConfig("y_columns", labels);
+                                        updated[idx] = { ...updated[idx], column: c };
+                                        commitMetrics(updated);
                                       }}
                                     >
                                       <SelectTrigger size="xs" className="h-7 flex-1 bg-card">
@@ -1035,12 +1019,7 @@ export function DataTab({
                                       onChange={(v) => {
                                         const updated = [...metrics];
                                         updated[idx] = { ...updated[idx], sqlExpression: v };
-                                        updateConfig("metrics", updated);
-                                        const labels = updated.map(mm => {
-                                          if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
-                                          return mm.label || `${mm.aggregate}(${mm.column})`;
-                                        });
-                                        updateConfig("y_columns", labels);
+                                        commitMetrics(updated);
                                       }}
                                     />
                                     <SqlInput
@@ -1050,12 +1029,7 @@ export function DataTab({
                                       onChange={(v) => {
                                         const updated = [...metrics];
                                         updated[idx] = { ...updated[idx], label: v };
-                                        updateConfig("metrics", updated);
-                                        const labels = updated.map(mm => {
-                                          if (mm.expressionType === "custom_sql") return mm.label || mm.sqlExpression || "";
-                                          return mm.label || `${mm.aggregate}(${mm.column})`;
-                                        });
-                                        updateConfig("y_columns", labels);
+                                        commitMetrics(updated);
                                       }}
                                     />
                                   </div>

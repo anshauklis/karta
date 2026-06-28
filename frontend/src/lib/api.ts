@@ -8,6 +8,35 @@ class ApiError extends Error {
   }
 }
 
+async function buildApiError(res: Response): Promise<ApiError> {
+  const raw = await res.text().catch(() => "");
+  let message = res.statusText;
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      message = parsed.detail || message;
+    } catch {
+      message = raw;
+    }
+  }
+  return new ApiError(res.status, message);
+}
+
+// Shared handling for non-OK responses: redirect to /login on 401, otherwise
+// surface the error via a toast. Always throws (or hangs on redirect).
+async function handleErrorResponse(res: Response): Promise<never> {
+  const error = await buildApiError(res);
+  if (res.status === 401) {
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+      await new Promise(() => {}); // hang until redirect
+    }
+  } else {
+    toast.error(error.message);
+  }
+  throw error;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -28,17 +57,7 @@ async function request<T>(
   });
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: res.statusText }));
-    const message = body.detail || res.statusText;
-    if (res.status === 401) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-        return new Promise(() => {}) as T; // hang until redirect
-      }
-    } else {
-      toast.error(message);
-    }
-    throw new ApiError(res.status, message);
+    await handleErrorResponse(res);
   }
 
   if (res.status === 204) return undefined as T;
@@ -62,10 +81,7 @@ export const api = {
       body: formData,
     }).then(async (res) => {
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ detail: res.statusText }));
-        const message = body.detail || res.statusText;
-        toast.error(message);
-        throw new ApiError(res.status, message);
+        await handleErrorResponse(res);
       }
       return res.json() as Promise<T>;
     });
@@ -88,8 +104,7 @@ export const api = {
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      const detail = await res.text();
-      throw new Error(detail || `HTTP ${res.status}`);
+      await handleErrorResponse(res);
     }
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();

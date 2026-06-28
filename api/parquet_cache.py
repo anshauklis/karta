@@ -7,6 +7,7 @@ Cache keyed by (connection_id, base_sql). RLS/filters applied at query time.
 import hashlib
 import logging
 import os
+import threading
 import time
 
 import pyarrow as pa
@@ -21,6 +22,23 @@ _BATCH_SIZE = 50_000
 
 # In-memory index: connection_id → set of cache keys (for fast invalidation)
 _conn_keys: dict[int, set[str]] = {}
+
+# Single-flight: one lock per cache key so that, when many charts on a dashboard
+# share the same (connection, base_sql), only ONE request streams the (40M-row)
+# source table on a cold/expired cache while the rest wait and reuse the result.
+# Per-process (locks the 4 uvicorn workers independently — still collapses an
+# N-chart stampede to at most one stream per worker).
+_populate_lock = threading.Lock()
+_key_locks: dict[str, threading.Lock] = {}
+
+
+def _get_key_lock(key: str) -> threading.Lock:
+    with _populate_lock:
+        lk = _key_locks.get(key)
+        if lk is None:
+            lk = threading.Lock()
+            _key_locks[key] = lk
+        return lk
 
 
 def _index_register(connection_id: int, key: str) -> None:
@@ -69,16 +87,26 @@ def get_or_populate(
     key = cache_key(connection_id, base_sql)
     path = parquet_path(key)
 
-    # Check cache hit
-    if os.path.exists(path):
-        age = time.time() - os.path.getmtime(path)
-        if age < effective_ttl:
-            return path
+    # Fast path: fresh cache hit, no lock needed.
+    if _is_fresh(path, effective_ttl):
+        return path
 
-    # Cache miss — stream from external DB
-    os.makedirs(PARQUET_CACHE_DIR, exist_ok=True)
-    _stream_to_parquet(engine, base_sql, path, db_type, connection_id, spec=spec)
+    # Cache miss — serialize population per key so concurrent requests for the
+    # same dataset don't each re-stream the whole source table.
+    with _get_key_lock(key):
+        # Re-check inside the lock: another thread may have just populated it.
+        if _is_fresh(path, effective_ttl):
+            return path
+        os.makedirs(PARQUET_CACHE_DIR, exist_ok=True)
+        _stream_to_parquet(engine, base_sql, path, db_type, connection_id, spec=spec)
     return path
+
+
+def _is_fresh(path: str, ttl: int) -> bool:
+    """True if the Parquet file exists and is within its TTL."""
+    if not os.path.exists(path):
+        return False
+    return (time.time() - os.path.getmtime(path)) < ttl
 
 
 def invalidate(connection_id: int, base_sql: str) -> None:

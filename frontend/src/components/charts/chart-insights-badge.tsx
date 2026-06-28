@@ -9,6 +9,8 @@ import type { ChartInsight } from "@/types";
 
 interface ChartInsightsBadgeProps {
   chartId: number;
+  /** Only fetch insights when the chart is in the viewport (avoids N+1 requests for off-screen charts). */
+  enabled?: boolean;
 }
 
 const severityClasses: Record<string, string> = {
@@ -36,8 +38,8 @@ function InsightTypeLabel({ type, t }: { type: ChartInsight["type"]; t: (key: st
   return <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{labels[type] || type}</span>;
 }
 
-export function ChartInsightsBadge({ chartId }: ChartInsightsBadgeProps) {
-  const { data } = useChartInsights(chartId);
+export function ChartInsightsBadge({ chartId, enabled = true }: ChartInsightsBadgeProps) {
+  const { data } = useChartInsights(chartId, enabled);
   const t = useTranslations("chart");
   const insights = data?.insights;
 

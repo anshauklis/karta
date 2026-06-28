@@ -1,4 +1,8 @@
+import copy
 import ipaddress
+import socket
+import threading
+import time
 import api.json_util as json
 import re as _re
 from fastapi import APIRouter, HTTPException, Depends, Request
@@ -32,7 +36,12 @@ def _is_private_ip(host: str) -> bool:
 
 
 def _validate_connection_host(host: str) -> None:
-    """Block SSRF: reject connections to internal/private hosts."""
+    """Block SSRF: reject connections to internal/private hosts.
+
+    Also resolves DNS names and rejects when any resolved address is private,
+    reserved, loopback or link-local (defends against DNS-rebinding to e.g.
+    169.254.169.254 cloud metadata).
+    """
     if not host:
         return
     host_lower = host.lower().strip()
@@ -40,6 +49,27 @@ def _validate_connection_host(host: str) -> None:
         raise HTTPException(400, f"Connection to '{host}' is not allowed")
     if _is_private_ip(host_lower):
         raise HTTPException(400, "Connection to private/internal IP addresses is not allowed")
+    # Resolve the hostname; reject if it maps to an internal address.
+    try:
+        infos = socket.getaddrinfo(host_lower, None)
+    except (socket.gaierror, UnicodeError, OSError):
+        return  # unresolvable here — the DB driver will fail to connect anyway
+    for info in infos:
+        if _is_private_ip(info[4][0]):
+            raise HTTPException(400, "Connection to private/internal IP addresses is not allowed")
+
+
+def _validate_sqlalchemy_uri(uri: str) -> None:
+    """Validate the host embedded in a raw SQLAlchemy URI for SSRF."""
+    if not uri:
+        return
+    try:
+        from sqlalchemy.engine import make_url
+        host = make_url(uri).host
+    except Exception:
+        return  # malformed/host-less URI — the driver will surface the error
+    if host:
+        _validate_connection_host(host)
 
 
 _SAFE_IDENTIFIER_RE = _re.compile(r'^[a-zA-Z_][a-zA-Z0-9_.]*$')
@@ -87,8 +117,28 @@ def get_engine_for_connection(c: dict):
     return engine, spec
 
 
+# Short-TTL cache of decrypted connection records. A dashboard with N charts on
+# the same connection otherwise issues N identical Postgres lookups + N AES-GCM
+# decrypts per load. Invalidated on connection update/delete (see those endpoints).
+_CONN_CACHE_TTL = 60  # seconds
+_conn_cache: dict[int, tuple[float, dict]] = {}
+_conn_cache_lock = threading.Lock()
+
+
+def _invalidate_connection_cache(conn_id: int) -> None:
+    """Drop a cached decrypted connection record."""
+    with _conn_cache_lock:
+        _conn_cache.pop(conn_id, None)
+
+
 def _get_connection_with_password(conn_id: int):
-    """Get connection details including decrypted password."""
+    """Get connection details including decrypted password (cached for _CONN_CACHE_TTL)."""
+    now = time.time()
+    with _conn_cache_lock:
+        entry = _conn_cache.get(conn_id)
+        if entry is not None and now - entry[0] < _CONN_CACHE_TTL:
+            return copy.deepcopy(entry[1])
+
     with engine.connect() as conn:
         result = conn.execute(text(
             "SELECT id, name, db_type, host, port, database_name, username, "
@@ -112,6 +162,8 @@ def _get_connection_with_password(conn_id: int):
                         row["extra_params"][field] = decrypt_password_safe(row["extra_params"][field])
                     except Exception:
                         pass  # field may not be encrypted (legacy data)
+    with _conn_cache_lock:
+        _conn_cache[conn_id] = (now, copy.deepcopy(row))
     return row
 
 
@@ -252,6 +304,8 @@ async def create_connection(req: ConnectionCreate, request: Request, current_use
     """Create a new database connection. Admin only. Password is encrypted with AES-256-GCM."""
     if req.host:
         _validate_connection_host(req.host)
+    if req.sqlalchemy_uri:
+        _validate_sqlalchemy_uri(req.sqlalchemy_uri)
     user_id = int(current_user["sub"])
     password_encrypted = encrypt_password_safe(req.password) if req.password else ""
     uri_encrypted = encrypt_password_safe(req.sqlalchemy_uri) if req.sqlalchemy_uri else None
@@ -297,6 +351,8 @@ async def update_connection(conn_id: int, req: ConnectionUpdate, request: Reques
     """Update connection details. Admin only. Password is re-encrypted if changed."""
     if req.host:
         _validate_connection_host(req.host)
+    if req.sqlalchemy_uri:
+        _validate_sqlalchemy_uri(req.sqlalchemy_uri)
     # Prevent editing system connections
     with engine.connect() as conn:
         row = conn.execute(
@@ -346,6 +402,7 @@ async def update_connection(conn_id: int, req: ConnectionUpdate, request: Reques
 
     from api.engine_cache import invalidate
     invalidate(conn_id)
+    _invalidate_connection_cache(conn_id)
     from api.parquet_cache import invalidate_connection
     invalidate_connection(conn_id)
 
@@ -374,6 +431,7 @@ async def delete_connection(conn_id: int, request: Request, current_user: dict =
         conn.commit()
     from api.engine_cache import invalidate
     invalidate(conn_id)
+    _invalidate_connection_cache(conn_id)
     from api.parquet_cache import invalidate_connection
     invalidate_connection(conn_id)
     await log_action(int(current_user["sub"]), "delete", "connection", conn_id,

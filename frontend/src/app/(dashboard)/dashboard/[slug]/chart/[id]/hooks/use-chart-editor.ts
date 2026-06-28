@@ -15,8 +15,12 @@ import { generateCodeFromVisual } from "@/lib/generate-code";
 import { parseCodeToVisual } from "@/lib/parse-code";
 import { useTheme } from "next-themes";
 import { useChartCapabilities } from "@/hooks/use-chart-capabilities";
-import { NEEDS_XY, SUPPORTS_COLOR, NO_STYLING } from "../lib/constants";
-import type { ChartExecuteResult, ConditionalFormatRule } from "@/types";
+import { deriveChartFlags } from "../lib/chart-flags";
+import { canPreviewChart, buildPreviewRequest, mergePreviewResult } from "../lib/chart-preview-logic";
+import { buildDraftPayload } from "../lib/chart-draft";
+import { computeSelectedColumns } from "../lib/chart-columns";
+import { useConditionalFormatting } from "./use-conditional-formatting";
+import type { ChartExecuteResult } from "@/types";
 import type { SaveParams } from "../components/save-chart-modal";
 
 export function useChartEditor(slug: string, id: string) {
@@ -135,10 +139,15 @@ export function useChartEditor(slug: string, id: string) {
   const codeEditTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-sync Visual -> Code when visual config changes
+  const prevChartTypeForCodeRef = useRef(chartType);
   useEffect(() => {
     if (isInitialLoadRef.current) return;
     if (codeEditingRef.current) return;
-    if (mode === "code") return; // Don't overwrite user code in code mode
+    const typeChanged = prevChartTypeForCodeRef.current !== chartType;
+    prevChartTypeForCodeRef.current = chartType;
+    // In code mode keep the user's code — EXCEPT when they explicitly switch the
+    // chart type, then regenerate so the code-mode visualization tracks the type.
+    if (mode === "code" && !typeChanged) return;
     setChartCode(generateCodeFromVisual(chartConfig, chartType));
   }, [chartConfig, chartType, mode]);
 
@@ -256,35 +265,22 @@ export function useChartEditor(slug: string, id: string) {
     }, 100);
   }, [existingChart, serverDraft, draftFetched, chartFetched, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Get available columns from last query result -- for pivot, use stored original columns
+  // Source-column browser: show the RAW query columns (queryColumns), not the
+  // chart's aggregated output. queryColumns is populated by a config-less
+  // discovery query in handlePreview; falls back to result.columns until then.
   const [queryColumns, setQueryColumns] = useState<string[]>([]);
-  const availableColumns = chartType === "pivot" ? queryColumns : (result?.columns || []);
+  const availableColumns = queryColumns.length > 0 ? queryColumns : (result?.columns || []);
 
   // Columns actually selected in the Data tab (for Customize tab filtering)
-  const selectedColumns = useMemo(() => {
-    if (chartType === "pivot") {
-      return [
-        ...((chartConfig.pivot_rows as string[]) || []),
-        ...((chartConfig.pivot_columns as string[]) || []),
-        ...((chartConfig.pivot_values as string[]) || []),
-      ].filter(Boolean);
-    }
-    if (chartType === "table") {
-      return ((chartConfig.y_columns as string[]) || []).filter(Boolean);
-    }
-    const cols: string[] = [];
-    if (chartConfig.x_column) cols.push(chartConfig.x_column as string);
-    if (chartConfig.y_columns) cols.push(...((chartConfig.y_columns as string[]) || []));
-    if (chartConfig.color_column) cols.push(chartConfig.color_column as string);
-    return cols.filter(Boolean);
-  }, [chartType, chartConfig.x_column, chartConfig.y_columns, chartConfig.color_column, chartConfig.pivot_rows, chartConfig.pivot_columns, chartConfig.pivot_values]);
+  const selectedColumns = useMemo(
+    () => computeSelectedColumns(chartType, chartConfig),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chartType, chartConfig.x_column, chartConfig.y_columns, chartConfig.color_column, chartConfig.pivot_rows, chartConfig.pivot_columns, chartConfig.pivot_values],
+  );
 
-  // When result changes, store the original query columns (before pivot transform)
-  useEffect(() => {
-    if (result?.columns && result.columns.length > 0 && chartType !== "pivot") {
-      setQueryColumns(result.columns);
-    }
-  }, [result, chartType]);
+  // Tracks the data source that queryColumns were discovered for, so the raw
+  // column list is refreshed only when the source (SQL/dataset/connection) changes.
+  const discoveredColsKeyRef = useRef<string>("");
 
   // Auto-fill y_columns with all columns when switching to table (if empty)
   useEffect(() => {
@@ -314,19 +310,18 @@ export function useChartEditor(slug: string, id: string) {
   }, [result?.rows, result?.columns]);
 
   const handlePreview = async () => {
-    if (dataSource === "dataset") {
-      if (!datasetId) return;
-    } else {
-      if (!connectionId || !sqlQuery.trim()) return;
-    }
+    if (!canPreviewChart({ dataSource, datasetId, connectionId, sqlQuery })) return;
     setPreviewing(true);
     execStartRef.current = Date.now();
     try {
       const previewConnectionId = dataSource === "dataset" ? undefined : connectionId;
       const previewDatasetId = dataSource === "dataset" ? datasetId : undefined;
 
-      // For pivot, first run a plain query to get columns for mapping
-      if (chartType === "pivot" && queryColumns.length === 0) {
+      // Discover RAW source columns (pre-aggregation) for the column browser.
+      // Re-runs only when the data source changed since the last discovery, so
+      // assigning a column (which re-previews on the same SQL) never shrinks it.
+      const sourceKey = `${dataSource}:${previewConnectionId}:${previewDatasetId}:${sqlQuery}`;
+      if (queryColumns.length === 0 || discoveredColsKeyRef.current !== sourceKey) {
         const plainRes = await previewChart.mutateAsync({
           connection_id: previewConnectionId,
           dataset_id: previewDatasetId,
@@ -335,27 +330,24 @@ export function useChartEditor(slug: string, id: string) {
           chart_type: "table",
           chart_config: {},
         });
-        if (plainRes.columns) setQueryColumns(plainRes.columns);
+        if (plainRes.columns) {
+          setQueryColumns(plainRes.columns);
+          discoveredColsKeyRef.current = sourceKey;
+        }
       }
 
-      const isCodeMode = activeTab === "code";
-      const res = await previewChart.mutateAsync({
-        connection_id: previewConnectionId,
-        dataset_id: previewDatasetId,
-        sql_query: sqlQuery,
-        mode: isCodeMode ? "code" : "visual",
-        chart_type: chartType,
-        chart_config: chartConfig,
-        ...(isCodeMode ? { chart_code: chartCode } : {}),
-        ...(chartVariables.length > 0 ? { variables: chartVariables } : {}),
-      });
-      setResult((prev) => {
-        // Preserve previous columns when response has error and returns no columns
-        if (res.error && (!res.columns || res.columns.length === 0) && prev?.columns?.length) {
-          return { ...res, columns: prev.columns };
-        }
-        return res;
-      });
+      const res = await previewChart.mutateAsync(buildPreviewRequest({
+        dataSource,
+        connectionId,
+        datasetId,
+        sqlQuery,
+        isCodeMode: activeTab === "code",
+        chartType,
+        chartConfig,
+        chartCode,
+        variables: chartVariables,
+      }));
+      setResult((prev) => mergePreviewResult(prev, res));
     } catch (e: unknown) {
       setResult((prev) => ({
         figure: null,
@@ -376,7 +368,7 @@ export function useChartEditor(slug: string, id: string) {
 
   // Auto-preview: debounced
   const autoPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const canAutoPreview = (dataSource === "dataset" ? !!datasetId : (!!connectionId && !!sqlQuery.trim()));
+  const canAutoPreview = canPreviewChart({ dataSource, datasetId, connectionId, sqlQuery });
   const triggerAutoPreview = useCallback((delay: number) => {
     if (isInitialLoadRef.current) return;
     if (!canAutoPreview) return;
@@ -523,43 +515,16 @@ export function useChartEditor(slug: string, id: string) {
     }
   };
 
-  // --- Conditional formatting helpers ---
-  const formattingRules = (chartConfig.conditional_formatting as ConditionalFormatRule[] | undefined) || [];
-
-  const addFormattingRule = () => {
-    const newRule: ConditionalFormatRule = {
-      column: "",
-      type: "threshold",
-      rules: [{ op: ">", value: 0, color: "#dcfce7", text_color: "" }],
-    };
-    updateConfig("conditional_formatting", [...formattingRules, newRule]);
-  };
-
-  const removeFormattingRule = (idx: number) => {
-    updateConfig("conditional_formatting", formattingRules.filter((_, i) => i !== idx));
-  };
-
-  const updateFormattingRule = (idx: number, patch: Partial<ConditionalFormatRule>) => {
-    const updated = formattingRules.map((r, i) => (i === idx ? { ...r, ...patch } : r));
-    updateConfig("conditional_formatting", updated);
-  };
-
-  const addThresholdSubRule = (ruleIdx: number) => {
-    const rule = formattingRules[ruleIdx];
-    const subRules = rule.rules || [];
-    updateFormattingRule(ruleIdx, { rules: [...subRules, { op: ">", value: 0, color: "#dcfce7", text_color: "" }] });
-  };
-
-  const removeThresholdSubRule = (ruleIdx: number, subIdx: number) => {
-    const rule = formattingRules[ruleIdx];
-    updateFormattingRule(ruleIdx, { rules: (rule.rules || []).filter((_, i) => i !== subIdx) });
-  };
-
-  const updateThresholdSubRule = (ruleIdx: number, subIdx: number, patch: Partial<{ op: string; value: number; color: string; text_color: string }>) => {
-    const rule = formattingRules[ruleIdx];
-    const subRules = (rule.rules || []).map((r, i) => (i === subIdx ? { ...r, ...patch } : r));
-    updateFormattingRule(ruleIdx, { rules: subRules });
-  };
+  // --- Conditional formatting helpers (extracted) ---
+  const {
+    formattingRules,
+    addFormattingRule,
+    removeFormattingRule,
+    updateFormattingRule,
+    addThresholdSubRule,
+    removeThresholdSubRule,
+    updateThresholdSubRule,
+  } = useConditionalFormatting(chartConfig, updateConfig);
 
   const handleSqlEditorMount = useCallback((_editor: unknown, monaco: unknown) => {
     const m = monaco as {
@@ -631,20 +596,22 @@ export function useChartEditor(slug: string, id: string) {
     if (isInitialLoadRef.current || !isNew) return;
     clearTimeout(draftTimerRef.current);
 
-    const draftData = {
+    const draftData = buildDraftPayload({
       chartId: "new",
-      dashboard_id: isStandalone ? selectedDashboardId : dashboard?.id,
-      connection_id: connectionId ?? null,
-      dataset_id: datasetId ?? null,
+      isStandalone,
+      selectedDashboardId,
+      dashboardId: dashboard?.id,
+      connectionId,
+      datasetId,
       title,
       description,
       mode,
-      chart_type: chartType,
-      chart_config: chartConfig,
-      chart_code: chartCode,
-      sql_query: sqlQuery,
-      variables: chartVariables.length > 0 ? chartVariables : null,
-    };
+      chartType,
+      chartConfig,
+      chartCode,
+      sqlQuery,
+      variables: chartVariables,
+    });
 
     // Keep flush function up-to-date with latest data
     flushDraftRef.current = () => upsertDraft.mutate(draftData);
@@ -692,21 +659,15 @@ export function useChartEditor(slug: string, id: string) {
     return () => document.removeEventListener("keydown", down);
   });
 
-  const isPivot = chartType === "pivot";
-  const isTable = chartType === "table";
-  const isKPI = chartType === "kpi";
-  const isHistogram = chartType === "histogram";
-
-  // Use API capabilities with hardcoded constants as fallback
+  // Derived UI flags (extracted to a pure helper). Capabilities come from the API
+  // with hardcoded constants as fallback.
   const { data: capsMap } = useChartCapabilities();
   const cap = capsMap?.[chartType];
-  const showXAxis = cap ? (cap.needs_x || isHistogram) : (NEEDS_XY.includes(chartType) || isHistogram);
-  const showYAxis = cap ? (cap.needs_y || isKPI) : (NEEDS_XY.includes(chartType) || isKPI);
-  const showColor = cap ? cap.supports_color : SUPPORTS_COLOR.includes(chartType);
-  const showStyling = cap ? cap.supports_styling : !NO_STYLING.includes(chartType);
-  const showConditionalFormatting = cap ? cap.supports_cond_format : (isPivot || isTable);
-
-  const canPreview = dataSource === "dataset" ? !!datasetId : (!!connectionId && !!sqlQuery.trim());
+  const {
+    isPivot, isTable, isKPI, isHistogram,
+    showXAxis, showYAxis, showColor, showStyling, showConditionalFormatting,
+    canPreview,
+  } = deriveChartFlags({ chartType, cap, dataSource, datasetId, connectionId, sqlQuery });
 
   return {
     // Route/identity

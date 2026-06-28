@@ -31,8 +31,13 @@ def _quote_value(val: Any, var_type: str = "text") -> str:
         if not math.isfinite(parsed):
             raise ValueError(f"Variable value '{s}' is not a finite number")
         return s
-    # text and date — single-quote with escaping
-    return "'" + s.replace("'", "''") + "'"
+    # text and date — single-quote with escaping.
+    # Escape backslashes as well as quotes: on engines where backslash is a string
+    # escape character (MySQL/MariaDB, ClickHouse) a trailing "\" would otherwise
+    # escape the closing quote and break out of the literal (SQL injection). Doubling
+    # the backslash is safe on those engines; on standard-conforming engines
+    # (PostgreSQL, MSSQL, DuckDB) it only affects values that literally contain "\".
+    return "'" + s.replace("\\", "\\\\").replace("'", "''") + "'"
 
 
 def substitute(

@@ -2,7 +2,12 @@
 
 import pytest
 
-from sql_validator import SQLValidationError, validate_sql, validate_sql_expression
+from sql_validator import (
+    SQLValidationError,
+    validate_sql,
+    validate_sql_expression,
+    validate_duckdb_expression,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -212,3 +217,33 @@ class TestExpressionValidation:
     def test_whitespace_stripping(self):
         result = validate_sql_expression("  col + 1  ")
         assert result == "col + 1"
+
+
+# ---------------------------------------------------------------------------
+# validate_duckdb_expression — DuckDB file/attach denylist (C2)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateDuckdbExpression:
+    def test_benign_expression_passes(self):
+        assert validate_duckdb_expression("amount > 100") == "amount > 100"
+
+    def test_read_text_blocked(self):
+        with pytest.raises(SQLValidationError, match="Forbidden DuckDB function"):
+            validate_duckdb_expression("read_text('/etc/passwd') IS NOT NULL")
+
+    def test_read_csv_blocked(self):
+        with pytest.raises(SQLValidationError, match="Forbidden DuckDB function"):
+            validate_duckdb_expression("read_csv('/etc/passwd') IS NOT NULL")
+
+    def test_glob_blocked(self):
+        with pytest.raises(SQLValidationError, match="Forbidden DuckDB function"):
+            validate_duckdb_expression("glob('/**') IS NOT NULL")
+
+    def test_attach_blocked(self):
+        with pytest.raises(SQLValidationError):
+            validate_duckdb_expression("1=1; ATTACH 'x.db'")
+
+    def test_duckdb_function_name_in_string_literal_allowed(self):
+        # The denylist only matches outside string literals.
+        assert validate_duckdb_expression("name = 'read_text'") == "name = 'read_text'"

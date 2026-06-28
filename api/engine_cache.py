@@ -13,25 +13,31 @@ log = logging.getLogger(__name__)
 
 _cache: dict[int, tuple] = {}  # {conn_id: (engine, created_at)}
 _lock = threading.Lock()
-ENGINE_TTL = 300  # 5 minutes
+
+# Individual pooled connections are recycled after this many seconds (graceful,
+# per-connection) instead of tearing down the whole pool on a wall-clock TTL.
+POOL_RECYCLE = 1800  # 30 minutes
 
 
 def get_engine(connection_id: int, url: str, db_type: str):
-    """Get or create a cached engine for an external connection."""
-    now = time.time()
-    with _lock:
-        if connection_id in _cache:
-            eng, created = _cache[connection_id]
-            if now - created < ENGINE_TTL:
-                return eng
-            try:
-                eng.dispose()
-            except Exception:
-                pass
-            del _cache[connection_id]
+    """Get or create a cached engine for an external connection.
 
-        eng = create_engine(url, pool_pre_ping=True, pool_size=5, max_overflow=3)
-        _cache[connection_id] = (eng, now)
+    The engine is kept until the connection is updated/deleted (invalidate) or the
+    process restarts. Freshness of pooled connections is handled by pool_pre_ping
+    (dead-connection detection) and pool_recycle (age-based recycle) — there is no
+    wall-clock dispose, which previously caused a reconnect storm every 5 minutes
+    under steady load.
+    """
+    with _lock:
+        entry = _cache.get(connection_id)
+        if entry is not None:
+            return entry[0]
+
+        eng = create_engine(
+            url, pool_pre_ping=True, pool_size=5, max_overflow=3,
+            pool_recycle=POOL_RECYCLE,
+        )
+        _cache[connection_id] = (eng, time.time())
         return eng
 
 
