@@ -683,6 +683,7 @@
     "saveAsDataset": "Сохранить как датасет",
     "csv": "CSV",
     "schemaBrowser": "Обозреватель схемы",
+    "allSchemas": "Все схемы",
     "selectConnection": "Выберите подключение",
     "noTablesFound": "Таблицы не найдены",
     "searchSchema": "Поиск таблиц и колонок",

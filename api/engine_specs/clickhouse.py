@@ -101,9 +101,9 @@ class ClickHouseSpec(BaseEngineSpec):
 
         ClickHouse is multi-database: with no `schema` the default SQLAlchemy
         inspector only sees the (usually empty) connection database, so the
-        schema browser comes up empty. Here we list every user database and
-        return fully-qualified `database.table` names (valid in CH queries),
-        or just the table names when a specific `schema` is requested.
+        schema browser comes up empty. Here we list every user database (or one
+        when `schema` is given) and always return fully-qualified
+        `database.table` names so inserts/autocomplete stay valid in CH queries.
         """
         if schema:
             where = "database = :db"
@@ -118,7 +118,7 @@ class ClickHouseSpec(BaseEngineSpec):
         )
         with engine.connect() as conn:
             rows = conn.execute(text(sql), params).fetchall()
-        return _group_clickhouse_columns(rows, qualified=schema is None)
+        return _group_clickhouse_columns(rows, qualified=True)
 
     def time_range_expression(self, column: str, days: int) -> str:
         return f"subtractDays(MAX({column}), {days})"
