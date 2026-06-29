@@ -1374,6 +1374,101 @@ def _execute_chart_full(
     return columns, rows, df, pq_path
 
 
+def run_chart_pipeline_sync(*, connection_id, sql_query, chart_config, mode,
+                            chart_type, chart_code, variables, variable_values,
+                            filters, uid, pq_ttl) -> dict:
+    """Synchronous chart execution core (data + figure). Worker-callable; returns a
+    JSON-serializable dict of ChartExecuteResponse fields. Same logic as the former
+    async _run_chart_pipeline, minus the to_thread boundary."""
+    from api.sql_params import extract_variables, substitute as var_substitute
+
+    # Substitute {{ variable }} placeholders with literal values
+    vars_ = variables or []
+    var_defaults = {v["name"]: v.get("default") for v in vars_ if v.get("name")}
+    var_types = {v["name"]: v.get("type", "text") for v in vars_ if v.get("name")}
+    if extract_variables(sql_query):
+        try:
+            sql_query = var_substitute(sql_query, variable_values or {}, var_defaults, var_types)
+        except ValueError as e:
+            return {"error": _classify_error(e)}
+
+    # Build custom SQL wrapper if config uses custom SQL expressions
+    skip_metrics = False
+    if _has_custom_sql(chart_config):
+        try:
+            sql_query, skip_metrics = _build_custom_sql_query(sql_query, chart_config)
+        except Exception as e:
+            return {"error": _classify_error(e)}
+
+    # Build pivot custom SQL wrapper (computed columns + duplicate value aliases)
+    if _has_pivot_custom_sql(chart_config):
+        try:
+            sql_query = _build_pivot_custom_sql_query(sql_query, chart_config)
+        except Exception as e:
+            return {"error": _classify_error(e)}
+
+    # Execute full pipeline via DuckDB
+    try:
+        columns, _rows, df, pq_path = _execute_chart_full(
+            connection_id, sql_query, chart_config,
+            filters, uid, skip_metrics, pq_ttl, include_rows=False)
+    except Exception as e:
+        return {"error": _classify_error(e)}
+
+    # Rename pivot custom SQL columns (_pcs_ prefix → original names)
+    df = _rename_pivot_custom_cols(df, chart_config)
+    columns = list(df.columns)
+    row_count = len(df)
+
+    # Render
+    figure = None
+    error = None
+    try:
+        if mode == "visual" and chart_type == "pivot":
+            pivot_result = build_pivot_table(chart_config, df)
+            return {
+                "figure": None,
+                "columns": pivot_result["columns"],
+                "rows": pivot_result["rows"],
+                "row_count": pivot_result["row_count"],
+                "error": None,
+                "formatting": pivot_result["formatting"],
+                "pivot_header_levels": pivot_result["pivot_header_levels"],
+                "pivot_row_index_count": pivot_result["pivot_row_index_count"],
+                "pivot_cond_format_meta": pivot_result.get("pivot_cond_format_meta"),
+            }
+        elif mode == "visual":
+            figure = build_visual_chart(chart_type, chart_config, df)
+        elif mode == "code":
+            code_result = execute_chart_code(chart_code, df, parquet_path=pq_path)
+            # Table/pivot mode: code returned data instead of figure
+            if isinstance(code_result, dict) and code_result.get("_table"):
+                return {
+                    "figure": None,
+                    "columns": [str(c) for c in code_result["columns"]],
+                    "rows": [list(r) for r in code_result["rows"][:500]],
+                    "row_count": code_result["row_count"],
+                    "error": None,
+                    "pivot_header_levels": code_result.get("pivot_header_levels"),
+                    "pivot_row_index_count": code_result.get("pivot_row_index_count"),
+                }
+            figure = code_result
+    except Exception as e:
+        error = _classify_error(e)
+
+    # Extract conditional formatting for table-type charts
+    formatting = chart_config.get("conditional_formatting", []) if chart_config else []
+
+    return {
+        "figure": _sanitize_figure(figure),
+        "columns": [str(c) for c in columns],
+        "rows": _sanitize_rows(df.head(200)),
+        "row_count": row_count,
+        "error": error,
+        "formatting": formatting,
+    }
+
+
 async def _run_chart_pipeline(
     *,
     connection_id: int,
@@ -1394,93 +1489,12 @@ async def _run_chart_pipeline(
     -> run the DuckDB pipeline -> render (visual/pivot/code) -> ChartExecuteResponse.
     Auth, view-tracking and result caching are the callers' responsibility.
     """
-    from api.sql_params import extract_variables, substitute as var_substitute
-
-    # Substitute {{ variable }} placeholders with literal values
-    vars_ = variables or []
-    var_defaults = {v["name"]: v.get("default") for v in vars_ if v.get("name")}
-    var_types = {v["name"]: v.get("type", "text") for v in vars_ if v.get("name")}
-    if extract_variables(sql_query):
-        try:
-            sql_query = var_substitute(sql_query, variable_values or {}, var_defaults, var_types)
-        except ValueError as e:
-            return ChartExecuteResponse(error=_classify_error(e))
-
-    # Build custom SQL wrapper if config uses custom SQL expressions
-    skip_metrics = False
-    if _has_custom_sql(chart_config):
-        try:
-            sql_query, skip_metrics = _build_custom_sql_query(sql_query, chart_config)
-        except Exception as e:
-            return ChartExecuteResponse(error=_classify_error(e))
-
-    # Build pivot custom SQL wrapper (computed columns + duplicate value aliases)
-    if _has_pivot_custom_sql(chart_config):
-        try:
-            sql_query = _build_pivot_custom_sql_query(sql_query, chart_config)
-        except Exception as e:
-            return ChartExecuteResponse(error=_classify_error(e))
-
-    # Execute full pipeline via DuckDB (IO-bound — run in thread pool)
-    try:
-        columns, _rows, df, pq_path = await asyncio.to_thread(
-            _execute_chart_full, connection_id, sql_query, chart_config,
-            filters, uid, skip_metrics, pq_ttl, include_rows=False)
-    except Exception as e:
-        return ChartExecuteResponse(error=_classify_error(e))
-
-    # Rename pivot custom SQL columns (_pcs_ prefix → original names)
-    df = _rename_pivot_custom_cols(df, chart_config)
-    columns = list(df.columns)
-    row_count = len(df)
-
-    # Render
-    figure = None
-    error = None
-    try:
-        if mode == "visual" and chart_type == "pivot":
-            pivot_result = build_pivot_table(chart_config, df)
-            return ChartExecuteResponse(
-                figure=None,
-                columns=pivot_result["columns"],
-                rows=pivot_result["rows"],
-                row_count=pivot_result["row_count"],
-                error=None,
-                formatting=pivot_result["formatting"],
-                pivot_header_levels=pivot_result["pivot_header_levels"],
-                pivot_row_index_count=pivot_result["pivot_row_index_count"],
-                pivot_cond_format_meta=pivot_result.get("pivot_cond_format_meta"),
-            )
-        elif mode == "visual":
-            figure = build_visual_chart(chart_type, chart_config, df)
-        elif mode == "code":
-            code_result = execute_chart_code(chart_code, df, parquet_path=pq_path)
-            # Table/pivot mode: code returned data instead of figure
-            if isinstance(code_result, dict) and code_result.get("_table"):
-                return ChartExecuteResponse(
-                    figure=None,
-                    columns=[str(c) for c in code_result["columns"]],
-                    rows=[list(r) for r in code_result["rows"][:500]],
-                    row_count=code_result["row_count"],
-                    error=None,
-                    pivot_header_levels=code_result.get("pivot_header_levels"),
-                    pivot_row_index_count=code_result.get("pivot_row_index_count"),
-                )
-            figure = code_result
-    except Exception as e:
-        error = _classify_error(e)
-
-    # Extract conditional formatting for table-type charts
-    formatting = chart_config.get("conditional_formatting", []) if chart_config else []
-
-    return ChartExecuteResponse(
-        figure=_sanitize_figure(figure),
-        columns=[str(c) for c in columns],
-        rows=_sanitize_rows(df.head(200)),
-        row_count=row_count,
-        error=error,
-        formatting=formatting,
-    )
+    payload = await asyncio.to_thread(
+        run_chart_pipeline_sync,
+        connection_id=connection_id, sql_query=sql_query, chart_config=chart_config,
+        mode=mode, chart_type=chart_type, chart_code=chart_code, variables=variables,
+        variable_values=variable_values, filters=filters, uid=uid, pq_ttl=pq_ttl)
+    return ChartExecuteResponse(**payload)
 
 
 @router.post("/api/charts/{chart_id}/execute", summary="Execute chart", response_model=ChartExecuteResponse)
