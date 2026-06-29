@@ -102,6 +102,8 @@ services:
   worker:
     image: ghcr.io/anshauklis/karta/api:main
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     # sh -c so REDIS_URL is resolved from the container env at runtime (avoids
     # fragile nested compose interpolation in a command array).
     command: ["sh", "-c", "uv run rq worker karta --url \"$REDIS_URL\""]
@@ -127,6 +129,13 @@ services:
       resources:
         limits:
           memory: 4G
+    # Override the image's HTTP healthcheck (the worker has no web server): a
+    # worker is healthy when it can reach its Redis (its job lifeline).
+    healthcheck:
+      test: ["CMD-SHELL", "uv run python -c \"import os,redis; redis.Redis.from_url(os.environ['REDIS_URL']).ping()\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     logging:
       driver: json-file
       options:
