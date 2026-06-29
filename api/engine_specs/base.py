@@ -84,6 +84,16 @@ class BaseEngineSpec:
             tables.append({"table_name": table_name, "columns": columns})
         return tables
 
+    def export_parquet(self, engine: Engine, sql: str, dest_path: str) -> bool:
+        """Stream the query result straight to a Parquet file using a fast,
+        engine-native path (e.g. ClickHouse `FORMAT Parquet`).
+
+        Return True if handled (file written to dest_path); return False when the
+        engine has no native export — the caller then falls back to row streaming.
+        Raise on actual failure so the caller can fall back too.
+        """
+        return False
+
     def test_connection(self, engine: Engine) -> bool:
         """Test connectivity. Default: SELECT 1."""
         with engine.connect() as conn:

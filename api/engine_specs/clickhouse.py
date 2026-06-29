@@ -3,6 +3,26 @@ from sqlalchemy import text
 from api.engine_specs.base import BaseEngineSpec, FieldDef
 
 
+def clickhouse_http_request(url, sql: str) -> tuple[str, dict, bytes]:
+    """Build the (endpoint, headers, body) for a ClickHouse HTTP query that
+    returns native Parquet. `url` is a SQLAlchemy URL (from the engine).
+
+    Pure/testable: no network. Credentials go in headers (not the URL) so they
+    never leak into logs; the body is the SELECT with a `FORMAT Parquet` suffix.
+    """
+    scheme = "https" if str((url.query or {}).get("protocol", "")).lower() == "https" else "http"
+    endpoint = f"{scheme}://{url.host}:{url.port or 8123}/"
+    headers = {
+        "X-ClickHouse-User": url.username or "default",
+        "X-ClickHouse-Key": url.password or "",
+        "X-ClickHouse-Database": url.database or "default",
+        "Content-Type": "text/plain; charset=utf-8",
+    }
+    clean = sql.strip().rstrip(";").strip()
+    body = f"{clean}\nFORMAT Parquet".encode("utf-8")
+    return endpoint, headers, body
+
+
 def _group_clickhouse_columns(rows, qualified: bool) -> list[dict]:
     """Group flat (database, table, name, type) rows into the schema-browser
     shape: [{"table_name", "columns": [{"name", "type", "nullable"}]}].
@@ -51,6 +71,22 @@ class ClickHouseSpec(BaseEngineSpec):
 
     def set_timeout(self, conn, timeout_sec: int) -> None:
         conn.execute(text(f"SET max_execution_time = {timeout_sec}"))
+
+    def export_parquet(self, engine, sql: str, dest_path: str) -> bool:
+        """Stream `SELECT ... FORMAT Parquet` straight from ClickHouse to disk.
+
+        Orders of magnitude faster than row-by-row streaming via the driver
+        (CH serialises Parquet natively), and avoids materialising rows in
+        Python. Raises on HTTP error so the caller falls back to row streaming.
+        """
+        import shutil
+        import urllib.request
+
+        endpoint, headers, body = clickhouse_http_request(engine.url, sql)
+        req = urllib.request.Request(endpoint, data=body, method="POST", headers=headers)
+        with urllib.request.urlopen(req, timeout=300) as resp, open(dest_path, "wb") as f:
+            shutil.copyfileobj(resp, f, length=1024 * 1024)
+        return True
 
     def get_schemas(self, engine) -> list[str]:
         with engine.connect() as conn:
