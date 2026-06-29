@@ -151,6 +151,7 @@ export function DataTab() {
                           onMount={handleSqlEditorMount}
                           options={{
                             minimap: { enabled: false },
+                            multiCursorModifier: "ctrlCmd",
                             lineNumbers: "on",
                             fontSize: 13,
                             scrollBeyondLastLine: false,

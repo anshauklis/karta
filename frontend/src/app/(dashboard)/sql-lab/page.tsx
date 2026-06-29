@@ -914,6 +914,7 @@ export default function SQLLabPage() {
               onMount={handleEditorMount}
               options={{
                 minimap: { enabled: false },
+                multiCursorModifier: "ctrlCmd",
                 fontSize: 13,
                 fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                 lineNumbers: "on",
