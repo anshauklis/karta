@@ -105,12 +105,89 @@ def _safe_rows(df: pd.DataFrame) -> list[list]:
 # Built-in color palettes (re-exported from the shared module for callers/tests)
 from api.renderers.palettes import PALETTES
 
-# Number format mapping for Y axis
+# Legacy number_format keys → d3 format strings. The Number Format selector now
+# sends raw d3 strings directly; these map old saved charts for backward compat.
 NUMBER_FORMATS = {
     "percent": ".1%",
     "currency": "$,.0f",
     "compact": "~s",
 }
+
+# Chart types with a single value axis where number formats drive ticks + labels.
+_VALUE_FMT_TYPES = {"bar", "line", "area", "scatter", "histogram"}
+
+
+def _column_format_parts(fmt: dict) -> tuple[str | None, str, str]:
+    """Convert a column_formats entry to a d3 (tickformat, prefix, suffix)."""
+    decimals = fmt.get("decimals")
+    prefix = fmt.get("prefix") or ""
+    suffix = fmt.get("suffix") or ""
+    comma = "," if fmt.get("thousands", True) else ""
+    t = fmt.get("type")
+    if t == "currency":
+        d = 2 if decimals is None else decimals
+        return f"{comma}.{d}f", (prefix or "$"), suffix
+    if t == "percent":
+        d = 1 if decimals is None else decimals
+        return f"{comma}.{d}%", prefix, suffix
+    if t == "number":
+        if decimals is None:
+            return (comma or None), prefix, suffix
+        return f"{comma}.{decimals}f", prefix, suffix
+    return None, prefix, suffix
+
+
+def _split_currency_symbol(d3str: str) -> tuple[str, str]:
+    """Split a leading non-$ currency symbol (€, £, …) out of a d3 format so
+    Plotly renders it via tickprefix; $ stays inline (d3 handles it natively)."""
+    import re
+    m = re.match(r"^([^\d,.~%#+\-\s]+)(.*)$", d3str)
+    if m and m.group(1) and m.group(1) != "$":
+        return m.group(2), m.group(1)
+    return d3str, ""
+
+
+def _value_format_parts(config: dict) -> tuple[str | None, str, str]:
+    """Resolve (tickformat, prefix, suffix) for the value axis and data labels.
+
+    Per-column format on the first y column wins; otherwise the global
+    number_format (a raw d3 string, a legacy key, or the _custom_ override)."""
+    cfmts = config.get("column_formats") or {}
+    for yc in (config.get("y_columns") or []):
+        f = cfmts.get(yc)
+        if isinstance(f, dict) and f.get("type") in ("currency", "percent", "number"):
+            return _column_format_parts(f)
+    nf = config.get("number_format") or ""
+    if nf == "_custom_":
+        nf = config.get("custom_number_format") or ""
+    nf = NUMBER_FORMATS.get(nf, nf)  # map legacy percent/currency/compact keys
+    if nf and nf != "auto":
+        fmt, prefix = _split_currency_symbol(nf)
+        return fmt, prefix, ""
+    return None, "", ""
+
+
+def _apply_value_format(fig, config, chart_type, orientation):
+    """Apply the resolved number format to the value-axis ticks and, when
+    show_values is on, to the data-label texttemplate. No-op when unformatted."""
+    if chart_type not in _VALUE_FMT_TYPES:
+        return
+    tickformat, prefix, suffix = _value_format_parts(config)
+    if not (tickformat or prefix or suffix):
+        return
+    axis = "x" if (chart_type == "bar" and orientation == "horizontal") else "y"
+    layout = {}
+    if tickformat:
+        layout[f"{axis}axis_tickformat"] = tickformat
+    if prefix:
+        layout[f"{axis}axis_tickprefix"] = prefix
+    if suffix:
+        layout[f"{axis}axis_ticksuffix"] = suffix
+    if layout:
+        fig.update_layout(**layout)
+    if config.get("show_values"):
+        inner = f"%{{{axis}:{tickformat}}}" if tickformat else f"%{{{axis}}}"
+        fig.update_traces(texttemplate=f"{prefix}{inner}{suffix}")
 
 
 def apply_transforms(df: pd.DataFrame, transforms: list[dict]) -> pd.DataFrame:
@@ -249,6 +326,11 @@ def build_visual_chart(chart_type: str, config: dict, df: pd.DataFrame) -> dict 
                        x_label, y_label)
     except Exception as exc:
         log.warning("Styling failed for %s: %s", chart_type, exc)
+
+    try:
+        _apply_value_format(fig, config, chart_type, orientation)
+    except Exception as exc:
+        log.warning("Value format failed for %s: %s", chart_type, exc)
 
     return fig.to_plotly_json()
 
@@ -395,13 +477,8 @@ def _apply_styling(fig, config, color_palette, number_format, orientation,
     palette_colors = PALETTES.get(color_palette, PALETTES["default"])
     fig.update_layout(colorway=palette_colors)
 
-    # Apply number format
-    tick_format = NUMBER_FORMATS.get(number_format)
-    if tick_format:
-        if orientation == "horizontal":
-            fig.update_layout(xaxis_tickformat=tick_format)
-        else:
-            fig.update_layout(yaxis_tickformat=tick_format)
+    # Number/value-axis formatting is handled by _apply_value_format (it supports
+    # raw d3 strings + per-column formats), called after styling.
 
     # Per-value color mapping
     color_map = config.get("color_map", {})
