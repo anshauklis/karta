@@ -1,5 +1,6 @@
 import plotly.express as px
 from api.renderers.base import BaseRenderer, ChartCapabilities
+from api.renderers.palettes import palette_sequence
 
 
 class LineRenderer(BaseRenderer):
@@ -11,7 +12,8 @@ class LineRenderer(BaseRenderer):
     def render(self, df, x_col, y, color, config, df_melted):
         show_values = config.get("show_values", False)
         fig = px.line(df_melted, x=x_col, y=y, color=color,
-                      text=y if show_values else None)
+                      text=y if show_values else None,
+                      color_discrete_sequence=palette_sequence(config))
         if show_values:
             fig.update_traces(textposition="top center")
         return fig

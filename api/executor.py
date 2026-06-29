@@ -3,7 +3,6 @@ import multiprocessing
 import re
 import pandas as pd
 import numpy as np
-import plotly.express as px
 import plotly.graph_objects as go
 
 log = logging.getLogger(__name__)
@@ -103,15 +102,8 @@ def _safe_rows(df: pd.DataFrame) -> list[list]:
                     row[col_idx] = str(v)
     return rows
 
-# Built-in color palettes
-PALETTES = {
-    "default": px.colors.qualitative.Plotly,
-    "pastel": px.colors.qualitative.Pastel,
-    "vivid": px.colors.qualitative.Vivid,
-    "bold": px.colors.qualitative.Bold,
-    "dark": px.colors.qualitative.Dark24,
-    "earth": px.colors.qualitative.Set2,
-}
+# Built-in color palettes (re-exported from the shared module for callers/tests)
+from api.renderers.palettes import PALETTES  # noqa: E402
 
 # Number format mapping for Y axis
 NUMBER_FORMATS = {

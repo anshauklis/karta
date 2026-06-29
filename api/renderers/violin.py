@@ -1,5 +1,6 @@
 import plotly.express as px
 from api.renderers.base import BaseRenderer, ChartCapabilities
+from api.renderers.palettes import palette_sequence
 
 
 class ViolinRenderer(BaseRenderer):
@@ -8,5 +9,6 @@ class ViolinRenderer(BaseRenderer):
 
     def render(self, df, x_col, y, color, config, df_melted):
         fig = px.violin(df_melted, x=x_col, y=y, color=color,
-                        box=True, points="outliers")
+                        box=True, points="outliers",
+                        color_discrete_sequence=palette_sequence(config))
         return fig
