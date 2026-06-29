@@ -5,7 +5,7 @@ import time
 import jwt as pyjwt
 import pytest
 
-from auth.jwt import JWT_SECRET, encode_token, decode_token
+from auth.jwt import encode_token, decode_token
 
 
 class TestEncodeDecodeRoundtrip:

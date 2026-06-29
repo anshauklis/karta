@@ -103,7 +103,7 @@ def _safe_rows(df: pd.DataFrame) -> list[list]:
     return rows
 
 # Built-in color palettes (re-exported from the shared module for callers/tests)
-from api.renderers.palettes import PALETTES  # noqa: E402
+from api.renderers.palettes import PALETTES
 
 # Number format mapping for Y axis
 NUMBER_FORMATS = {

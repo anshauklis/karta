@@ -2,7 +2,6 @@
 
 import base64
 
-import pytest
 
 from crypto import (
     decrypt_password,

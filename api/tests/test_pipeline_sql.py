@@ -5,7 +5,6 @@ import pytest
 from pipeline_sql import (
     build_pipeline_sql,
     _chart_filters_cte,
-    _time_range_cte,
     _time_grain_cte,
     _quote_ident,
     SQLValidationError,
