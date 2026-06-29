@@ -82,6 +82,7 @@ import { useTranslations } from "next-intl";
 import { layoutAwareFilter } from "@/lib/layout-aware-filter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChartEditor } from "./hooks/use-chart-editor";
+import { ChartEditorProvider } from "./context/chart-editor-context";
 import { CodeTab } from "./components/code-tab";
 import { CustomizeTab } from "./components/customize-tab";
 import { DataTab } from "./components/data-tab";
@@ -154,49 +155,35 @@ export default function ChartEditorPage({
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
+  // Only the editor values page.tsx renders itself are destructured here; the
+  // tab/preview panels read everything else from ChartEditorContext.
   const {
     // Route/identity
-    isNew, isStandalone, chartId, router, dashboard, allDashboards, existingChart, connections, datasets, isDark,
+    isNew, isStandalone, chartId, router, dashboard, allDashboards, existingChart, connections, datasets,
     // Standalone dashboard selector
-    selectedDashboardId, setSelectedDashboardId: _setSelectedDashboardId,
-    // Tab selector
-    dashboardTabs: _dashboardTabs, selectedTabId: _selectedTabId, setSelectedTabId: _setSelectedTabId,
+    selectedDashboardId,
     // Mutations
     updateChart, createChart, createStandaloneChart,
     // Form state
     title, setTitle, description, setDescription, showDesc, setShowDesc,
     connectionId, setConnectionId, dataSource, setDataSource, datasetId, setDatasetId,
-    sqlQuery, setSqlQuery, mode, chartType, setChartType, chartCode, setChartCode,
-    chartConfig, setChartConfig, chartVariables, setChartVariables,
+    sqlQuery, setSqlQuery, chartType, setChartType, chartConfig, setChartConfig,
     // Undo
     configUndo,
     // Tab state
-    activeTab, setActiveTab, codeSubTab, setCodeSubTab,
-    customizeSubTab, setCustomizeSubTab, execTime,
-    tooltipOpen, setTooltipOpen, statsOpen, setStatsOpen,
-    transformsOpen, setTransformsOpen, refLinesOpen, setRefLinesOpen,
-    codeUpdatedVisual, setCodeUpdatedVisual, editorZoom, setEditorZoom,
+    activeTab, setActiveTab, codeUpdatedVisual, setCodeUpdatedVisual, editorZoom, setEditorZoom,
     // Preview/result
-    result, previewing, showHistory, setShowHistory,
+    previewing, showHistory, setShowHistory,
     chartGalleryOpen, setChartGalleryOpen,
-    fmtSelectedCols, setFmtSelectedCols,
     saveModalOpen, setSaveModalOpen,
     // Columns
-    queryColumns, availableColumns, selectedColumns, columnTypes,
+    availableColumns, columnTypes,
     // Handlers
-    handlePreview, handleModalSave,
-    handleYColumnsChange, handleMultiSelectToggle, updateConfig,
-    handleRunQuery, handleSqlEditorMount,
+    handleModalSave, updateConfig,
     // Templates
     templates, addTemplate,
-    // Conditional formatting
-    formattingRules, addFormattingRule, removeFormattingRule, updateFormattingRule,
-    addThresholdSubRule, removeThresholdSubRule, updateThresholdSubRule,
     // Derived booleans
-    isPivot, isTable, isKPI, isHistogram,
-    showXAxis, showYAxis, showColor, showStyling, showConditionalFormatting, canPreview: _canPreview,
-    // Refs
-    codeEditingRef, codeEditTimerRef,
+    isTable,
   } = editor;
 
   // Ctrl+S / Cmd+S opens the save modal
@@ -366,7 +353,7 @@ export default function ChartEditorPage({
   }
 
   return (
-    <>
+    <ChartEditorProvider editor={editor}>
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
     <div className="flex h-[calc(100vh-5.5rem)] flex-col">
       {/* Top bar — Superset-style header */}
@@ -705,84 +692,15 @@ export default function ChartEditorPage({
 
           {/* Scrollable tab content */}
           <TabsContent value="data" className="flex-1 overflow-y-auto p-3 space-y-3 mt-0" style={{ zoom: editorZoom }}>
-            <DataTab
-              dataSource={dataSource}
-              sqlQuery={sqlQuery}
-              setSqlQuery={setSqlQuery}
-              handleSqlEditorMount={handleSqlEditorMount}
-              handleRunQuery={handleRunQuery}
-              previewing={previewing}
-              isDark={isDark}
-              chartConfig={chartConfig}
-              updateConfig={updateConfig}
-              setChartConfig={setChartConfig}
-              chartType={chartType}
-              availableColumns={availableColumns}
-              queryColumns={queryColumns}
-              columnTypes={columnTypes}
-              result={result}
-              isPivot={isPivot}
-              isTable={isTable}
-              isKPI={isKPI}
-              isHistogram={isHistogram}
-              showXAxis={showXAxis}
-              showYAxis={showYAxis}
-              showColor={showColor}
-              handleYColumnsChange={handleYColumnsChange}
-              handleMultiSelectToggle={handleMultiSelectToggle}
-              variables={chartVariables}
-              onVariablesChange={setChartVariables}
-            />
+            <DataTab />
           </TabsContent>
 
           <TabsContent value="customize" className="flex-1 overflow-y-auto p-3 space-y-3 mt-0" style={{ zoom: editorZoom }}>
-            <CustomizeTab
-              chartConfig={chartConfig}
-              chartType={chartType}
-              result={result}
-              availableColumns={selectedColumns}
-              customizeSubTab={customizeSubTab}
-              setCustomizeSubTab={setCustomizeSubTab}
-              fmtSelectedCols={fmtSelectedCols}
-              setFmtSelectedCols={setFmtSelectedCols}
-              isPivot={isPivot}
-              showStyling={showStyling}
-              showConditionalFormatting={showConditionalFormatting}
-              tooltipOpen={tooltipOpen}
-              setTooltipOpen={setTooltipOpen}
-              statsOpen={statsOpen}
-              setStatsOpen={setStatsOpen}
-              transformsOpen={transformsOpen}
-              setTransformsOpen={setTransformsOpen}
-              refLinesOpen={refLinesOpen}
-              setRefLinesOpen={setRefLinesOpen}
-              formattingRules={formattingRules}
-              addFormattingRule={addFormattingRule}
-              removeFormattingRule={removeFormattingRule}
-              updateFormattingRule={updateFormattingRule}
-              addThresholdSubRule={addThresholdSubRule}
-              removeThresholdSubRule={removeThresholdSubRule}
-              updateThresholdSubRule={updateThresholdSubRule}
-              updateConfig={updateConfig}
-            />
+            <CustomizeTab />
           </TabsContent>
 
           <TabsContent value="code" className="flex-1 overflow-y-auto p-3 space-y-3 mt-0" style={{ zoom: editorZoom }}>
-            <CodeTab
-              chartCode={chartCode}
-              setChartCode={setChartCode}
-              codeSubTab={codeSubTab}
-              setCodeSubTab={setCodeSubTab}
-              codeUpdatedVisual={codeUpdatedVisual}
-              setCodeUpdatedVisual={setCodeUpdatedVisual}
-              codeEditingRef={codeEditingRef}
-              codeEditTimerRef={codeEditTimerRef}
-              result={result}
-              previewing={previewing}
-              isDark={isDark}
-              setChartType={setChartType}
-              setChartConfig={setChartConfig}
-            />
+            <CodeTab />
           </TabsContent>
 
           </Tabs>{/* end tabs */}
@@ -793,18 +711,7 @@ export default function ChartEditorPage({
 
         {/* Right panel — Preview */}
         <Panel id="preview" defaultSize="65%" minSize="30%">
-        <ChartPreview
-          result={result}
-          previewing={previewing}
-          execTime={execTime}
-          chartType={chartType}
-          chartConfig={chartConfig}
-          title={title}
-          isDark={isDark}
-          onPreview={handlePreview}
-          dataSource={dataSource}
-          mode={mode}
-        />
+        <ChartPreview />
         </Panel>
         </PanelGroup>
 
@@ -896,6 +803,6 @@ export default function ChartEditorPage({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-    </>
+    </ChartEditorProvider>
   );
 }

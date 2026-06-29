@@ -32,8 +32,9 @@ import { useTranslations } from "next-intl";
 import { ColumnFormatsTable } from "./column-formats-table";
 import { COLOR_PALETTES, SUPPORTS_STACK, SUPPORTS_SORT, SUPPORTS_OVERLAYS } from "../lib/constants";
 import { FORMAT_PRESETS, d3Format } from "@/lib/d3-format";
-import type { ColumnFormat, ConditionalFormatRule, ChartExecuteResult } from "@/types";
+import type { ColumnFormat, ChartExecuteResult } from "@/types";
 import type { PivotValueFormat } from "@/components/charts/data-table";
+import { useChartEditorContext } from "../context/chart-editor-context";
 
 /* ---- Pivot Filter Section (reusable for rows & columns) ---- */
 function PivotFilterSection({
@@ -131,65 +132,36 @@ function PivotFilterSection({
   );
 }
 
-export interface CustomizeTabProps {
-  chartConfig: Record<string, unknown>;
-  chartType: string;
-  result: ChartExecuteResult | null;
-  availableColumns: string[];
-  customizeSubTab: "formatting" | "overlays" | "advanced";
-  setCustomizeSubTab: (v: "formatting" | "overlays" | "advanced") => void;
-  fmtSelectedCols: string[];
-  setFmtSelectedCols: (v: string[]) => void;
-  isPivot: boolean;
-  showStyling: boolean;
-  showConditionalFormatting: boolean;
-  tooltipOpen: boolean;
-  setTooltipOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
-  statsOpen: boolean;
-  setStatsOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
-  transformsOpen: boolean;
-  setTransformsOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
-  refLinesOpen: boolean;
-  setRefLinesOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
-  formattingRules: ConditionalFormatRule[];
-  addFormattingRule: () => void;
-  removeFormattingRule: (idx: number) => void;
-  updateFormattingRule: (idx: number, patch: Partial<ConditionalFormatRule>) => void;
-  addThresholdSubRule: (ruleIdx: number) => void;
-  removeThresholdSubRule: (ruleIdx: number, subIdx: number) => void;
-  updateThresholdSubRule: (ruleIdx: number, subIdx: number, patch: Record<string, unknown>) => void;
-  updateConfig: (key: string, value: unknown) => void;
-}
-
-export function CustomizeTab({
-  chartConfig,
-  chartType,
-  result,
-  availableColumns,
-  customizeSubTab,
-  setCustomizeSubTab,
-  fmtSelectedCols,
-  setFmtSelectedCols,
-  isPivot,
-  showStyling,
-  showConditionalFormatting,
-  tooltipOpen,
-  setTooltipOpen,
-  statsOpen,
-  setStatsOpen,
-  transformsOpen,
-  setTransformsOpen,
-  refLinesOpen,
-  setRefLinesOpen,
-  formattingRules,
-  addFormattingRule,
-  removeFormattingRule,
-  updateFormattingRule,
-  addThresholdSubRule,
-  removeThresholdSubRule,
-  updateThresholdSubRule,
-  updateConfig,
-}: CustomizeTabProps) {
+export function CustomizeTab() {
+  const {
+    chartConfig,
+    chartType,
+    result,
+    selectedColumns: availableColumns,
+    customizeSubTab,
+    setCustomizeSubTab,
+    fmtSelectedCols,
+    setFmtSelectedCols,
+    isPivot,
+    showStyling,
+    showConditionalFormatting,
+    tooltipOpen,
+    setTooltipOpen,
+    statsOpen,
+    setStatsOpen,
+    transformsOpen,
+    setTransformsOpen,
+    refLinesOpen,
+    setRefLinesOpen,
+    formattingRules,
+    addFormattingRule,
+    removeFormattingRule,
+    updateFormattingRule,
+    addThresholdSubRule,
+    removeThresholdSubRule,
+    updateThresholdSubRule,
+    updateConfig,
+  } = useChartEditorContext();
   const tp = useTranslations("pivot");
   return (
     <div className="space-y-4">

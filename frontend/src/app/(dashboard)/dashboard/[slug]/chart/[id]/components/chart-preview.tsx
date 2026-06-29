@@ -11,35 +11,22 @@ import { DataTable } from "@/components/charts/data-table";
 import { formatCellValue } from "@/lib/format";
 import { formatDateByGrain } from "@/lib/date-format";
 import { downloadCSV, downloadExcel } from "@/lib/export";
-import type { ChartExecuteResult, ConditionalFormatRule, ColumnFormat } from "@/types";
+import type { ConditionalFormatRule, ColumnFormat } from "@/types";
+import { useChartEditorContext } from "../context/chart-editor-context";
 
 type SessionWithToken = { accessToken?: string } | null;
 
-interface ChartPreviewProps {
-  result: ChartExecuteResult | null;
-  previewing: boolean;
-  execTime: number | null;
-  chartType: string;
-  chartConfig: Record<string, unknown>;
-  title: string;
-  isDark: boolean;
-  onPreview: () => void;
-  dataSource: "sql" | "dataset";
-  mode: "visual" | "code";
-}
-
-export function ChartPreview({
-  result,
-  previewing,
-  execTime,
-  chartType,
-  chartConfig,
-  title,
-  isDark: _isDark,
-  onPreview: _onPreview,
-  dataSource,
-  mode,
-}: ChartPreviewProps) {
+export function ChartPreview() {
+  const {
+    result,
+    previewing,
+    execTime,
+    chartType,
+    chartConfig,
+    title,
+    dataSource,
+    mode,
+  } = useChartEditorContext();
   const { data: session } = useSession();
   const token = (session as SessionWithToken)?.accessToken;
   const t = useTranslations("chart");
