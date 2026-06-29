@@ -114,8 +114,23 @@ def execute_sql(req: SQLExecuteRequest, current_user: dict = require_role("sql_l
         )
 
     c_max_fetch = min(getattr(req, "limit", 1000), 10_000)
+    from api import job_queue
     try:
-        core = run_sql_core(req.connection_id, clean_sql, c_max_fetch)
+        if job_queue.queue_enabled():
+            from api.tasks import execute_sql_task
+            try:
+                core = job_queue.submit_and_wait(
+                    execute_sql_task,
+                    {"connection_id": req.connection_id, "clean_sql": clean_sql, "max_fetch": c_max_fetch},
+                    job_timeout=120, max_wait=90)
+            except job_queue.QueueBusy:
+                raise HTTPException(status_code=503, detail="Server is busy, please retry shortly")
+            except job_queue.QueueJobError as e:
+                raise HTTPException(status_code=400, detail=f"Query execution failed: {e}")
+        else:
+            core = run_sql_core(req.connection_id, clean_sql, c_max_fetch)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Query execution failed: {str(e)}")
     columns, rows, elapsed = core["columns"], core["rows"], core["execution_time_ms"]

@@ -1469,31 +1469,37 @@ def run_chart_pipeline_sync(*, connection_id, sql_query, chart_config, mode,
     }
 
 
-async def _run_chart_pipeline(
-    *,
-    connection_id: int,
-    sql_query: str,
-    chart_config: dict,
-    mode: str,
-    chart_type: str,
-    chart_code: str | None,
-    variables: list | None,
-    variable_values: dict | None,
-    filters: dict | None,
-    uid: int,
-    pq_ttl: int | None,
-) -> ChartExecuteResponse:
+async def _run_chart_pipeline(*, connection_id, sql_query, chart_config, mode,
+                              chart_type, chart_code, variables, variable_values,
+                              filters, uid, pq_ttl) -> ChartExecuteResponse:
     """Shared execute/preview pipeline.
 
     Substitute {{ variable }} values -> build custom-SQL / pivot-custom-SQL wrappers
     -> run the DuckDB pipeline -> render (visual/pivot/code) -> ChartExecuteResponse.
     Auth, view-tracking and result caching are the callers' responsibility.
     """
-    payload = await asyncio.to_thread(
-        run_chart_pipeline_sync,
-        connection_id=connection_id, sql_query=sql_query, chart_config=chart_config,
-        mode=mode, chart_type=chart_type, chart_code=chart_code, variables=variables,
-        variable_values=variable_values, filters=filters, uid=uid, pq_ttl=pq_ttl)
+    from api import job_queue
+    kwargs = dict(connection_id=connection_id, sql_query=sql_query,
+                  chart_config=chart_config, mode=mode, chart_type=chart_type,
+                  chart_code=chart_code, variables=variables,
+                  variable_values=variable_values, filters=filters, uid=uid,
+                  pq_ttl=pq_ttl)
+    if job_queue.queue_enabled():
+        from api.tasks import execute_chart_task
+        try:
+            payload = await asyncio.to_thread(
+                job_queue.submit_and_wait, execute_chart_task, kwargs,
+                job_timeout=300, max_wait=90)
+        except job_queue.QueueBusy:
+            return ChartExecuteResponse(error={
+                "code": "SERVER_BUSY",
+                "message": "Server is busy, please retry shortly",
+                "detail": "All query workers are occupied"})
+        except Exception:
+            # Redis/worker unavailable → graceful inline fallback
+            payload = await asyncio.to_thread(run_chart_pipeline_sync, **kwargs)
+    else:
+        payload = await asyncio.to_thread(run_chart_pipeline_sync, **kwargs)
     return ChartExecuteResponse(**payload)
 
 
