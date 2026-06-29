@@ -553,7 +553,9 @@ After the `api` service block, add (mirror api's `environment`, `volumes`, `depe
   worker:
     build: ./api
     restart: unless-stopped
-    command: ["uv", "run", "rq", "worker", "karta", "--url", "${REDIS_URL:-redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0}"]
+    # sh -c so REDIS_URL is resolved from the container env at runtime (avoids
+    # fragile nested compose interpolation in a command array).
+    command: ["sh", "-c", "uv run rq worker karta --url \"$REDIS_URL\""]
     environment:
       DATABASE_URL: postgresql://karta:${POSTGRES_PASSWORD}@postgres:5432/karta
       JWT_SECRET: ${JWT_SECRET}
