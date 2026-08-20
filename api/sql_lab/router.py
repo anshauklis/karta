@@ -1,4 +1,6 @@
 import time
+from decimal import Decimal
+import numbers
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
@@ -9,6 +11,54 @@ from api.cache import cache_key, get_cached, set_cached
 from api.auth.dependencies import require_role
 
 router = APIRouter(prefix="/api/sql", tags=["sql_lab"])
+
+
+def run_sql_core(connection_id: int, clean_sql: str, max_fetch: int) -> dict:
+    """Synchronous SQL execution core. Worker-callable; returns JSON-serializable
+    {columns, rows, execution_time_ms}. Raises on execution failure."""
+    c = _get_connection_with_password(connection_id)
+    engine, spec = get_engine_for_connection(c)
+    start = time.time()
+    if c["db_type"] == "duckdb":
+        df = spec.execute_native(c["database_name"], clean_sql)
+        columns = list(df.columns)
+        rows = [list(row) for row in df.head(max_fetch).itertuples(index=False, name=None)]
+        for i, row in enumerate(rows):
+            for j, val in enumerate(row):
+                if val is None or isinstance(val, (str, bool, int, float)):
+                    continue
+                if isinstance(val, numbers.Integral):
+                    rows[i][j] = int(val)
+                elif isinstance(val, numbers.Real):
+                    rows[i][j] = float(val)
+                else:
+                    try:
+                        rows[i][j] = float(val)
+                    except (TypeError, ValueError):
+                        rows[i][j] = str(val)
+    else:
+        with engine.connect() as conn:
+            spec.set_timeout(conn, 30)
+            result = conn.execute(text(clean_sql))
+            columns = list(result.keys())
+            rows = [list(row) for row in result.fetchmany(max_fetch)]
+            for i, row in enumerate(rows):
+                for j, val in enumerate(row):
+                    if val is None or isinstance(val, (str, bool, int, float)):
+                        continue
+                    if isinstance(val, Decimal):
+                        rows[i][j] = float(val)
+                    elif isinstance(val, numbers.Integral):
+                        rows[i][j] = int(val)
+                    elif isinstance(val, numbers.Real):
+                        rows[i][j] = float(val)
+                    else:
+                        try:
+                            rows[i][j] = float(val)
+                        except (TypeError, ValueError):
+                            rows[i][j] = str(val)
+    elapsed = int((time.time() - start) * 1000)
+    return {"columns": columns, "rows": rows, "execution_time_ms": elapsed}
 
 
 @router.post("/validate", response_model=SQLValidateResponse, summary="Validate SQL query")
@@ -63,65 +113,29 @@ def execute_sql(req: SQLExecuteRequest, current_user: dict = require_role("sql_l
             execution_time_ms=0,
         )
 
-    # Get connection
-    c = _get_connection_with_password(req.connection_id)
-    max_fetch = min(getattr(req, "limit", 1000), 10_000)
-
-    engine, spec = get_engine_for_connection(c)
-
+    c_max_fetch = min(getattr(req, "limit", 1000), 10_000)
+    from api import job_queue
     try:
-        start = time.time()
-        if c["db_type"] == "duckdb":
-            # DuckDB fast path: native API avoids SQLAlchemy overhead
-            import numbers
-            df = spec.execute_native(c["database_name"], clean_sql)
-            columns = list(df.columns)
-            rows = [list(row) for row in df.head(max_fetch).itertuples(index=False, name=None)]
-            for i, row in enumerate(rows):
-                for j, val in enumerate(row):
-                    if val is None or isinstance(val, (str, bool, int, float)):
-                        continue
-                    if isinstance(val, numbers.Integral):
-                        rows[i][j] = int(val)
-                    elif isinstance(val, numbers.Real):
-                        rows[i][j] = float(val)
-                    else:
-                        try:
-                            rows[i][j] = float(val)
-                        except (TypeError, ValueError):
-                            rows[i][j] = str(val)
+        if job_queue.queue_enabled():
+            from api.tasks import execute_sql_task
+            try:
+                core = job_queue.submit_and_wait(
+                    execute_sql_task,
+                    {"connection_id": req.connection_id, "clean_sql": clean_sql, "max_fetch": c_max_fetch},
+                    job_timeout=120, max_wait=90)
+            except job_queue.QueueBusy:
+                raise HTTPException(status_code=503, detail="Server is busy, please retry shortly")
+            except job_queue.QueueJobError as e:
+                raise HTTPException(status_code=400, detail=f"Query execution failed: {e}")
         else:
-            with engine.connect() as conn:
-                # Set statement timeout (30s)
-                spec.set_timeout(conn, 30)
-                result = conn.execute(text(clean_sql))
-                columns = list(result.keys())
-                rows = [list(row) for row in result.fetchmany(max_fetch)]
-                # Convert non-serializable types to JSON-safe Python primitives
-                from decimal import Decimal
-                import numbers
-                for i, row in enumerate(rows):
-                    for j, val in enumerate(row):
-                        if val is None or isinstance(val, (str, bool, int, float)):
-                            continue
-                        if isinstance(val, Decimal):
-                            rows[i][j] = float(val)
-                        elif isinstance(val, numbers.Integral):
-                            rows[i][j] = int(val)
-                        elif isinstance(val, numbers.Real):
-                            rows[i][j] = float(val)
-                        else:
-                            try:
-                                rows[i][j] = float(val)
-                            except (TypeError, ValueError):
-                                rows[i][j] = str(val)
-        elapsed = int((time.time() - start) * 1000)
+            core = run_sql_core(req.connection_id, clean_sql, c_max_fetch)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Query execution failed: {str(e)}")
+    columns, rows, elapsed = core["columns"], core["rows"], core["execution_time_ms"]
 
-    # Store in cache
     set_cached(key, {"columns": columns, "rows": rows})
-
     return SQLExecuteResponse(
         columns=columns,
         rows=rows[:req.limit],

@@ -3,6 +3,48 @@ from sqlalchemy import text
 from api.engine_specs.base import BaseEngineSpec, FieldDef
 
 
+def clickhouse_http_request(url, sql: str) -> tuple[str, dict, bytes]:
+    """Build the (endpoint, headers, body) for a ClickHouse HTTP query that
+    returns native Parquet. `url` is a SQLAlchemy URL (from the engine).
+
+    Pure/testable: no network. Credentials go in headers (not the URL) so they
+    never leak into logs; the body is the SELECT with a `FORMAT Parquet` suffix.
+    """
+    scheme = "https" if str((url.query or {}).get("protocol", "")).lower() == "https" else "http"
+    endpoint = f"{scheme}://{url.host}:{url.port or 8123}/"
+    headers = {
+        "X-ClickHouse-User": url.username or "default",
+        "X-ClickHouse-Key": url.password or "",
+        "X-ClickHouse-Database": url.database or "default",
+        "Content-Type": "text/plain; charset=utf-8",
+    }
+    clean = sql.strip().rstrip(";").strip()
+    body = f"{clean}\nFORMAT Parquet".encode("utf-8")
+    return endpoint, headers, body
+
+
+def _group_clickhouse_columns(rows, qualified: bool) -> list[dict]:
+    """Group flat (database, table, name, type) rows into the schema-browser
+    shape: [{"table_name", "columns": [{"name", "type", "nullable"}]}].
+
+    `qualified` → table_name is `database.table`; otherwise the bare table.
+    A column is nullable when its CH type is wrapped in `Nullable(...)`.
+    """
+    tables: dict[str, list] = {}
+    order: list[str] = []
+    for database, table, name, col_type in rows:
+        key = f"{database}.{table}" if qualified else table
+        if key not in tables:
+            tables[key] = []
+            order.append(key)
+        tables[key].append({
+            "name": name,
+            "type": col_type,
+            "nullable": str(col_type).startswith("Nullable("),
+        })
+    return [{"table_name": k, "columns": tables[k]} for k in order]
+
+
 class ClickHouseSpec(BaseEngineSpec):
     db_type = "clickhouse"
     display_name = "ClickHouse"
@@ -30,6 +72,22 @@ class ClickHouseSpec(BaseEngineSpec):
     def set_timeout(self, conn, timeout_sec: int) -> None:
         conn.execute(text(f"SET max_execution_time = {timeout_sec}"))
 
+    def export_parquet(self, engine, sql: str, dest_path: str) -> bool:
+        """Stream `SELECT ... FORMAT Parquet` straight from ClickHouse to disk.
+
+        Orders of magnitude faster than row-by-row streaming via the driver
+        (CH serialises Parquet natively), and avoids materialising rows in
+        Python. Raises on HTTP error so the caller falls back to row streaming.
+        """
+        import shutil
+        import urllib.request
+
+        endpoint, headers, body = clickhouse_http_request(engine.url, sql)
+        req = urllib.request.Request(endpoint, data=body, method="POST", headers=headers)
+        with urllib.request.urlopen(req, timeout=300) as resp, open(dest_path, "wb") as f:
+            shutil.copyfileobj(resp, f, length=1024 * 1024)
+        return True
+
     def get_schemas(self, engine) -> list[str]:
         with engine.connect() as conn:
             rows = conn.execute(text(
@@ -37,6 +95,30 @@ class ClickHouseSpec(BaseEngineSpec):
             )).fetchall()
             return [r[0] for r in rows
                     if r[0] not in ("system", "information_schema", "INFORMATION_SCHEMA")]
+
+    def get_schema(self, engine, schema: str | None = None) -> list[dict]:
+        """List tables and columns from system.columns.
+
+        ClickHouse is multi-database: with no `schema` the default SQLAlchemy
+        inspector only sees the (usually empty) connection database, so the
+        schema browser comes up empty. Here we list every user database (or one
+        when `schema` is given) and always return fully-qualified
+        `database.table` names so inserts/autocomplete stay valid in CH queries.
+        """
+        if schema:
+            where = "database = :db"
+            params = {"db": schema}
+        else:
+            where = ("database NOT IN "
+                     "('system', 'information_schema', 'INFORMATION_SCHEMA')")
+            params = {}
+        sql = (
+            "SELECT database, table, name, type FROM system.columns "
+            f"WHERE {where} ORDER BY database, table, position"
+        )
+        with engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+        return _group_clickhouse_columns(rows, qualified=True)
 
     def time_range_expression(self, column: str, days: int) -> str:
         return f"subtractDays(MAX({column}), {days})"

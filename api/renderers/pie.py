@@ -1,5 +1,6 @@
 import plotly.express as px
 from api.renderers.base import BaseRenderer, ChartCapabilities
+from api.renderers.palettes import palette_sequence
 
 
 class PieRenderer(BaseRenderer):
@@ -15,7 +16,8 @@ class PieRenderer(BaseRenderer):
     def render(self, df, x_col, y, color, config, df_melted):
         y_cols = config.get("y_columns", [])
         donut_hole = config.get("donut_hole", 0)
-        fig = px.pie(df, values=y_cols[0], names=x_col, hole=donut_hole)
+        fig = px.pie(df, values=y_cols[0], names=x_col, hole=donut_hole,
+                     color_discrete_sequence=palette_sequence(config))
         if config.get("show_values"):
             fig.update_traces(textinfo="label+percent+value")
         return fig

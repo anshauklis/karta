@@ -9,18 +9,17 @@ import { useDashboardBySlug, useDashboards } from "@/hooks/use-dashboards";
 import { useTemplates } from "@/hooks/use-templates";
 import { useUndo } from "@/hooks/use-undo";
 import { useDatasets } from "@/hooks/use-datasets";
-import { useChartDraft, useUpsertChartDraft, useDeleteChartDraft } from "@/hooks/use-chart-drafts";
+import { useChartDraft, useDeleteChartDraft } from "@/hooks/use-chart-drafts";
 import { useDashboardTabs, useMoveChartToTab } from "@/hooks/use-tabs";
 import { generateCodeFromVisual } from "@/lib/generate-code";
 import { parseCodeToVisual } from "@/lib/parse-code";
 import { useTheme } from "next-themes";
 import { useChartCapabilities } from "@/hooks/use-chart-capabilities";
 import { deriveChartFlags } from "../lib/chart-flags";
-import { canPreviewChart, buildPreviewRequest, mergePreviewResult } from "../lib/chart-preview-logic";
-import { buildDraftPayload } from "../lib/chart-draft";
 import { computeSelectedColumns } from "../lib/chart-columns";
 import { useConditionalFormatting } from "./use-conditional-formatting";
-import type { ChartExecuteResult } from "@/types";
+import { useChartPreview } from "./use-chart-preview";
+import { useChartDraftSync } from "./use-chart-draft-sync";
 import type { SaveParams } from "../components/save-chart-modal";
 
 export function useChartEditor(slug: string, id: string) {
@@ -60,8 +59,6 @@ export function useChartEditor(slug: string, id: string) {
   const [activeTab, setActiveTab] = useState<"data" | "customize" | "code" | "metrics">("data");
   const [codeSubTab, setCodeSubTab] = useState<"editor" | "output">("editor");
   const [customizeSubTab, setCustomizeSubTab] = useState<"formatting" | "overlays" | "advanced">("formatting");
-  const [execTime, setExecTime] = useState<number | null>(null);
-  const execStartRef = useRef<number>(0);
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [transformsOpen, setTransformsOpen] = useState(false);
@@ -138,6 +135,21 @@ export function useChartEditor(slug: string, id: string) {
   const codeEditingRef = useRef(false);
   const codeEditTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Preview/execute path + auto-preview timers (extracted sub-hook)
+  const {
+    result,
+    previewing,
+    execTime,
+    queryColumns,
+    handlePreview,
+    handlePreviewRef,
+    handleRunQuery,
+  } = useChartPreview({
+    dataSource, datasetId, connectionId, sqlQuery, activeTab,
+    chartType, chartConfig, chartCode, chartVariables,
+    previewChart, isInitialLoadRef,
+  });
+
   // Auto-sync Visual -> Code when visual config changes
   const prevChartTypeForCodeRef = useRef(chartType);
   useEffect(() => {
@@ -151,9 +163,7 @@ export function useChartEditor(slug: string, id: string) {
     setChartCode(generateCodeFromVisual(chartConfig, chartType));
   }, [chartConfig, chartType, mode]);
 
-  // Preview state
-  const [result, setResult] = useState<ChartExecuteResult | null>(null);
-  const [previewing, setPreviewing] = useState(false);
+  // Preview UI state
   const [showHistory, setShowHistory] = useState(false);
   const [chartGalleryOpen, setChartGalleryOpen] = useState(false);
   const [fmtSelectedCols, setFmtSelectedCols] = useState<string[]>([]);
@@ -162,7 +172,6 @@ export function useChartEditor(slug: string, id: string) {
   // --- Server-side draft (hooks must be called before effects that use them) ---
   const draftKey = isNew ? undefined : id;
   const { data: serverDraft, isFetched: draftFetched } = useChartDraft(draftKey);
-  const upsertDraft = useUpsertChartDraft();
   const deleteDraftMutation = useDeleteChartDraft();
 
   // Helper: apply draft state to all editor fields
@@ -265,10 +274,8 @@ export function useChartEditor(slug: string, id: string) {
     }, 100);
   }, [existingChart, serverDraft, draftFetched, chartFetched, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Source-column browser: show the RAW query columns (queryColumns), not the
-  // chart's aggregated output. queryColumns is populated by a config-less
-  // discovery query in handlePreview; falls back to result.columns until then.
-  const [queryColumns, setQueryColumns] = useState<string[]>([]);
+  // Source-column browser: prefer the RAW query columns (queryColumns from the
+  // preview hook) over the chart's aggregated output; fall back to result.columns.
   const availableColumns = queryColumns.length > 0 ? queryColumns : (result?.columns || []);
 
   // Columns actually selected in the Data tab (for Customize tab filtering)
@@ -277,10 +284,6 @@ export function useChartEditor(slug: string, id: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [chartType, chartConfig.x_column, chartConfig.y_columns, chartConfig.color_column, chartConfig.pivot_rows, chartConfig.pivot_columns, chartConfig.pivot_values],
   );
-
-  // Tracks the data source that queryColumns were discovered for, so the raw
-  // column list is refreshed only when the source (SQL/dataset/connection) changes.
-  const discoveredColsKeyRef = useRef<string>("");
 
   // Auto-fill y_columns with all columns when switching to table (if empty)
   useEffect(() => {
@@ -308,100 +311,6 @@ export function useChartEditor(slug: string, id: string) {
     }
     return types;
   }, [result?.rows, result?.columns]);
-
-  const handlePreview = async () => {
-    if (!canPreviewChart({ dataSource, datasetId, connectionId, sqlQuery })) return;
-    setPreviewing(true);
-    execStartRef.current = Date.now();
-    try {
-      const previewConnectionId = dataSource === "dataset" ? undefined : connectionId;
-      const previewDatasetId = dataSource === "dataset" ? datasetId : undefined;
-
-      // Discover RAW source columns (pre-aggregation) for the column browser.
-      // Re-runs only when the data source changed since the last discovery, so
-      // assigning a column (which re-previews on the same SQL) never shrinks it.
-      const sourceKey = `${dataSource}:${previewConnectionId}:${previewDatasetId}:${sqlQuery}`;
-      if (queryColumns.length === 0 || discoveredColsKeyRef.current !== sourceKey) {
-        const plainRes = await previewChart.mutateAsync({
-          connection_id: previewConnectionId,
-          dataset_id: previewDatasetId,
-          sql_query: sqlQuery,
-          mode: "visual",
-          chart_type: "table",
-          chart_config: {},
-        });
-        if (plainRes.columns) {
-          setQueryColumns(plainRes.columns);
-          discoveredColsKeyRef.current = sourceKey;
-        }
-      }
-
-      const res = await previewChart.mutateAsync(buildPreviewRequest({
-        dataSource,
-        connectionId,
-        datasetId,
-        sqlQuery,
-        isCodeMode: activeTab === "code",
-        chartType,
-        chartConfig,
-        chartCode,
-        variables: chartVariables,
-      }));
-      setResult((prev) => mergePreviewResult(prev, res));
-    } catch (e: unknown) {
-      setResult((prev) => ({
-        figure: null,
-        columns: prev?.columns || [],
-        rows: [],
-        row_count: 0,
-        error: e instanceof Error ? e.message : String(e),
-      }));
-    } finally {
-      setPreviewing(false);
-      if (execStartRef.current) setExecTime(Date.now() - execStartRef.current);
-    }
-  };
-
-  // Stable ref to handlePreview (avoids stale closures in timers)
-  const handlePreviewRef = useRef<() => void>(() => {});
-  handlePreviewRef.current = handlePreview;
-
-  // Auto-preview: debounced
-  const autoPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const canAutoPreview = canPreviewChart({ dataSource, datasetId, connectionId, sqlQuery });
-  const triggerAutoPreview = useCallback((delay: number) => {
-    if (isInitialLoadRef.current) return;
-    if (!canAutoPreview) return;
-    if (autoPreviewTimerRef.current) clearTimeout(autoPreviewTimerRef.current);
-    autoPreviewTimerRef.current = setTimeout(() => {
-      handlePreviewRef.current();
-    }, delay);
-  }, [canAutoPreview]);
-
-  // Auto-preview on visual config changes (800ms)
-  useEffect(() => {
-    triggerAutoPreview(800);
-    return () => { if (autoPreviewTimerRef.current) clearTimeout(autoPreviewTimerRef.current); };
-  }, [chartConfig, chartType, triggerAutoPreview]);
-
-  // Auto-preview on data source changes (immediate)
-  useEffect(() => {
-    triggerAutoPreview(100);
-    return () => { if (autoPreviewTimerRef.current) clearTimeout(autoPreviewTimerRef.current); };
-  }, [datasetId, connectionId, triggerAutoPreview]);
-
-  // Auto-preview on SQL changes (1500ms)
-  useEffect(() => {
-    triggerAutoPreview(1500);
-    return () => { if (autoPreviewTimerRef.current) clearTimeout(autoPreviewTimerRef.current); };
-  }, [sqlQuery, triggerAutoPreview]);
-
-  // Auto-preview on code changes (1500ms) -- only in code tab
-  useEffect(() => {
-    if (activeTab !== "code") return;
-    triggerAutoPreview(1500);
-    return () => { if (autoPreviewTimerRef.current) clearTimeout(autoPreviewTimerRef.current); };
-  }, [chartCode, activeTab, triggerAutoPreview]);
 
   const handleModalSave = async (params: SaveParams) => {
     const data = {
@@ -483,38 +392,6 @@ export function useChartEditor(slug: string, id: string) {
     setChartConfig((prev: Record<string, unknown>) => ({ ...prev, [key]: value }));
   };
 
-  // For pivot: run a plain query first to get column names
-  const handleRunQuery = async () => {
-    if (dataSource === "dataset") {
-      if (!datasetId) return;
-    } else {
-      if (!connectionId || !sqlQuery.trim()) return;
-    }
-    setPreviewing(true);
-    try {
-      const res = await previewChart.mutateAsync({
-        connection_id: dataSource === "dataset" ? undefined : connectionId,
-        dataset_id: dataSource === "dataset" ? datasetId : undefined,
-        sql_query: sqlQuery,
-        mode: "visual",
-        chart_type: "table",
-        chart_config: {},
-      });
-      if (res.columns) setQueryColumns(res.columns);
-      setResult(res);
-    } catch (e: unknown) {
-      setResult((prev) => ({
-        figure: null,
-        columns: prev?.columns || [],
-        rows: [],
-        row_count: 0,
-        error: e instanceof Error ? e.message : String(e),
-      }));
-    } finally {
-      setPreviewing(false);
-    }
-  };
-
   // --- Conditional formatting helpers (extracted) ---
   const {
     formattingRules,
@@ -586,48 +463,24 @@ export function useChartEditor(slug: string, id: string) {
     });
   }, []);
 
-  // --- Server-side draft auto-save ---
-  const draftTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  // Ref holding a flush function with latest data — called on unmount
-  const flushDraftRef = useRef<(() => void) | null>(null);
-
-  // Debounced auto-save to server (3s) — only for new charts
-  useEffect(() => {
-    if (isInitialLoadRef.current || !isNew) return;
-    clearTimeout(draftTimerRef.current);
-
-    const draftData = buildDraftPayload({
-      chartId: "new",
-      isStandalone,
-      selectedDashboardId,
-      dashboardId: dashboard?.id,
-      connectionId,
-      datasetId,
-      title,
-      description,
-      mode,
-      chartType,
-      chartConfig,
-      chartCode,
-      sqlQuery,
-      variables: chartVariables,
-    });
-
-    // Keep flush function up-to-date with latest data
-    flushDraftRef.current = () => upsertDraft.mutate(draftData);
-
-    draftTimerRef.current = setTimeout(() => {
-      upsertDraft.mutate(draftData);
-      flushDraftRef.current = null; // saved — nothing to flush
-    }, 3000);
-    return () => clearTimeout(draftTimerRef.current);
-  }, [title, description, sqlQuery, mode, chartType, chartConfig, chartCode, connectionId, datasetId, chartVariables]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Flush unsaved draft immediately on unmount (only for new charts)
-  useEffect(() => {
-    if (!isNew) return;
-    return () => { flushDraftRef.current?.(); };
-  }, [isNew]);
+  // --- Server-side draft auto-save (extracted sub-hook) ---
+  useChartDraftSync({
+    isNew,
+    isStandalone,
+    selectedDashboardId,
+    dashboardId: dashboard?.id,
+    connectionId,
+    datasetId,
+    title,
+    description,
+    mode,
+    chartType,
+    chartConfig,
+    chartCode,
+    sqlQuery,
+    chartVariables,
+    isInitialLoadRef,
+  });
 
   // --- Keyboard shortcuts ---
   useEffect(() => {

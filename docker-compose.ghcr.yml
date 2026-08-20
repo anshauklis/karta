@@ -99,6 +99,49 @@ services:
       timeout: 3s
       retries: 5
 
+  worker:
+    image: ghcr.io/anshauklis/karta/api:main
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # sh -c so REDIS_URL is resolved from the container env at runtime (avoids
+    # fragile nested compose interpolation in a command array).
+    command: ["sh", "-c", "rq worker karta --url \"$REDIS_URL\""]
+    environment:
+      DATABASE_URL: postgresql://karta:${POSTGRES_PASSWORD}@postgres:5432/karta
+      JWT_SECRET: ${JWT_SECRET}
+      CONNECTION_SECRET: ${CONNECTION_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0
+      QUERY_QUEUE_ENABLED: ${QUERY_QUEUE_ENABLED:-false}
+      AI_API_URL: ${AI_API_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gpt-4o}
+      AI_ENABLED: ${AI_ENABLED:-false}
+    volumes:
+      - ./data/csv:/app/data/csv
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: ${WORKER_REPLICAS:-2}
+      resources:
+        limits:
+          memory: 4G
+    # Override the image's HTTP healthcheck (the worker has no web server): a
+    # worker is healthy when it can reach its Redis (its job lifeline).
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,redis; redis.Redis.from_url(os.environ['REDIS_URL']).ping()\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   frontend:
     image: ghcr.io/anshauklis/karta/frontend:main
     restart: unless-stopped

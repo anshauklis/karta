@@ -3,7 +3,6 @@ import multiprocessing
 import re
 import pandas as pd
 import numpy as np
-import plotly.express as px
 import plotly.graph_objects as go
 
 log = logging.getLogger(__name__)
@@ -103,22 +102,145 @@ def _safe_rows(df: pd.DataFrame) -> list[list]:
                     row[col_idx] = str(v)
     return rows
 
-# Built-in color palettes
-PALETTES = {
-    "default": px.colors.qualitative.Plotly,
-    "pastel": px.colors.qualitative.Pastel,
-    "vivid": px.colors.qualitative.Vivid,
-    "bold": px.colors.qualitative.Bold,
-    "dark": px.colors.qualitative.Dark24,
-    "earth": px.colors.qualitative.Set2,
-}
+# Built-in color palettes (re-exported from the shared module for callers/tests)
+from api.renderers.palettes import PALETTES
 
-# Number format mapping for Y axis
+# Legacy number_format keys → d3 format strings. The Number Format selector now
+# sends raw d3 strings directly; these map old saved charts for backward compat.
 NUMBER_FORMATS = {
     "percent": ".1%",
     "currency": "$,.0f",
     "compact": "~s",
 }
+
+def _column_format_parts(fmt: dict) -> tuple[str | None, str, str]:
+    """Convert a column_formats entry to a d3 (tickformat, prefix, suffix).
+
+    The `$` currency symbol is inlined into the format string (d3 supports it,
+    so it shows in hover too); other symbols (€, £, custom) stay as a separate
+    prefix because Plotly's tickprefix/literal prefix is the only way to render
+    them and they cannot appear in axis hover."""
+    decimals = fmt.get("decimals")
+    prefix = fmt.get("prefix") or ""
+    suffix = fmt.get("suffix") or ""
+    comma = "," if fmt.get("thousands", True) else ""
+    t = fmt.get("type")
+    if t == "currency":
+        d = 2 if decimals is None else decimals
+        sym = prefix or "$"
+        if sym == "$":
+            return f"${comma}.{d}f", "", suffix
+        return f"{comma}.{d}f", sym, suffix
+    if t == "percent":
+        d = 1 if decimals is None else decimals
+        return f"{comma}.{d}%", prefix, suffix
+    if t == "number":
+        if decimals is None:
+            return (comma or None), prefix, suffix
+        return f"{comma}.{decimals}f", prefix, suffix
+    return None, prefix, suffix
+
+
+def _split_currency_symbol(d3str: str) -> tuple[str, str]:
+    """Split a leading non-$ currency symbol (€, £, …) out of a d3 format so
+    Plotly renders it via tickprefix; $ stays inline (d3 handles it natively)."""
+    import re
+    m = re.match(r"^([^\d,.~%#+\-\s]+)(.*)$", d3str)
+    if m and m.group(1) and m.group(1) != "$":
+        return m.group(2), m.group(1)
+    return d3str, ""
+
+
+def _value_format_parts(config: dict) -> tuple[str | None, str, str]:
+    """Resolve (tickformat, prefix, suffix) for the value axis, labels and hover.
+
+    Per-column format on the first y column wins; otherwise the global
+    number_format (a raw d3 string, a legacy key, or the _custom_ override)."""
+    cfmts = config.get("column_formats") or {}
+    for yc in (config.get("y_columns") or []):
+        f = cfmts.get(yc)
+        if isinstance(f, dict) and f.get("type") in ("currency", "percent", "number"):
+            return _column_format_parts(f)
+    nf = config.get("number_format") or ""
+    if nf == "_custom_":
+        nf = config.get("custom_number_format") or ""
+    nf = NUMBER_FORMATS.get(nf, nf)  # map legacy percent/currency/compact keys
+    if nf and nf != "auto":
+        fmt, prefix = _split_currency_symbol(nf)
+        return fmt, prefix, ""
+    return None, "", ""
+
+
+def _set_axis_format(fig, axis_name, tickformat, prefix, suffix):
+    """Set tick + hover format (and prefix/suffix) on a value axis.
+
+    `axis_name` is the full Plotly layout axis name ("yaxis", "yaxis2", "xaxis")."""
+    upd = {}
+    if tickformat:
+        upd[f"{axis_name}_tickformat"] = tickformat
+        upd[f"{axis_name}_hoverformat"] = tickformat
+    if prefix:
+        upd[f"{axis_name}_tickprefix"] = prefix
+    if suffix:
+        upd[f"{axis_name}_ticksuffix"] = suffix
+    if upd:
+        fig.update_layout(**upd)
+
+
+def _apply_value_format(fig, config, chart_type, orientation):
+    """Apply the resolved number format uniformly across chart types: value-axis
+    ticks + hover, and data labels (when show_values). No-op when unformatted.
+
+    Covers every type with a value field: cartesian (bar/line/area/scatter/
+    histogram), combo (both y axes), funnel, waterfall, pie/donut, treemap and
+    heatmap. Hover uses axis hoverformat where there is a value axis (so the
+    auto category/colour context is preserved) and an explicit hovertemplate
+    only for the axis-less types."""
+    tickformat, prefix, suffix = _value_format_parts(config)
+    if not (tickformat or prefix or suffix):
+        return
+    show_values = bool(config.get("show_values"))
+
+    def tmpl(ref: str) -> str:
+        inner = f"%{{{ref}:{tickformat}}}" if tickformat else f"%{{{ref}}}"
+        return f"{prefix}{inner}{suffix}"
+
+    if chart_type in ("bar", "line", "area", "scatter", "histogram"):
+        ref = "x" if (chart_type == "bar" and orientation == "horizontal") else "y"
+        _set_axis_format(fig, f"{ref}axis", tickformat, prefix, suffix)
+        if show_values:
+            fig.update_traces(texttemplate=tmpl(ref))
+    elif chart_type == "combo":
+        _set_axis_format(fig, "yaxis", tickformat, prefix, suffix)
+        _set_axis_format(fig, "yaxis2", tickformat, prefix, suffix)
+        if show_values:
+            fig.update_traces(texttemplate=tmpl("y"))
+    elif chart_type == "funnel":
+        _set_axis_format(fig, "xaxis", tickformat, prefix, suffix)
+        if show_values:
+            fig.update_traces(texttemplate=f"{tmpl('value')} (%{{percentInitial}})")
+    elif chart_type == "waterfall":
+        _set_axis_format(fig, "yaxis", tickformat, prefix, suffix)
+        if show_values:
+            fig.update_traces(texttemplate=tmpl("y"))
+    elif chart_type in ("pie", "donut"):
+        fig.update_traces(hovertemplate=f"%{{label}}<br>{tmpl('value')} (%{{percent}})<extra></extra>")
+        if show_values:
+            fig.update_traces(texttemplate=f"%{{label}}<br>%{{percent}}<br>{tmpl('value')}")
+    elif chart_type == "treemap":
+        fig.update_traces(
+            hovertemplate=f"%{{label}}<br>{tmpl('value')}<extra></extra>",
+            texttemplate=f"%{{label}}<br>{tmpl('value')}",
+        )
+    elif chart_type == "heatmap":
+        fig.update_traces(hovertemplate=f"%{{x}} / %{{y}}<br>{tmpl('z')}<extra></extra>")
+        if tickformat:
+            try:
+                fig.update_coloraxes(colorbar_tickformat=tickformat)
+            except Exception:
+                pass
+        if show_values:
+            fig.update_traces(texttemplate=tmpl("z"))
 
 
 def apply_transforms(df: pd.DataFrame, transforms: list[dict]) -> pd.DataFrame:
@@ -257,6 +379,11 @@ def build_visual_chart(chart_type: str, config: dict, df: pd.DataFrame) -> dict 
                        x_label, y_label)
     except Exception as exc:
         log.warning("Styling failed for %s: %s", chart_type, exc)
+
+    try:
+        _apply_value_format(fig, config, chart_type, orientation)
+    except Exception as exc:
+        log.warning("Value format failed for %s: %s", chart_type, exc)
 
     return fig.to_plotly_json()
 
@@ -403,13 +530,8 @@ def _apply_styling(fig, config, color_palette, number_format, orientation,
     palette_colors = PALETTES.get(color_palette, PALETTES["default"])
     fig.update_layout(colorway=palette_colors)
 
-    # Apply number format
-    tick_format = NUMBER_FORMATS.get(number_format)
-    if tick_format:
-        if orientation == "horizontal":
-            fig.update_layout(xaxis_tickformat=tick_format)
-        else:
-            fig.update_layout(yaxis_tickformat=tick_format)
+    # Number/value-axis formatting is handled by _apply_value_format (it supports
+    # raw d3 strings + per-column formats), called after styling.
 
     # Per-value color mapping
     color_map = config.get("color_map", {})

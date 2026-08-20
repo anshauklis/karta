@@ -5,43 +5,27 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { parseCodeToVisual } from "@/lib/parse-code";
-import type { ChartExecuteResult } from "@/types";
-import { useState, useRef, useCallback, type MutableRefObject } from "react";
+import { useState, useRef, useCallback } from "react";
+import { useChartEditorContext } from "../context/chart-editor-context";
 
 import dynamic from "next/dynamic";
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
-interface CodeTabProps {
-  chartCode: string;
-  setChartCode: (v: string) => void;
-  codeSubTab: "editor" | "output";
-  setCodeSubTab: (v: "editor" | "output") => void;
-  codeUpdatedVisual: boolean;
-  setCodeUpdatedVisual: (v: boolean) => void;
-  codeEditingRef: MutableRefObject<boolean>;
-  codeEditTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
-  result: ChartExecuteResult | null;
-  previewing: boolean;
-  isDark: boolean;
-  setChartType: (v: string) => void;
-  setChartConfig: (fn: (prev: Record<string, unknown>) => Record<string, unknown>) => void;
-}
-
-export function CodeTab({
-  chartCode,
-  setChartCode,
-  codeSubTab,
-  setCodeSubTab,
-  codeUpdatedVisual: _codeUpdatedVisual,
-  setCodeUpdatedVisual,
-  codeEditingRef,
-  codeEditTimerRef,
-  result,
-  previewing,
-  isDark,
-  setChartType,
-  setChartConfig,
-}: CodeTabProps) {
+export function CodeTab() {
+  const {
+    chartCode,
+    setChartCode,
+    codeSubTab,
+    setCodeSubTab,
+    setCodeUpdatedVisual,
+    codeEditingRef,
+    codeEditTimerRef,
+    result,
+    previewing,
+    isDark,
+    setChartType,
+    setChartConfig,
+  } = useChartEditorContext();
   const t = useTranslations("chart");
   const parseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isCodeEditing, setIsCodeEditing] = useState(false);
@@ -111,6 +95,7 @@ export function CodeTab({
             }}
             options={{
               minimap: { enabled: false },
+              multiCursorModifier: "ctrlCmd",
               lineNumbers: "on",
               fontSize: 13,
               scrollBeyondLastLine: false,

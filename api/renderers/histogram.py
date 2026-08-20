@@ -1,5 +1,6 @@
 import plotly.express as px
 from api.renderers.base import BaseRenderer, ChartCapabilities
+from api.renderers.palettes import palette_sequence
 
 
 class HistogramRenderer(BaseRenderer):
@@ -11,10 +12,12 @@ class HistogramRenderer(BaseRenderer):
         y_cols = config.get("y_columns", [])
         color_col = config.get("color_column") or None
         text_auto = bool(config.get("show_values"))
+        seq = palette_sequence(config)
         if y_cols:
             fig = px.histogram(df, x=x_col, y=y_cols[0], color=color_col,
-                               nbins=bins, histfunc="sum", text_auto=text_auto)
+                               nbins=bins, histfunc="sum", text_auto=text_auto,
+                               color_discrete_sequence=seq)
         else:
             fig = px.histogram(df, x=x_col, color=color_col, nbins=bins,
-                               text_auto=text_auto)
+                               text_auto=text_auto, color_discrete_sequence=seq)
         return fig

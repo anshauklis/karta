@@ -1,5 +1,6 @@
 import copy
 import ipaddress
+import os
 import socket
 import threading
 import time
@@ -35,16 +36,30 @@ def _is_private_ip(host: str) -> bool:
         return False
 
 
+def _allowed_hosts() -> set[str]:
+    """Operator-trusted hosts that bypass the SSRF private-IP guard.
+
+    Self-hosted deployments routinely connect to a warehouse on the same private
+    network/Docker bridge (e.g. an internal ClickHouse), which the guard would
+    otherwise block. Opt-in via the CONNECTION_ALLOWED_HOSTS env (comma-separated
+    hostnames/IPs); empty by default, so the secure default is unchanged.
+    """
+    return {h.strip().lower() for h in os.environ.get("CONNECTION_ALLOWED_HOSTS", "").split(",") if h.strip()}
+
+
 def _validate_connection_host(host: str) -> None:
     """Block SSRF: reject connections to internal/private hosts.
 
     Also resolves DNS names and rejects when any resolved address is private,
     reserved, loopback or link-local (defends against DNS-rebinding to e.g.
-    169.254.169.254 cloud metadata).
+    169.254.169.254 cloud metadata). Hosts in CONNECTION_ALLOWED_HOSTS are
+    explicitly trusted by the operator and bypass the check.
     """
     if not host:
         return
     host_lower = host.lower().strip()
+    if host_lower in _allowed_hosts():
+        return
     if host_lower in _BLOCKED_HOSTS:
         raise HTTPException(400, f"Connection to '{host}' is not allowed")
     if _is_private_ip(host_lower):
@@ -493,7 +508,6 @@ def get_schema(conn_id: int, schema: str | None = None, current_user: dict = Dep
     ]
 
 
-import os
 
 _SAMPLE_ROWS_MAX = int(os.environ.get("SAMPLE_ROWS_MAX", "50"))
 

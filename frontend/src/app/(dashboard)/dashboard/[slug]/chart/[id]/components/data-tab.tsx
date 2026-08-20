@@ -21,8 +21,8 @@ import {
 import { DropZone } from "./drop-zone";
 import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
-import type { ChartExecuteResult, ChartVariable } from "@/types";
 import { resolveMetricLabels, type EditorMetric } from "../lib/metric-labels";
+import { useChartEditorContext } from "../context/chart-editor-context";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -65,63 +65,33 @@ function SqlInput({
   );
 }
 
-export interface DataTabProps {
-  dataSource: string;
-  sqlQuery: string;
-  setSqlQuery: (v: string) => void;
-  handleSqlEditorMount: (editor: unknown, monaco: unknown) => void;
-  handleRunQuery: () => void;
-  previewing: boolean;
-  isDark: boolean;
-  chartConfig: Record<string, unknown>;
-  updateConfig: (key: string, value: unknown) => void;
-  setChartConfig: (cfg: Record<string, unknown> | ((prev: Record<string, unknown>) => Record<string, unknown>)) => void;
-  chartType: string;
-  availableColumns: string[];
-  queryColumns: string[];
-  columnTypes: Record<string, string>;
-  result: ChartExecuteResult | null;
-  isPivot: boolean;
-  isTable: boolean;
-  isKPI: boolean;
-  isHistogram: boolean;
-  showXAxis: boolean;
-  showYAxis: boolean;
-  showColor: boolean;
-  handleYColumnsChange: (col: string) => void;
-  handleMultiSelectToggle: (key: string, col: string) => void;
-  variables: ChartVariable[];
-  onVariablesChange: (vars: ChartVariable[]) => void;
-}
-
-export function DataTab({
-  dataSource,
-  sqlQuery,
-  setSqlQuery,
-  handleSqlEditorMount,
-  handleRunQuery,
-  previewing,
-  isDark,
-  chartConfig,
-  updateConfig,
-  setChartConfig,
-  chartType,
-  availableColumns,
-  queryColumns,
-  columnTypes: _columnTypes,
-  result: _result,
-  isPivot,
-  isTable,
-  isKPI,
-  isHistogram,
-  showXAxis,
-  showYAxis,
-  showColor,
-  handleYColumnsChange,
-  handleMultiSelectToggle,
-  variables,
-  onVariablesChange,
-}: DataTabProps) {
+export function DataTab() {
+  const {
+    dataSource,
+    sqlQuery,
+    setSqlQuery,
+    handleSqlEditorMount,
+    handleRunQuery,
+    previewing,
+    isDark,
+    chartConfig,
+    updateConfig,
+    setChartConfig,
+    chartType,
+    availableColumns,
+    queryColumns,
+    isPivot,
+    isTable,
+    isKPI,
+    isHistogram,
+    showXAxis,
+    showYAxis,
+    showColor,
+    handleYColumnsChange,
+    handleMultiSelectToggle,
+    chartVariables: variables,
+    setChartVariables: onVariablesChange,
+  } = useChartEditorContext();
   const t = useTranslations("chart");
 
   // Resolve metric labels (output column = source column name, with
@@ -181,6 +151,7 @@ export function DataTab({
                           onMount={handleSqlEditorMount}
                           options={{
                             minimap: { enabled: false },
+                            multiCursorModifier: "ctrlCmd",
                             lineNumbers: "on",
                             fontSize: 13,
                             scrollBeyondLastLine: false,

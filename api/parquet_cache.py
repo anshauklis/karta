@@ -180,13 +180,63 @@ def _remove_key(key: str) -> None:
             pass
 
 
+def _native_export_to_parquet(engine, sql: str, dest_path: str, connection_id: int, spec) -> bool:
+    """Try the engine's native Parquet export (e.g. ClickHouse FORMAT Parquet).
+
+    Writes atomically (tmp → rename), reads columns/row_count back from the
+    Parquet footer for the metadata sidecar. Returns True if handled, False if
+    the engine has no native export. Cleans up the tmp file on any failure.
+    """
+    import api.json_util as json
+
+    tmp_path = dest_path + ".tmp"
+    try:
+        handled = spec.export_parquet(engine, sql, tmp_path)
+        if not handled:
+            return False
+        os.replace(tmp_path, dest_path)
+    except Exception:
+        try:
+            os.remove(tmp_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+    pf = pq.ParquetFile(dest_path)
+    columns = list(pf.schema_arrow.names)
+    total_rows = pf.metadata.num_rows
+    key = cache_key(connection_id, sql)
+    with open(meta_path(key), "w") as f:
+        f.write(json.dumps({
+            "created_at": time.time(),
+            "columns": columns,
+            "connection_id": connection_id,
+            "row_count": total_rows,
+        }))
+    _index_register(connection_id, key)
+    logger.info(f"Cached {total_rows} rows to {dest_path} (native parquet export)")
+    return True
+
+
 def _stream_to_parquet(engine, sql: str, dest_path: str, db_type: str, connection_id: int, spec=None) -> None:
     """Stream query results to Parquet file in batches.
 
     Memory per batch: ~8 MB (50K rows × 20 cols × 8 bytes).
     Uses atomic write (tmp file → rename) to avoid partial reads.
+    Prefers a native Parquet export (ClickHouse) when the spec supports it.
     """
     import api.json_util as json
+
+    # Fast path: native engine Parquet export (falls through to row streaming
+    # on unsupported engines or any failure).
+    if spec is not None:
+        try:
+            if _native_export_to_parquet(engine, sql, dest_path, connection_id, spec):
+                return
+        except Exception as exc:
+            logger.warning(
+                "Native Parquet export failed (%s); falling back to row streaming", exc
+            )
 
     tmp_path = dest_path + ".tmp"
     writer = None

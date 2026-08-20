@@ -12,7 +12,7 @@ import {
   type SortingState,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { useConnections, useConnectionSchema } from "@/hooks/use-connections";
+import { useConnections, useConnectionSchema, useConnectionSchemas } from "@/hooks/use-connections";
 import { useExecuteSQL } from "@/hooks/use-sql";
 import { useCreateDataset } from "@/hooks/use-datasets";
 import {
@@ -579,7 +579,13 @@ export default function SQLLabPage() {
     window.history.replaceState({}, "", "/sql-lab");
   }, [tabs, tabsLoading, searchParams]);
 
-  const { data: schema, isLoading: schemaLoading } = useConnectionSchema(activeConnectionId);
+  // Schema/database selector (multi-schema engines: ClickHouse DBs, Postgres schemas).
+  // null = the engine's default view (ClickHouse: all DBs as db.table; Postgres: public).
+  const [selectedSchema, setSelectedSchema] = useState<string | null>(null);
+  const { data: schemaList } = useConnectionSchemas(activeConnectionId);
+  useEffect(() => { queueMicrotask(() => setSelectedSchema(null)); }, [activeConnectionId]);
+
+  const { data: schema, isLoading: schemaLoading } = useConnectionSchema(activeConnectionId, selectedSchema);
   useEffect(() => { schemaRef.current = schema; }, [schema]);
 
   const handleRun = useCallback(() => {
@@ -879,10 +885,22 @@ export default function SQLLabPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Schema Browser */}
         <div className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
-          <div className="border-b border-slate-200 px-3 py-2">
+          <div className="border-b border-slate-200 px-3 py-2 space-y-2">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               {t("schemaBrowser")}
             </h2>
+            {schemaList && schemaList.length > 1 && (
+              <select
+                value={selectedSchema ?? ""}
+                onChange={(e) => setSelectedSchema(e.target.value || null)}
+                className="w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">{t("allSchemas")}</option>
+                {schemaList.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="flex-1 overflow-auto">
             {activeConnectionId ? (
@@ -914,6 +932,7 @@ export default function SQLLabPage() {
               onMount={handleEditorMount}
               options={{
                 minimap: { enabled: false },
+                multiCursorModifier: "ctrlCmd",
                 fontSize: 13,
                 fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                 lineNumbers: "on",

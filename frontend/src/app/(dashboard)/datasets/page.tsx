@@ -726,6 +726,7 @@ function DatasetEditorDialog({
                       onChange={(v) => setSqlQuery(v ?? "")}
                       options={{
                         minimap: { enabled: false },
+                        multiCursorModifier: "ctrlCmd",
                         fontSize: 13,
                         fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                         lineNumbers: "on",
@@ -1021,6 +1022,7 @@ function DatasetEditorDialog({
                     onChange={(v) => setSqlQuery(v ?? "")}
                     options={{
                       minimap: { enabled: false },
+                      multiCursorModifier: "ctrlCmd",
                       fontSize: 13,
                       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                       lineNumbers: "on",

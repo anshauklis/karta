@@ -31,6 +31,7 @@ dependencies = [
     "playwright>=1.40.0",
     "ldap3>=2.9.1",
     "stripe>=14.4.0",
+    "rq>=2.10.0",
 ]
 
 [dependency-groups]
@@ -49,3 +50,5 @@ ignore = ["E501"]
 "renderers/__init__.py" = ["E402"]
 "executor.py" = ["E402"]
 "connections/router.py" = ["E402"]
+# conftest sets env vars and sys.path before importing the app — imports must follow
+"tests/integration/conftest.py" = ["E402"]
