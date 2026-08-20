@@ -106,7 +106,7 @@ services:
       - no-new-privileges:true
     # sh -c so REDIS_URL is resolved from the container env at runtime (avoids
     # fragile nested compose interpolation in a command array).
-    command: ["sh", "-c", "uv run rq worker karta --url \"$REDIS_URL\""]
+    command: ["sh", "-c", "rq worker karta --url \"$REDIS_URL\""]
     environment:
       DATABASE_URL: postgresql://karta:${POSTGRES_PASSWORD}@postgres:5432/karta
       JWT_SECRET: ${JWT_SECRET}
@@ -132,7 +132,7 @@ services:
     # Override the image's HTTP healthcheck (the worker has no web server): a
     # worker is healthy when it can reach its Redis (its job lifeline).
     healthcheck:
-      test: ["CMD-SHELL", "uv run python -c \"import os,redis; redis.Redis.from_url(os.environ['REDIS_URL']).ping()\""]
+      test: ["CMD-SHELL", "python -c \"import os,redis; redis.Redis.from_url(os.environ['REDIS_URL']).ping()\""]
       interval: 30s
       timeout: 5s
       retries: 3
